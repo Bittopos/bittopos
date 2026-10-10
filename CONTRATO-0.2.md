@@ -1,10 +1,12 @@
 Bittopos — Contrato técnico 0.2.0
 
-Estado: Propuesta para iniciar la implementación
+Estado: Contrato técnico de la línea de desarrollo 0.2.0
 Lenguaje principal: Rust
 Formato de recursos: TOML
 Formato de espacios de trabajo: JSON
-Entorno inicial: Local, mediante Termux
+Entorno inicial: Local, incluido Termux
+
+___
 
 1. Objetivo
 
@@ -14,13 +16,15 @@ La implementación debe priorizar la simplicidad, la persistencia segura, la mod
 
 Este contrato define el comportamiento requerido, no obliga a utilizar una arquitectura interna más compleja de lo necesario.
 
+El núcleo y la CLI tienen responsabilidades distintas. Crear un recurso no significa necesariamente incorporarlo a un workspace; esa decisión la toma la interfaz al coordinar las operaciones.
+
+___
+
 2. Terminología
 
 2.1. Resource
 
-Unidad de información identificable y persistente. Conserva el nombre "Resource" en el código de Rust durante esta versión.
-
-Un recurso puede componerse de varios contenidos ("Content").
+Unidad de información identificable y persistente. Cada recurso tiene un UUID estable y una estructura Info. Su definición se almacena en un archivo TOML independiente.
 
 2.2. Content
 
@@ -28,10 +32,17 @@ Unidad de contenido que agrupa información de una responsabilidad determinada d
 
 Los contenidos iniciales son:
 
-- Management: identidad del recurso y gestión de sus instancias.
 - Info: título, descripción y etiquetas.
 
-La arquitectura conceptual admite varios contenidos por recurso, pero la implementación inicial solo necesita los dos contenidos anteriores.
+La arquitectura conceptual admite varios contenidos por recurso, pero la implementación inicial solo necesita el contenido anterior.
+
+2.2.1 Info
+
+Información descriptiva del recurso:
+title: título obligatorio.
+description: descripción opcional.
+tags: vector de etiquetas, que puede estar vacío.
+La edición de estos datos no debe alterar el identificador del recurso.
 
 2.3. Detail
 
@@ -51,15 +62,23 @@ Representa datos estructurados directamente como vectores, en lugar de una colec
 
 Las relaciones y otras estructuras especializadas podrán utilizar este concepto en versiones futuras. No se implementarán ahora.
 
+Nota: No implementar en la versión 0.2.0 (solo conceptualmente)
+
 2.5. Instance
 
-Referencia a un recurso original mediante su identificador. No constituye una copia de la definición del recurso.
+Referencia a un recurso original mediante su identificador. No constituye una copia de su información descriptiva.
 
-Una instancia normal debe reflejar los datos actuales del recurso original cuando estos se consulten.
+Al resolver una instancia se consulta la definición actual del recurso original. Una referencia cuyo recurso no existe debe producir un error identificable.
 
 2.6. Workspace
 
-Espacio de trabajo que registra explícitamente las instancias que contiene. Solo deben aparecer los recursos referenciados por ese espacio de trabajo.
+Espacio de trabajo que registra explícitamente las instancias que contiene. Solo aparece en los recursos referenciados.
+
+2.7. CLI
+
+Interfaz de línea de comandos denominada bitto. Recibe argumentos y modificadores, invoca las operaciones del núcleo y presenta resultados y errores al usuario. Puede coordinar varias operaciones del núcleo para ofrecer un comando de mayor nivel.
+
+___
 
 3. Modelo de datos inicial
 
@@ -71,6 +90,8 @@ Responsabilidades conceptuales:
 - Representar el vector de instancias asociadas al espacio de trabajo o a la estructura de gestión correspondiente.
 
 Para evitar duplicar información, el identificador del recurso se almacena en su definición TOML y las instancias activas del espacio de trabajo se registran en su archivo JSON. El modelo lógico de gestión puede reunir ambas responsabilidades sin exigir que todos los datos residan físicamente en el mismo archivo.
+
+Nota: No implementar en la versión 0.2.0 hasta tener pruebas que lo respalden o hasta futuros incrementos. Queda parcialmente implementado.
 
 3.2. Info
 
@@ -114,6 +135,8 @@ Cada entrada identifica un recurso original. El espacio de trabajo no debe almac
 
 El formato JSON debe poder ampliarse sin introducir campos innecesarios en esta versión.
 
+___
+
 4. Persistencia
 
 1. Cada recurso se almacena en un archivo TOML independiente.
@@ -126,6 +149,14 @@ El formato JSON debe poder ampliarse sin introducir campos innecesarios en esta 
 8. La ausencia de un recurso referenciado debe producir un error identificable, no la creación automática de un recurso sustituto.
 9. Las operaciones de escritura deben evitar dejar archivos parcialmente escritos cuando sea razonablemente posible.
 10. La ubicación de los datos debe ser configurable y no depender accidentalmente del directorio desde el que se ejecuta el programa.
+11. El núcleo crea recursos y gestiona referencias mediante operaciones separadas.
+12. `bitto create` crea un recurso y, por defecto, lo incorpora al workspace por defecto.
+13. `bitto create --no-instance` crea el recurso sin incorporarlo al workspace.
+14. `bitto add UUID` incorpora un recurso existente.
+15. El workspace por defecto utiliza provisionalmente el nombre de archivo proyecto.json; esto no significa que exista un sistema de proyectos o perfiles.
+
+___
+
 
 5. Responsabilidades del código
 
@@ -158,29 +189,35 @@ La interfaz web no necesita implementarse completamente antes de disponer de un 
 
 La persistencia directa desde el navegador requerirá un mecanismo local apropiado en una etapa posterior. Esta versión no incluye un servidor HTTP.
 
+Nota: No implementar interfaz web en la versión 0.2.0 (mantener conceptualmente)
+
 6. Organización del código
 
-Se mantendrá inicialmente un único paquete de Cargo.
+El repositorio utiliza un workspace de Cargo con dos paquetes:
 
-La distribución propuesta es:
+- `bittopos-core`: paquete raíz que contiene el núcleo reutilizable.
+- `bitto-cli`: paquete ubicado en cli/ que contiene la interfaz de terminal y depende del núcleo mediante una dependencia local.
+
+La organización concreta conserva los módulos existentes cuando sus responsabilidades siguen siendo apropiadas.
+La estructura principal es:
 
 bittopos/
 ├── Cargo.toml
 ├── Cargo.lock
 ├── README.md
+├── CONTRATO-0.1.md
 ├── CONTRATO-0.2.md
 ├── src/
 │   ├── lib.rs
 │   ├── resource.rs
 │   ├── store.rs
-│   ├── workspace.rs
-│   └── bin/
-│       └── bitto.rs
-└── tests/
+│   └── workspace.rs
+└── cli/
+    ├── Cargo.toml
+    └── src/
+        └── main.rs
 
-Esta distribución es orientativa. Se conservarán los módulos existentes cuando sus responsabilidades sigan siendo apropiadas. No se crearán archivos vacíos ni módulos innecesarios únicamente para ajustarse al esquema.
-
-Las rutas del sistema de archivos se representarán con las herramientas de Rust, como "Path" y "PathBuf", evitando construir rutas mediante concatenación manual de cadenas.
+El núcleo no depende de la CLI. La CLI utiliza las interfaces públicas del núcleo, sin duplicar sus reglas de validación ni su mecanismo de persistencia.
 
 7. Alcance funcional
 
@@ -188,14 +225,16 @@ Incluido
 
 - Crear recursos.
 - Consultar recursos.
-- Editar título, descripción y etiquetas.
+- Editar título, descripción y etiquetas al momento de su creación.
 - Conservar el ID durante las ediciones.
 - Listar recursos almacenados.
-- Crear y leer espacios de trabajo JSON.
+- leer espacio de trabajo JSON por defecto.
 - Incorporar explícitamente referencias a recursos.
 - Resolver las referencias al abrir un espacio de trabajo.
 - Informar sobre referencias inválidas o recursos inexistentes.
 - Probar las operaciones del núcleo de forma independiente de la CLI.
+
+La CLI actual muestra los recursos del workspace o consulta un recurso por UUID.
 
 Excluido
 
@@ -252,6 +291,8 @@ La versión se considerará funcional cuando:
 - [ ] Las rutas de almacenamiento no dependan del directorio de ejecución.
 - [ ] Las pruebas existentes y nuevas pasen.
 - [ ] La CLI utilice las operaciones del núcleo sin duplicar su lógica.
+
+Los perfiles, proyectos, `bitto init`, relaciones avanzadas, permisos configurables, servidor y web siguen fuera del alcance actual.
 
 11. Método de implementación
 
