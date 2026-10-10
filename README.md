@@ -106,7 +106,7 @@ Se requiere una instalación de Rust y Cargo.
 Comprobar el formato:
 
 ```bash
-cargo fmt --check
+cargo fmt --all -- --check
 ```
 
 Comprobar la compilación de todos los paquetes:
