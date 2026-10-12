@@ -276,7 +276,7 @@ mod tests {
         assert_ne!(first, second);
         assert_eq!(workspace.instances.len(), 2);
         store.save("proyecto", &workspace).unwrap();
-        assert_eq!(store.load("proyecto", &resources).unwrap(), workspace);
+        assert_eq!(store.load("proyecto").unwrap(), workspace);
     }
 
     #[test]
