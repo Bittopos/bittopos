@@ -133,8 +133,7 @@ fn run() -> Result<(), String> {
                     .add_resource(resource.id)
                     .map_err(|error| error.to_string())?;
 
-                workspaces
-                    .save(WORKSPACE_FILE, &workspace)
+                save_instance(&resources, &workspaces, &workspace, resource.id, instance_id)
                     .map_err(|error| {
                         format!(
                             "el recurso se creó, pero no se pudo incorporar \
@@ -196,8 +195,7 @@ fn run() -> Result<(), String> {
                 .add_resource(id)
                 .map_err(|error| error.to_string())?;
 
-            workspaces
-                .save(WORKSPACE_FILE, &workspace)
+            save_instance(&resources, &workspaces, &workspace, id, instance_id)
                 .map_err(|error| error.to_string())?;
 
             println!(
@@ -205,6 +203,34 @@ fn run() -> Result<(), String> {
                 resource.info.title, resource.id, instance_id
             );
         }
+    }
+
+    Ok(())
+}
+
+/// Registra la instancia en la definición y persiste el workspace.
+/// Si falla la escritura del workspace, intenta revertir la asignación para no
+/// dejar una entrada huérfana por un error de escritura ordinario.
+fn save_instance(
+    resources: &ResourceStore,
+    workspaces: &WorkspaceStore,
+    workspace: &Workspace,
+    resource_id: Uuid,
+    instance_id: Uuid,
+) -> Result<(), String> {
+    resources
+        .register_instance(resource_id, instance_id)
+        .map_err(|error| error.to_string())?;
+
+    if let Err(workspace_error) = workspaces.save(WORKSPACE_FILE, workspace) {
+        return match resources.unregister_instance(resource_id, instance_id) {
+            Ok(_) => Err(format!(
+                "no se pudo guardar el workspace ({workspace_error}); la asignación se revirtió"
+            )),
+            Err(rollback_error) => Err(format!(
+                "no se pudo guardar el workspace ({workspace_error}) y falló la reversión                  de allocation ({rollback_error}); requiere recuperación"
+            )),
+        };
     }
 
     Ok(())
