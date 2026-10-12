@@ -7,7 +7,7 @@ El proyecto se desarrolla de forma incremental, separando el núcleo reutilizabl
 ## Estado del proyecto
 
 - **Versión del paquete del núcleo:** `0.1.0`.
-- **Línea de desarrollo:** contrato técnico `0.3.0` (identidad y persistencia de instancias en implementación).
+- **Línea de desarrollo:** contrato técnico `0.3.0` (identidad de instancias y registro inicial de asignaciones en implementación).
 - **Interfaz disponible:** CLI `bitto`.
 - **Entorno inicial:** local, incluido Termux en Android.
 
@@ -32,13 +32,13 @@ Cada recurso tiene un identificador UUID estable y contiene información descrip
 - `description`: descripción opcional.
 - `tags`: lista de etiquetas, que puede estar vacía.
 
-Cada recurso se persiste en un archivo TOML independiente.
+Cada recurso se persiste en un archivo TOML independiente. El segmento administrativo `management.allocation` registra los IDs de las instancias conocidas que proceden de esa definición; el núcleo mantiene ese registro fuera de las operaciones públicas de edición descriptiva.
 
 ### Espacios de trabajo
 
 Un espacio de trabajo contiene instancias persistidas en JSON. Cada instancia tiene un `id` propio y referencia su recurso de origen mediante `source.id`. Varias instancias pueden compartir el mismo recurso de origen sin compartir identidad. La información descriptiva del recurso no se copia en el espacio de trabajo.
 
-Al cargar un JSON antiguo con `resource_id`, el núcleo convierte cada referencia al esquema nuevo, asigna identidades propias y valida que los recursos de origen existan. Solo guarda la migración después de validar todas las referencias; si encuentra una referencia inválida, devuelve un error y conserva el archivo original. Los nuevos identificadores quedan persistidos para que no cambien en futuras lecturas.
+Al cargar un JSON antiguo con `resource_id`, el núcleo convierte cada referencia al esquema nuevo, asigna identidades propias y valida que los recursos de origen existan. Solo guarda la migración después de validar todas las referencias; si encuentra una referencia inválida, devuelve un error y conserva el archivo original. Los nuevos identificadores quedan persistidos para que no cambien en futuras lecturas. Al cargar un workspace, el núcleo también comprueba que las instancias estén registradas en `management.allocation` y completa las asignaciones que falten.
 
 Crear un recurso y añadirlo a un espacio de trabajo son operaciones distintas en el núcleo. La CLI puede coordinarlas según el comando y sus modificadores.
 
