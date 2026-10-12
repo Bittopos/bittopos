@@ -358,6 +358,10 @@ mod tests {
         store.save("proyecto", &workspace).unwrap();
         let loaded = store.load("proyecto", &resources).unwrap();
         assert_eq!(loaded, workspace);
+        assert_eq!(
+            resources.get(resource.id).unwrap().management.allocation,
+            vec![instance_id]
+        );
 
         let json = fs::read_to_string(store.root().join("proyecto.json")).unwrap();
         assert!(json.contains(r#""id""#));
@@ -396,6 +400,10 @@ mod tests {
         let migrated = store.load("proyecto", &resources).unwrap();
         let instance_id = migrated.instances[0].id;
         assert_eq!(migrated.instances[0].source.id, resource.id);
+        assert_eq!(
+            resources.get(resource.id).unwrap().management.allocation,
+            vec![instance_id]
+        );
 
         let persisted = fs::read_to_string(&path).unwrap();
         assert!(!persisted.contains(r#""resource_id""#));
