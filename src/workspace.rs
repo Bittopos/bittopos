@@ -435,7 +435,7 @@ mod tests {
 
     #[test]
     fn reports_missing_resource_reference() {
-        let (_dir, resources, workspaces) = setup();
+        let (_dir, resources, _workspaces) = setup();
         let mut workspace = Workspace::new();
         let missing_id = Uuid::now_v7();
         workspace.add_resource(missing_id).unwrap();
