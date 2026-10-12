@@ -102,7 +102,7 @@ pub fn reconcile_workspace(
 
     let mut missing: Vec<_> = allocated
         .iter()
-        .filter(|(instance_id, _)| !seen.contains(instance_id))
+        .filter(|(instance_id, _)| !seen.contains(*instance_id))
         .map(|(instance_id, source_id)| (*instance_id, *source_id))
         .collect();
     missing.sort_by_key(|(instance_id, _)| *instance_id);
