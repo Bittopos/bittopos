@@ -11,5 +11,5 @@ mod workspace;
 
 pub use lifecycle::{create_instance, reconcile_workspace, remove_instance, LifecycleError, RecoveryReport};
 pub use resource::{Info, Resource, ResourcePatch, ResourceWarning};
-pub use store::{ResourceStore, StoreError};
+pub use store::{ResourceStore, StoreError, TemporaryInspection};
 pub use workspace::{Instance, Source, Workspace, WorkspaceError, WorkspaceStore};
