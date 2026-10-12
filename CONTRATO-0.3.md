@@ -154,7 +154,7 @@ Son componentes conceptuales reservados para relaciones y referencias. No se imp
 9. Los identificadores internos del sistema no se representan como simples datos de usuario ni se modifican mediante ediciones genéricas de segmentos.
 10. Los alias no forman parte del alcance funcional de 0.3. Si se añaden en el futuro, no sustituirán a los identificadores estables.
 
-La implementación mantiene `allocation` como fuente de verdad para reconstruir el workspace. La creación confirma primero la asignación y luego persiste la instancia; la eliminación retira primero la asignación y luego persiste el workspace. Si el proceso se interrumpe entre ambos pasos, la siguiente reconciliación reconstruye las instancias asignadas y elimina las residuales. La recuperación valida todos los recursos antes de modificar el workspace y se detiene ante archivos ilegibles o IDs asignados a más de un recurso. El núcleo permite varias instancias del mismo origen y valida la identidad propia de cada instancia.
+La implementación mantiene `allocation` como fuente de verdad para reconstruir el workspace. La creación confirma primero la asignación y luego persiste la instancia; la eliminación retira primero la asignación y luego persiste el workspace. Si el proceso se interrumpe entre ambos pasos, la siguiente reconciliación reconstruye las instancias asignadas y elimina las residuales. La recuperación valida todos los recursos antes de modificar el workspace, exige que cada recurso tenga `management.allocation` y se detiene ante archivos ilegibles, registros ausentes o IDs asignados a más de un recurso. El núcleo permite varias instancias del mismo origen y valida la identidad propia de cada instancia.
 
 ## 6. Herencia y máscaras
 
