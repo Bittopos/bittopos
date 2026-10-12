@@ -20,6 +20,7 @@ pub enum StoreError {
     IdNotFirstLine(PathBuf),
     TemporaryExists(PathBuf),
     PreparedContentMismatch(Uuid),
+    AllocationConflict(Uuid),
 }
 
 impl std::fmt::Display for StoreError {
@@ -55,6 +56,10 @@ impl std::fmt::Display for StoreError {
             Self::PreparedContentMismatch(id) => write!(
                 f,
                 "el contenido temporal preparado no coincide con el recurso esperado {id}"
+            ),
+            Self::AllocationConflict(id) => write!(
+                f,
+                "la instancia {id} ya figura en la asignación del recurso"
             ),
         }
     }
@@ -125,6 +130,42 @@ impl ResourceStore {
             return Err(StoreError::NotFound(id));
         }
         self.read_file(&path, id)
+    }
+
+    /// Registra una identidad de instancia en el espacio administrativo de la definición.
+    /// Es una operación interna del núcleo, no parte de la API pública del recurso.
+    pub(crate) fn register_instance(
+        &self,
+        resource_id: Uuid,
+        instance_id: Uuid,
+    ) -> Result<(), StoreError> {
+        let mut resource = self.get(resource_id)?;
+        if resource.management.allocation.contains(&instance_id) {
+            return Err(StoreError::AllocationConflict(instance_id));
+        }
+        resource.management.allocation.push(instance_id);
+        self.write_existing(&resource)
+    }
+
+    /// Retira una identidad de instancia del registro administrativo.
+    /// Devuelve false si el registro ya no contenía esa identidad.
+    pub(crate) fn unregister_instance(
+        &self,
+        resource_id: Uuid,
+        instance_id: Uuid,
+    ) -> Result<bool, StoreError> {
+        let mut resource = self.get(resource_id)?;
+        let Some(position) = resource
+            .management
+            .allocation
+            .iter()
+            .position(|id| *id == instance_id)
+        else {
+            return Ok(false);
+        };
+        resource.management.allocation.remove(position);
+        self.write_existing(&resource)?;
+        Ok(true)
     }
 
     pub fn update(
@@ -369,6 +410,34 @@ mod tests {
         assert!(file.contains("[management]"));
         assert!(file.contains("allocation = []"));
         assert!(resource.management.allocation.is_empty());
+    }
+
+    #[test]
+    fn allocation_registers_and_unregisters_instance_ids() {
+        let (_dir, store) = store();
+        let (resource, _) = store.create("Asignación", None).unwrap();
+        let instance_id = Uuid::now_v7();
+
+        store.register_instance(resource.id, instance_id).unwrap();
+        assert_eq!(store.get(resource.id).unwrap().management.allocation, vec![instance_id]);
+
+        assert!(store.unregister_instance(resource.id, instance_id).unwrap());
+        assert!(store.get(resource.id).unwrap().management.allocation.is_empty());
+        assert!(!store.unregister_instance(resource.id, instance_id).unwrap());
+    }
+
+    #[test]
+    fn allocation_rejects_duplicate_instance_ids() {
+        let (_dir, store) = store();
+        let (resource, _) = store.create("Asignación", None).unwrap();
+        let instance_id = Uuid::now_v7();
+
+        store.register_instance(resource.id, instance_id).unwrap();
+        assert!(matches!(
+            store.register_instance(resource.id, instance_id),
+            Err(StoreError::AllocationConflict(id)) if id == instance_id
+        ));
+        assert_eq!(store.get(resource.id).unwrap().management.allocation, vec![instance_id]);
     }
 
     #[test]
