@@ -2,7 +2,10 @@ use std::env;
 use std::path::PathBuf;
 use std::process;
 
-use bittopos_core::{ResourcePatch, ResourceStore, Workspace, WorkspaceError, WorkspaceStore};
+use bittopos_core::{
+    create_instance, reconcile_workspace, remove_instance, ResourcePatch, ResourceStore,
+    Workspace, WorkspaceError, WorkspaceStore,
+};
 use clap::{Parser, Subcommand};
 use uuid::Uuid;
 
@@ -17,35 +20,24 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Crea un recurso y lo incorpora al workspace por defecto.
+    /// Crea una definición y, salvo --no-instance, una instancia en el workspace.
     Create {
-        /// Título del recurso.
         title: String,
-
-        /// Descripción del recurso.
         #[arg(long)]
         description: Option<String>,
-
-        /// Etiqueta del recurso. Puede repetirse.
         #[arg(long = "tag")]
         tags: Vec<String>,
-
-        /// Crea el recurso sin incorporarlo al workspace.
         #[arg(long)]
         no_instance: bool,
     },
-
-    /// Muestra los títulos del workspace o un recurso completo.
-    Show {
-        /// UUID del recurso que se quiere consultar.
-        id: Option<Uuid>,
-    },
-
-    /// Incorpora al workspace un recurso existente.
-    Add {
-        /// UUID del recurso que se quiere incorporar.
-        id: Uuid,
-    },
+    /// Muestra las instancias del workspace o consulta una definición por UUID.
+    Show { id: Option<Uuid> },
+    /// Crea una instancia de una definición existente.
+    Add { id: Uuid },
+    /// Elimina una instancia por su UUID propio.
+    Remove { id: Uuid },
+    /// Reconstruye el workspace a partir de las asignaciones confirmadas.
+    Recover,
 }
 
 struct Paths {
@@ -60,14 +52,9 @@ impl Paths {
             None => {
                 let home =
                     env::var_os("HOME").ok_or("no se pudo determinar el directorio del usuario")?;
-
-                PathBuf::from(home)
-                    .join(".local")
-                    .join("share")
-                    .join("bittopos")
+                PathBuf::from(home).join(".local").join("share").join("bittopos")
             }
         };
-
         Ok(Self {
             resources: home.join("resources"),
             workspaces: home.join("workspaces"),
@@ -84,17 +71,15 @@ fn main() {
 
 fn run() -> Result<(), String> {
     let cli = Cli::parse();
-
     let Some(command) = cli.command else {
         Cli::parse_from(["bitto", "--help"]);
         return Ok(());
     };
 
     let paths = Paths::discover()?;
-
     let resources = ResourceStore::new(&paths.resources).map_err(|error| error.to_string())?;
-
-    let workspaces = WorkspaceStore::new(&paths.workspaces).map_err(|error| error.to_string())?;
+    let workspaces =
+        WorkspaceStore::new(&paths.workspaces).map_err(|error| error.to_string())?;
 
     match command {
         Command::Create {
@@ -110,139 +95,103 @@ fn run() -> Result<(), String> {
             if !tags.is_empty() {
                 match resources.update(
                     resource.id,
-                    ResourcePatch {
-                        tags: Some(tags),
-                        ..Default::default()
-                    },
+                    ResourcePatch { tags: Some(tags), ..Default::default() },
                 ) {
                     Ok((updated, _)) => resource = updated,
                     Err(error) => {
                         return Err(format!(
-                            "el recurso se creó, pero no se pudieron guardar \
-                             sus etiquetas: {} ({}). Detalle: {}",
+                            "el recurso se creó, pero no se pudieron guardar sus etiquetas: {} ({}). Detalle: {}",
                             resource.info.title, resource.id, error
                         ));
                     }
                 }
             }
 
-            let instance_id = if !no_instance {
-                let mut workspace = load_workspace(&workspaces, &resources)?;
-
-                let instance_id = workspace
-                    .add_resource(resource.id)
-                    .map_err(|error| error.to_string())?;
-
-                save_instance(&resources, &workspaces, &workspace, resource.id, instance_id)
-                    .map_err(|error| {
-                        format!(
-                            "el recurso se creó, pero no se pudo incorporar \
-                             al workspace: {} ({}). Detalle: {}",
-                            resource.info.title, resource.id, error
-                        )
-                    })?;
-                Some(instance_id)
-            } else {
+            let instance_id = if no_instance {
                 None
+            } else {
+                Some(create_instance(&resources, &workspaces, WORKSPACE_FILE, resource.id)
+                    .map_err(|error| format!(
+                        "el recurso se creó, pero no se pudo crear su instancia: {error}"
+                    ))?)
             };
 
             println!("Recurso creado: {} ({})", resource.info.title, resource.id);
             if let Some(instance_id) = instance_id {
-                println!("Instancia creada en el workspace: {instance_id}");
+                println!("Instancia creada: {instance_id}");
             }
         }
-
         Command::Show { id: Some(id) } => {
             let resource = resources.get(id).map_err(|error| error.to_string())?;
-
             println!("ID: {}", resource.id);
             println!("Título: {}", resource.info.title);
-
             if let Some(description) = &resource.info.description {
                 println!("Descripción: {description}");
             }
-
             if !resource.info.tags.is_empty() {
                 println!("Etiquetas: {}", resource.info.tags.join(", "));
             }
         }
-
         Command::Show { id: None } => {
-            let workspace = load_workspace(&workspaces, &resources)?;
-            let resolved = workspace
-                .resolve(&resources)
+            let (workspace, report) = reconcile_workspace(&resources, &workspaces, WORKSPACE_FILE)
                 .map_err(|error| error.to_string())?;
-
-            if resolved.is_empty() {
-                println!("El workspace está vacío.");
-            } else {
-                for (instance, resource) in workspace.instances.iter().zip(resolved.iter()) {
-                    println!(
-                        "- {} [{}] — recurso {}",
-                        resource.info.title, instance.id, instance.source.id
-                    );
-                }
-            }
+            report_recovery(report.restored, report.removed);
+            print_workspace(&workspace, &resources)?;
         }
-
         Command::Add { id } => {
-            // Comprobamos que el recurso exista antes de registrar la referencia.
             let resource = resources.get(id).map_err(|error| error.to_string())?;
-
-            let mut workspace = load_workspace(&workspaces, &resources)?;
-
-            let instance_id = workspace
-                .add_resource(id)
+            let instance_id = create_instance(&resources, &workspaces, WORKSPACE_FILE, id)
                 .map_err(|error| error.to_string())?;
-
-            save_instance(&resources, &workspaces, &workspace, id, instance_id)
-                .map_err(|error| error.to_string())?;
-
             println!(
-                "Instancia añadida al workspace: {} — recurso {} (instancia {})",
+                "Instancia añadida: {} — recurso {} (instancia {})",
                 resource.info.title, resource.id, instance_id
             );
         }
+        Command::Remove { id } => {
+            remove_instance(&resources, &workspaces, WORKSPACE_FILE, id)
+                .map_err(|error| error.to_string())?;
+            println!("Instancia eliminada: {id}");
+        }
+        Command::Recover => {
+            let (workspace, report) = reconcile_workspace(&resources, &workspaces, WORKSPACE_FILE)
+                .map_err(|error| error.to_string())?;
+            report_recovery(report.restored, report.removed);
+            println!("Workspace consistente: {} instancia(s).", workspace.instances.len());
+        }
     }
 
     Ok(())
 }
 
-/// Registra la instancia en la definición y persiste el workspace.
-/// Si falla la escritura del workspace, intenta revertir la asignación para no
-/// dejar una entrada huérfana por un error de escritura ordinario.
-fn save_instance(
-    resources: &ResourceStore,
-    workspaces: &WorkspaceStore,
+fn report_recovery(restored: usize, removed: usize) {
+    if restored > 0 || removed > 0 {
+        eprintln!(
+            "Recuperación aplicada: {restored} instancia(s) reconstruida(s), {removed} instancia(s) residual(es) eliminada(s)."
+        );
+    }
+}
+
+fn print_workspace(
     workspace: &Workspace,
-    resource_id: Uuid,
-    instance_id: Uuid,
+    resources: &ResourceStore,
 ) -> Result<(), String> {
-    resources
-        .register_instance(resource_id, instance_id)
-        .map_err(|error| error.to_string())?;
-
-    if let Err(workspace_error) = workspaces.save(WORKSPACE_FILE, workspace) {
-        return match resources.unregister_instance(resource_id, instance_id) {
-            Ok(_) => Err(format!(
-                "no se pudo guardar el workspace ({workspace_error}); la asignación se revirtió"
-            )),
-            Err(rollback_error) => Err(format!(
-                "no se pudo guardar el workspace ({workspace_error}) y falló la reversión                  de allocation ({rollback_error}); requiere recuperación"
-            )),
-        };
+    let resolved = workspace.resolve(resources).map_err(|error| error.to_string())?;
+    if resolved.is_empty() {
+        println!("El workspace está vacío.");
+    } else {
+        for (instance, resource) in workspace.instances.iter().zip(resolved.iter()) {
+            println!(
+                "- {} [{}] — recurso {}",
+                resource.info.title, instance.id, instance.source.id
+            );
+        }
     }
-
     Ok(())
 }
 
-fn load_workspace(
-    store: &WorkspaceStore,
-    resources: &ResourceStore,
-) -> Result<Workspace, String> {
-    match store.load(WORKSPACE_FILE, resources) {
-        Ok(workspace) => Ok(workspace),
-        Err(WorkspaceError::NotFound(_)) => Ok(Workspace::new()),
-        Err(error) => Err(error.to_string()),
-    }
+// Conserva el tipo importado explícitamente para distinguir un workspace ausente
+// de errores de lectura o de un esquema incompatible.
+#[allow(dead_code)]
+fn workspace_error_is_missing(error: &WorkspaceError) -> bool {
+    matches!(error, WorkspaceError::NotFound(_))
 }
