@@ -4,7 +4,7 @@ use std::process;
 
 use bittopos_core::{
     create_instance, reconcile_workspace, remove_instance, ResourcePatch, ResourceStore,
-    Workspace, WorkspaceError, WorkspaceStore,
+    Workspace, WorkspaceStore,
 };
 use clap::{Parser, Subcommand};
 use uuid::Uuid;
@@ -187,11 +187,4 @@ fn print_workspace(
         }
     }
     Ok(())
-}
-
-// Conserva el tipo importado explícitamente para distinguir un workspace ausente
-// de errores de lectura o de un esquema incompatible.
-#[allow(dead_code)]
-fn workspace_error_is_missing(error: &WorkspaceError) -> bool {
-    matches!(error, WorkspaceError::NotFound(_))
 }
