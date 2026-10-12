@@ -154,7 +154,7 @@ Son componentes conceptuales reservados para relaciones y referencias. No se imp
 9. Los identificadores internos del sistema no se representan como simples datos de usuario ni se modifican mediante ediciones genéricas de segmentos.
 10. Los alias no forman parte del alcance funcional de 0.3. Si se añaden en el futuro, no sustituirán a los identificadores estables.
 
-La implementación deberá mantener coherentes el registro de asignaciones, el estado persistido de las instancias, `source.id` y las referencias desde el espacio de trabajo. Si una operación falla a mitad de camino, no debe comunicar éxito ni dejar silenciosamente una instancia imposible de resolver. Las operaciones de escritura deberán minimizar estados parciales y definir cómo detectar o recuperar inconsistencias. La restricción actual que impide instanciar dos veces el mismo recurso deberá sustituirse por validación de identidad de instancia, permitiendo varias instancias del mismo origen.
+La implementación mantiene `allocation` como fuente de verdad para reconstruir el workspace. La creación confirma primero la asignación y luego persiste la instancia; la eliminación retira primero la asignación y luego persiste el workspace. Si el proceso se interrumpe entre ambos pasos, la siguiente reconciliación reconstruye las instancias asignadas y elimina las residuales. La recuperación valida todos los recursos antes de modificar el workspace y se detiene ante archivos ilegibles o IDs asignados a más de un recurso. La restricción actual que impide instanciar dos veces el mismo recurso deberá sustituirse por validación de identidad de instancia, permitiendo varias instancias del mismo origen.
 
 ## 6. Herencia y máscaras
 
@@ -188,7 +188,7 @@ Los recursos individuales se persisten en TOML; el espacio de trabajo, las ident
 
 En el nuevo esquema, el recurso mantiene `id` en el nivel superior de su TOML. Cada instancia mantiene `id` propio en el nivel superior del JSON y `source.id` dentro del segmento `source`. No se conserva `resource_id` como campo permanente paralelo.
 
-Los archivos JSON existentes que contengan `resource_id` deberán admitirse mediante una transición de compatibilidad controlada. La migración debe recuperar el ID de origen desde el campo antiguo, asignar una identidad propia a cada instancia cuando no exista, construir `source.id`, validar las referencias y escribir el nuevo esquema solo cuando los datos puedan migrarse sin pérdida. La migración debe detectar conflictos o referencias inválidas explícitamente; no debe sobrescribir datos ni informar éxito ante una conversión incompleta. Después de la migración, la escritura normal produce exclusivamente el esquema nuevo.
+Se rompe deliberadamente la compatibilidad con archivos JSON que contengan `resource_id`: no se migran automáticamente ni se sobrescriben. El lector acepta exclusivamente el esquema vigente con `id` y `source.id`; los archivos antiguos o malformados producen un error explícito. El usuario deberá eliminar o recrear manualmente los datos antiguos si desea continuar.
 
 La persistencia deberá permitir distinguir, como mínimo:
 
@@ -282,7 +282,7 @@ Esta organización es una dirección de diseño, no una afirmación de que todos
 - Mantener `Resource.id` y `Instance.id` como identidades independientes fuera de los segmentos.
 - Introducir el segmento de instancia `source` con el componente protegido `source.id`.
 - Permitir múltiples instancias del mismo recurso, diferenciadas por `Instance.id`.
-- Migrar JSON antiguos de `resource_id` al nuevo esquema con una transición controlada.
+- Rechazar JSON antiguos que contengan `resource_id`; no existe migración automática.
 - Restringir `management.allocation` al espacio de definición.
 - Distinguir el espacio de definición del espacio de instanciación.
 - Definir los segmentos `management`, `info` y `semantic`.
@@ -318,7 +318,7 @@ La línea 0.3 podrá considerarse coherente con este contrato cuando las impleme
 - [ ] `Instance.id` permanece en el nivel superior del estado JSON, fuera de los segmentos, y es distinto del ID del recurso original.
 - [ ] `source.id` referencia el recurso de origen y no puede modificarse mediante operaciones genéricas de edición.
 - [ ] Varias instancias pueden referenciar el mismo recurso y distinguirse por su propio ID.
-- [ ] Los JSON antiguos con `resource_id` pueden migrarse de forma controlada, con validación y sin pérdida silenciosa de datos.
+- [ ] Los JSON con `resource_id` se rechazan sin modificarlos.
 - [ ] `management.allocation` no puede consultarse, modificarse ni enmascararse desde el espacio de instanciación.
 - [ ] `allocation` se mantiene separado de la contención y registra las identidades de instancia asociadas a la definición.
 - [ ] `structural` registra solo los hijos directos de una instancia.
@@ -339,7 +339,7 @@ Estos criterios describen lo que debe verificarse; no afirman que la implementac
 
 La implementación de este contrato debe terminar con una revisión explícita de fallas de seguridad evidentes o aparentes. La revisión deberá registrar los riesgos observados, las condiciones para reproducirlos, el impacto posible, las mitigaciones implementadas y los problemas que queden pendientes. No debe afirmarse que el sistema es seguro únicamente porque la interfaz ordinaria rechace operaciones prohibidas.
 
-Como mínimo, se revisarán los caminos alternativos de escritura, la protección de `Resource.id`, `Instance.id` y `source.id`, el aislamiento de la definición original, el acceso a `management.allocation`, la validación de archivos cargados, la migración JSON, las referencias inexistentes y los estados parciales ante fallos de persistencia. La edición manual directa de los archivos locales queda fuera de la responsabilidad de la aplicación, pero los archivos que esta cargue deben validarse antes de confiar en su contenido.
+Como mínimo, se revisarán los caminos alternativos de escritura, la protección de `Resource.id`, `Instance.id` y `source.id`, el aislamiento de la definición original, el acceso a `management.allocation`, la validación de archivos cargados, el rechazo del esquema JSON obsoleto, las referencias inexistentes y los estados parciales ante fallos de persistencia. La edición manual directa de los archivos locales queda fuera de la responsabilidad de la aplicación, pero los archivos que esta cargue deben validarse antes de confiar en su contenido.
 
 Esta sección establece una revisión pendiente de la implementación; no afirma que se haya realizado una auditoría ni que se hayan encontrado o descartado vulnerabilidades.
 
