@@ -391,7 +391,7 @@ mod tests {
         fs::write(
             &path,
             format!(
-                "id = \\"{id}\\\"\\n\\n[info]\\ntitle = \\"Recurso antiguo\\\"\\ntags = []\\n"
+                "id = \"{id}\"\n\n[info]\ntitle = \"Recurso antiguo\"\ntags = []\n"
             ),
         )
         .unwrap();
