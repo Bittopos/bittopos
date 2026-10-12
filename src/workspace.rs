@@ -326,11 +326,11 @@ mod tests {
         assert_eq!(loaded, workspace);
 
         let json = fs::read_to_string(store.root().join("proyecto.json")).unwrap();
-        assert!(json.contains("\\"id\\""));
-        assert!(json.contains("\\"source\\""));
-        assert!(json.contains(&format!("\\"id\\": \\"{}\\"", instance_id)));
-        assert!(json.contains(&format!("\\"id\\": \\"{}\\"", resource.id)));
-        assert!(!json.contains("\\"resource_id\\""));
+        assert!(json.contains(r#""id""#));
+        assert!(json.contains(r#""source""#));
+        assert!(json.contains(&format!(r#""id": "{}""#, instance_id)));
+        assert!(json.contains(&format!(r#""id": "{}""#, resource.id)));
+        assert!(!json.contains(r#""resource_id""#));
     }
 
     #[test]
@@ -354,7 +354,7 @@ mod tests {
         let (resource, _) = resources.create("Antiguo", None).unwrap();
         let path = store.root().join("proyecto.json");
         let legacy = format!(
-            "{{\n  \\"instances\\": [{{ \\"resource_id\\": \\"{}\\" }}]\n}}",
+            r#"{{ "instances": [{{ "resource_id": "{}" }}] }}"#,
             resource.id
         );
         fs::write(&path, &legacy).unwrap();
@@ -364,7 +364,7 @@ mod tests {
         assert_eq!(migrated.instances[0].source.id, resource.id);
 
         let persisted = fs::read_to_string(&path).unwrap();
-        assert!(!persisted.contains("\\"resource_id\\""));
+        assert!(!persisted.contains(r#""resource_id""#));
         assert!(persisted.contains(&instance_id.to_string()));
 
         let loaded_again = store.load("proyecto", &resources).unwrap();
@@ -377,7 +377,7 @@ mod tests {
         let path = store.root().join("proyecto.json");
         let missing_id = Uuid::now_v7();
         let legacy = format!(
-            "{{\n  \\"instances\\": [{{ \\"resource_id\\": \\"{}\\" }}]\n}}",
+            r#"{{ "instances": [{{ "resource_id": "{}" }}] }}"#,
             missing_id
         );
         fs::write(&path, &legacy).unwrap();
