@@ -205,21 +205,6 @@ impl WorkspaceStore {
                     source: Source { id: resource_id },
                 });
             }
-
-            migrated.validate_instance_ids()?;
-            for instance in &migrated.instances {
-                match resources.get(instance.source.id) {
-                    Ok(_) => {}
-                    Err(StoreError::NotFound(id)) => {
-                        return Err(WorkspaceError::UnresolvedReference(id));
-                    }
-                    Err(error) => return Err(WorkspaceError::Resource(error)),
-                }
-            }
-
-            // La escritura atómica conserva el JSON original si la conversión,
-            // validación o escritura del temporal falla.
-            self.save(name, &migrated)?;
             migrated
         } else {
             let mut instances = Vec::with_capacity(raw.instances.len());
@@ -229,12 +214,61 @@ impl WorkspaceStore {
                     _ => return Err(WorkspaceError::InvalidInstanceFormat),
                 }
             }
-            let workspace = Workspace { instances };
-            workspace.validate_instance_ids()?;
-            workspace
+            Workspace { instances }
         };
 
+        workspace.validate_instance_ids()?;
+
+        // Validamos todas las referencias antes de cambiar asignaciones o migrar el JSON.
+        for instance in &workspace.instances {
+            match resources.get(instance.source.id) {
+                Ok(_) => {}
+                Err(StoreError::NotFound(id)) => {
+                    return Err(WorkspaceError::UnresolvedReference(id));
+                }
+                Err(error) => return Err(WorkspaceError::Resource(error)),
+            }
+        }
+
+        // Reconcilia el registro administrativo con las instancias del workspace.
+        // Solo se revierten las asignaciones que esta carga acaba de añadir.
+        let added_allocations = Self::ensure_allocations(&workspace, resources)?;
+
+        if is_legacy {
+            // La migración se escribe solo después de validar y reconciliar el registro.
+            if let Err(error) = self.save(name, &workspace) {
+                Self::rollback_allocations(resources, &added_allocations);
+                return Err(error);
+            }
+        }
+
         Ok(workspace)
+    }
+
+    fn ensure_allocations(
+        workspace: &Workspace,
+        resources: &ResourceStore,
+    ) -> Result<Vec<(Uuid, Uuid)>, WorkspaceError> {
+        let mut added = Vec::new();
+
+        for instance in &workspace.instances {
+            match resources.ensure_instance_registered(instance.source.id, instance.id) {
+                Ok(true) => added.push((instance.source.id, instance.id)),
+                Ok(false) => {}
+                Err(error) => {
+                    Self::rollback_allocations(resources, &added);
+                    return Err(WorkspaceError::Resource(error));
+                }
+            }
+        }
+
+        Ok(added)
+    }
+
+    fn rollback_allocations(resources: &ResourceStore, added: &[(Uuid, Uuid)]) {
+        for (resource_id, instance_id) in added.iter().rev() {
+            let _ = resources.unregister_instance(*resource_id, *instance_id);
+        }
     }
 
     pub fn save(&self, name: &str, workspace: &Workspace) -> Result<(), WorkspaceError> {
@@ -324,6 +358,10 @@ mod tests {
         store.save("proyecto", &workspace).unwrap();
         let loaded = store.load("proyecto", &resources).unwrap();
         assert_eq!(loaded, workspace);
+        assert_eq!(
+            resources.get(resource.id).unwrap().management.allocation,
+            vec![instance_id]
+        );
 
         let json = fs::read_to_string(store.root().join("proyecto.json")).unwrap();
         assert!(json.contains(r#""id""#));
@@ -362,6 +400,10 @@ mod tests {
         let migrated = store.load("proyecto", &resources).unwrap();
         let instance_id = migrated.instances[0].id;
         assert_eq!(migrated.instances[0].source.id, resource.id);
+        assert_eq!(
+            resources.get(resource.id).unwrap().management.allocation,
+            vec![instance_id]
+        );
 
         let persisted = fs::read_to_string(&path).unwrap();
         assert!(!persisted.contains(r#""resource_id""#));

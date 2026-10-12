@@ -8,7 +8,19 @@ pub struct Resource {
     /// Identidad estable del recurso.
     /// Se serializa primero para facilitar la comprobación del archivo.
     pub id: Uuid,
+    /// Metadatos administrativos reservados al núcleo.
+    /// No se exponen a consumidores externos ni a operaciones de instancia.
+    #[serde(default)]
+    pub(crate) management: Management,
     pub info: Info,
+}
+
+/// Estado administrativo del recurso. Su contenido no forma parte de la API pública.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Management {
+    /// Identidades de instancias creadas a partir de esta definición.
+    #[serde(default)]
+    pub(crate) allocation: Vec<Uuid>,
 }
 
 /// Información descriptiva del recurso.

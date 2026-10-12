@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 use crate::resource::{
-    normalize_description, normalize_name, validate_stored_name, Info, Resource, ResourcePatch,
-    ResourceWarning,
+    normalize_description, normalize_name, validate_stored_name, Info, Management, Resource,
+    ResourcePatch, ResourceWarning,
 };
 
 #[derive(Debug)]
@@ -20,6 +20,7 @@ pub enum StoreError {
     IdNotFirstLine(PathBuf),
     TemporaryExists(PathBuf),
     PreparedContentMismatch(Uuid),
+    AllocationConflict(Uuid),
 }
 
 impl std::fmt::Display for StoreError {
@@ -55,6 +56,10 @@ impl std::fmt::Display for StoreError {
             Self::PreparedContentMismatch(id) => write!(
                 f,
                 "el contenido temporal preparado no coincide con el recurso esperado {id}"
+            ),
+            Self::AllocationConflict(id) => write!(
+                f,
+                "la instancia {id} ya figura en la asignación del recurso"
             ),
         }
     }
@@ -105,6 +110,7 @@ impl ResourceStore {
         let description = normalize_description(description.map(str::to_owned));
         let resource = Resource {
             id,
+            management: Management::default(),
             info: Info {
                 title: name,
                 description,
@@ -124,6 +130,59 @@ impl ResourceStore {
             return Err(StoreError::NotFound(id));
         }
         self.read_file(&path, id)
+    }
+
+    /// Registra una identidad de instancia en el espacio administrativo de la definición.
+    /// Es una operación de ciclo de vida; no permite editar directamente el segmento
+    /// administrativo ni reemplazar la asignación completa.
+    pub fn register_instance(
+        &self,
+        resource_id: Uuid,
+        instance_id: Uuid,
+    ) -> Result<(), StoreError> {
+        let mut resource = self.get(resource_id)?;
+        if resource.management.allocation.contains(&instance_id) {
+            return Err(StoreError::AllocationConflict(instance_id));
+        }
+        resource.management.allocation.push(instance_id);
+        self.write_existing(&resource)
+    }
+
+    /// Asegura que la asignación contenga la instancia; devuelve true si la añadió.
+    /// Se usa para reparar/reconstruir el registro al cargar workspaces existentes.
+    pub(crate) fn ensure_instance_registered(
+        &self,
+        resource_id: Uuid,
+        instance_id: Uuid,
+    ) -> Result<bool, StoreError> {
+        let mut resource = self.get(resource_id)?;
+        if resource.management.allocation.contains(&instance_id) {
+            return Ok(false);
+        }
+        resource.management.allocation.push(instance_id);
+        self.write_existing(&resource)?;
+        Ok(true)
+    }
+
+    /// Retira una identidad de instancia del registro administrativo.
+    /// Devuelve false si el registro ya no contenía esa identidad.
+    pub fn unregister_instance(
+        &self,
+        resource_id: Uuid,
+        instance_id: Uuid,
+    ) -> Result<bool, StoreError> {
+        let mut resource = self.get(resource_id)?;
+        let Some(position) = resource
+            .management
+            .allocation
+            .iter()
+            .position(|id| *id == instance_id)
+        else {
+            return Ok(false);
+        };
+        resource.management.allocation.remove(position);
+        self.write_existing(&resource)?;
+        Ok(true)
     }
 
     pub fn update(
@@ -342,6 +401,63 @@ mod tests {
     }
 
     #[test]
+    fn loads_legacy_resource_without_management_with_empty_allocation() {
+        let (_dir, store) = store();
+        let id = Uuid::now_v7();
+        let path = store.path_for(id);
+        fs::write(
+            &path,
+            format!(
+                "id = \"{id}\"\n\n[info]\ntitle = \"Recurso antiguo\"\ntags = []\n"
+            ),
+        )
+        .unwrap();
+
+        let resource = store.get(id).unwrap();
+        assert_eq!(resource.info.title, "Recurso antiguo");
+        assert!(resource.management.allocation.is_empty());
+    }
+
+    #[test]
+    fn new_resource_persists_management_with_empty_allocation() {
+        let (_dir, store) = store();
+        let (resource, _) = store.create("Nuevo", None).unwrap();
+        let file = fs::read_to_string(store.path_for(resource.id)).unwrap();
+
+        assert!(file.contains("[management]"));
+        assert!(file.contains("allocation = []"));
+        assert!(resource.management.allocation.is_empty());
+    }
+
+    #[test]
+    fn allocation_registers_and_unregisters_instance_ids() {
+        let (_dir, store) = store();
+        let (resource, _) = store.create("Asignación", None).unwrap();
+        let instance_id = Uuid::now_v7();
+
+        store.register_instance(resource.id, instance_id).unwrap();
+        assert_eq!(store.get(resource.id).unwrap().management.allocation, vec![instance_id]);
+
+        assert!(store.unregister_instance(resource.id, instance_id).unwrap());
+        assert!(store.get(resource.id).unwrap().management.allocation.is_empty());
+        assert!(!store.unregister_instance(resource.id, instance_id).unwrap());
+    }
+
+    #[test]
+    fn allocation_rejects_duplicate_instance_ids() {
+        let (_dir, store) = store();
+        let (resource, _) = store.create("Asignación", None).unwrap();
+        let instance_id = Uuid::now_v7();
+
+        store.register_instance(resource.id, instance_id).unwrap();
+        assert!(matches!(
+            store.register_instance(resource.id, instance_id),
+            Err(StoreError::AllocationConflict(id)) if id == instance_id
+        ));
+        assert_eq!(store.get(resource.id).unwrap().management.allocation, vec![instance_id]);
+    }
+
+    #[test]
     fn same_name_gets_distinct_ids() {
         let (_dir, store) = store();
         let (a, _) = store.create("Igual", None).unwrap();
@@ -470,6 +586,7 @@ mod tests {
         let id = Uuid::now_v7();
         let resource = Resource {
             id,
+            management: Management::default(),
             info: Info {
                 title: "Temporal preparado".to_owned(),
                 description: None,
