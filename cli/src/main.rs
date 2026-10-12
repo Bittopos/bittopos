@@ -81,6 +81,12 @@ fn run() -> Result<(), String> {
     let workspaces =
         WorkspaceStore::new(&paths.workspaces).map_err(|error| error.to_string())?;
 
+    // Toda invocación comienza reconciliando el workspace con allocation.
+    let (startup_workspace, startup_report) =
+        reconcile_workspace(&resources, &workspaces, WORKSPACE_FILE)
+            .map_err(|error| error.to_string())?;
+    report_recovery(startup_report.restored, startup_report.removed);
+
     match command {
         Command::Create {
             title,
@@ -133,10 +139,7 @@ fn run() -> Result<(), String> {
             }
         }
         Command::Show { id: None } => {
-            let (workspace, report) = reconcile_workspace(&resources, &workspaces, WORKSPACE_FILE)
-                .map_err(|error| error.to_string())?;
-            report_recovery(report.restored, report.removed);
-            print_workspace(&workspace, &resources)?;
+            print_workspace(&startup_workspace, &resources)?;
         }
         Command::Add { id } => {
             let resource = resources.get(id).map_err(|error| error.to_string())?;
@@ -153,10 +156,10 @@ fn run() -> Result<(), String> {
             println!("Instancia eliminada: {id}");
         }
         Command::Recover => {
-            let (workspace, report) = reconcile_workspace(&resources, &workspaces, WORKSPACE_FILE)
-                .map_err(|error| error.to_string())?;
-            report_recovery(report.restored, report.removed);
-            println!("Workspace consistente: {} instancia(s).", workspace.instances.len());
+            println!(
+                "Workspace consistente: {} instancia(s).",
+                startup_workspace.instances.len()
+            );
         }
     }
 
