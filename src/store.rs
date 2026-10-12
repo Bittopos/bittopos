@@ -21,6 +21,7 @@ pub enum StoreError {
     TemporaryExists(PathBuf),
     PreparedContentMismatch(Uuid),
     AllocationConflict(Uuid),
+    IncompleteManagement(Uuid),
 }
 
 impl std::fmt::Display for StoreError {
@@ -149,6 +150,15 @@ impl ResourceStore {
             let expected_id = Uuid::parse_str(stem).map_err(|_| {
                 StoreError::InvalidFileName(path.clone())
             })?;
+            let content = fs::read_to_string(&path)?;
+            let document: toml::Value = toml::from_str(&content)?;
+            if document
+                .get("management")
+                .and_then(|management| management.get("allocation"))
+                .is_none()
+            {
+                return Err(StoreError::IncompleteManagement(expected_id));
+            }
             resources.push(self.read_file(&path, expected_id)?);
         }
         resources.sort_by_key(|resource| resource.id);
@@ -439,6 +449,21 @@ mod tests {
         let resource = store.get(id).unwrap();
         assert_eq!(resource.info.title, "Recurso antiguo");
         assert!(resource.management.allocation.is_empty());
+    }
+
+    #[test]
+    fn strict_scan_rejects_resource_without_allocation_before_recovery() {
+        let (_dir, store) = store();
+        let id = Uuid::now_v7();
+        fs::write(
+            store.path_for(id),
+            format!("id = \"{id}\"\n\n[info]\ntitle = \"Antiguo\"\ntags = []\n"),
+        ).unwrap();
+
+        assert!(matches!(
+            store.all_strict(),
+            Err(StoreError::IncompleteManagement(found)) if found == id
+        ));
     }
 
     #[test]
