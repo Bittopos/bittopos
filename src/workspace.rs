@@ -39,7 +39,6 @@ pub enum WorkspaceError {
     NotFound(String),
     UnresolvedReference(Uuid),
     DuplicateInstanceId(Uuid),
-    DuplicateAllocationId(Uuid),
 }
 
 impl std::fmt::Display for WorkspaceError {
@@ -55,9 +54,6 @@ impl std::fmt::Display for WorkspaceError {
             }
             Self::DuplicateInstanceId(id) => {
                 write!(f, "el ID de instancia {id} está duplicado en el workspace")
-            }
-            Self::DuplicateAllocationId(id) => {
-                write!(f, "el ID de instancia {id} aparece asignado a más de un recurso")
             }
         }
     }
@@ -90,7 +86,7 @@ impl Workspace {
 
     /// Crea una instancia nueva de un recurso, incluso si ya hay otras
     /// instancias del mismo recurso en este workspace.
-    pub fn add_resource(&mut self, resource_id: Uuid) -> Result<Uuid, WorkspaceError> {
+    pub(crate) fn add_resource(&mut self, resource_id: Uuid) -> Result<Uuid, WorkspaceError> {
         let instance_id = Uuid::now_v7();
         self.instances.push(Instance {
             id: instance_id,
@@ -100,17 +96,9 @@ impl Workspace {
     }
 
     /// Elimina una instancia por su identidad propia.
-    pub fn remove_instance(&mut self, instance_id: Uuid) -> bool {
+    pub(crate) fn remove_instance(&mut self, instance_id: Uuid) -> bool {
         let previous_len = self.instances.len();
         self.instances.retain(|instance| instance.id != instance_id);
-        self.instances.len() != previous_len
-    }
-
-    /// Elimina todas las instancias cuyo origen sea el recurso indicado.
-    pub fn remove_resource(&mut self, resource_id: Uuid) -> bool {
-        let previous_len = self.instances.len();
-        self.instances
-            .retain(|instance| instance.source.id != resource_id);
         self.instances.len() != previous_len
     }
 
