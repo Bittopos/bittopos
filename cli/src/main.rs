@@ -126,10 +126,10 @@ fn run() -> Result<(), String> {
                 }
             }
 
-            if !no_instance {
-                let mut workspace = load_workspace(&workspaces)?;
+            let instance_id = if !no_instance {
+                let mut workspace = load_workspace(&workspaces, &resources)?;
 
-                workspace
+                let instance_id = workspace
                     .add_resource(resource.id)
                     .map_err(|error| error.to_string())?;
 
@@ -142,9 +142,15 @@ fn run() -> Result<(), String> {
                             resource.info.title, resource.id, error
                         )
                     })?;
-            }
+                Some(instance_id)
+            } else {
+                None
+            };
 
             println!("Recurso creado: {} ({})", resource.info.title, resource.id);
+            if let Some(instance_id) = instance_id {
+                println!("Instancia creada en el workspace: {instance_id}");
+            }
         }
 
         Command::Show { id: Some(id) } => {
@@ -163,7 +169,7 @@ fn run() -> Result<(), String> {
         }
 
         Command::Show { id: None } => {
-            let workspace = load_workspace(&workspaces)?;
+            let workspace = load_workspace(&workspaces, &resources)?;
             let resolved = workspace
                 .resolve(&resources)
                 .map_err(|error| error.to_string())?;
@@ -171,8 +177,11 @@ fn run() -> Result<(), String> {
             if resolved.is_empty() {
                 println!("El workspace está vacío.");
             } else {
-                for resource in resolved {
-                    println!("- {}", resource.info.title);
+                for (instance, resource) in workspace.instances.iter().zip(resolved.iter()) {
+                    println!(
+                        "- {} [{}] — recurso {}",
+                        resource.info.title, instance.id, instance.source.id
+                    );
                 }
             }
         }
@@ -181,9 +190,9 @@ fn run() -> Result<(), String> {
             // Comprobamos que el recurso exista antes de registrar la referencia.
             let resource = resources.get(id).map_err(|error| error.to_string())?;
 
-            let mut workspace = load_workspace(&workspaces)?;
+            let mut workspace = load_workspace(&workspaces, &resources)?;
 
-            workspace
+            let instance_id = workspace
                 .add_resource(id)
                 .map_err(|error| error.to_string())?;
 
@@ -192,8 +201,8 @@ fn run() -> Result<(), String> {
                 .map_err(|error| error.to_string())?;
 
             println!(
-                "Recurso añadido al workspace: {} ({})",
-                resource.info.title, resource.id
+                "Instancia añadida al workspace: {} — recurso {} (instancia {})",
+                resource.info.title, resource.id, instance_id
             );
         }
     }
@@ -201,8 +210,11 @@ fn run() -> Result<(), String> {
     Ok(())
 }
 
-fn load_workspace(store: &WorkspaceStore) -> Result<Workspace, String> {
-    match store.load(WORKSPACE_FILE) {
+fn load_workspace(
+    store: &WorkspaceStore,
+    resources: &ResourceStore,
+) -> Result<Workspace, String> {
+    match store.load(WORKSPACE_FILE, resources) {
         Ok(workspace) => Ok(workspace),
         Err(WorkspaceError::NotFound(_)) => Ok(Workspace::new()),
         Err(error) => Err(error.to_string()),
