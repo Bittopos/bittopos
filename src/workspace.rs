@@ -7,15 +7,44 @@ use uuid::Uuid;
 
 use crate::{Resource, ResourceStore, StoreError};
 
+/// Referencia protegida al recurso del que procede una instancia.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Source {
+    pub id: Uuid,
+}
+
+/// Aparición concreta de un recurso dentro de un espacio de trabajo.
+/// Su identidad no depende de la identidad del recurso de origen.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Instance {
-    pub resource_id: Uuid,
+    pub id: Uuid,
+    pub source: Source,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Workspace {
     #[serde(default)]
     pub instances: Vec<Instance>,
+}
+
+/// Representación de transición para reconocer el esquema anterior sin
+/// deserializarlo directamente como el modelo definitivo.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawWorkspace {
+    #[serde(default)]
+    instances: Vec<RawInstance>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawInstance {
+    id: Option<Uuid>,
+    source: Option<Source>,
+    resource_id: Option<Uuid>,
 }
 
 #[derive(Debug)]
@@ -24,9 +53,10 @@ pub enum WorkspaceError {
     Json(serde_json::Error),
     Resource(StoreError),
     InvalidName,
+    InvalidInstanceFormat,
     NotFound(String),
     UnresolvedReference(Uuid),
-    DuplicateReference(Uuid),
+    DuplicateInstanceId(Uuid),
 }
 
 impl std::fmt::Display for WorkspaceError {
@@ -36,14 +66,16 @@ impl std::fmt::Display for WorkspaceError {
             Self::Json(error) => write!(f, "JSON inválido: {error}"),
             Self::Resource(error) => write!(f, "error de recurso: {error}"),
             Self::InvalidName => write!(f, "nombre de workspace inválido"),
-            Self::NotFound(name) => {
-                write!(f, "no existe el workspace {name}")
-            }
+            Self::InvalidInstanceFormat => write!(
+                f,
+                "formato de instancia inválido o mezcla de esquemas antiguo y nuevo"
+            ),
+            Self::NotFound(name) => write!(f, "no existe el workspace {name}"),
             Self::UnresolvedReference(id) => {
                 write!(f, "no se puede resolver la referencia al recurso {id}")
             }
-            Self::DuplicateReference(id) => {
-                write!(f, "el recurso {id} ya está en el workspace")
+            Self::DuplicateInstanceId(id) => {
+                write!(f, "el ID de instancia {id} está duplicado en el workspace")
             }
         }
     }
@@ -74,34 +106,51 @@ impl Workspace {
         Self::default()
     }
 
-    pub fn add_resource(&mut self, id: Uuid) -> Result<(), WorkspaceError> {
-        if self
-            .instances
-            .iter()
-            .any(|instance| instance.resource_id == id)
-        {
-            return Err(WorkspaceError::DuplicateReference(id));
-        }
-
-        self.instances.push(Instance { resource_id: id });
-        Ok(())
+    /// Crea una instancia nueva de un recurso, incluso si ya hay otras
+    /// instancias del mismo recurso en este workspace.
+    pub fn add_resource(&mut self, resource_id: Uuid) -> Result<Uuid, WorkspaceError> {
+        let instance_id = Uuid::now_v7();
+        self.instances.push(Instance {
+            id: instance_id,
+            source: Source { id: resource_id },
+        });
+        Ok(instance_id)
     }
 
-    pub fn remove_resource(&mut self, id: Uuid) -> bool {
+    /// Elimina una instancia por su identidad propia.
+    pub fn remove_instance(&mut self, instance_id: Uuid) -> bool {
         let previous_len = self.instances.len();
-        self.instances.retain(|instance| instance.resource_id != id);
+        self.instances.retain(|instance| instance.id != instance_id);
+        self.instances.len() != previous_len
+    }
+
+    /// Elimina todas las instancias cuyo origen sea el recurso indicado.
+    pub fn remove_resource(&mut self, resource_id: Uuid) -> bool {
+        let previous_len = self.instances.len();
+        self.instances
+            .retain(|instance| instance.source.id != resource_id);
         self.instances.len() != previous_len
     }
 
     pub fn resolve(&self, resources: &ResourceStore) -> Result<Vec<Resource>, WorkspaceError> {
         self.instances
             .iter()
-            .map(|instance| match resources.get(instance.resource_id) {
+            .map(|instance| match resources.get(instance.source.id) {
                 Ok(resource) => Ok(resource),
                 Err(StoreError::NotFound(id)) => Err(WorkspaceError::UnresolvedReference(id)),
                 Err(error) => Err(WorkspaceError::Resource(error)),
             })
             .collect()
+    }
+
+    fn validate_instance_ids(&self) -> Result<(), WorkspaceError> {
+        let mut seen = std::collections::HashSet::with_capacity(self.instances.len());
+        for instance in &self.instances {
+            if !seen.insert(instance.id) {
+                return Err(WorkspaceError::DuplicateInstanceId(instance.id));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -120,7 +169,13 @@ impl WorkspaceStore {
         &self.root
     }
 
-    pub fn load(&self, name: &str) -> Result<Workspace, WorkspaceError> {
+    /// Carga un workspace. Los JSON antiguos se migran automáticamente solo
+    /// después de convertirlos por completo y validar todos sus recursos de origen.
+    pub fn load(
+        &self,
+        name: &str,
+        resources: &ResourceStore,
+    ) -> Result<Workspace, WorkspaceError> {
         let path = self.path_for(name)?;
 
         let content = match fs::read_to_string(&path) {
@@ -131,10 +186,59 @@ impl WorkspaceStore {
             Err(error) => return Err(WorkspaceError::Io(error)),
         };
 
-        Ok(serde_json::from_str(&content)?)
+        let raw: RawWorkspace = serde_json::from_str(&content)?;
+        let is_legacy = !raw.instances.is_empty()
+            && raw.instances.iter().all(|instance| {
+                instance.id.is_none()
+                    && instance.source.is_none()
+                    && instance.resource_id.is_some()
+            });
+
+        let workspace = if is_legacy {
+            let mut migrated = Workspace::new();
+            for raw_instance in raw.instances {
+                let resource_id = raw_instance
+                    .resource_id
+                    .ok_or(WorkspaceError::InvalidInstanceFormat)?;
+                migrated.instances.push(Instance {
+                    id: Uuid::now_v7(),
+                    source: Source { id: resource_id },
+                });
+            }
+
+            migrated.validate_instance_ids()?;
+            for instance in &migrated.instances {
+                match resources.get(instance.source.id) {
+                    Ok(_) => {}
+                    Err(StoreError::NotFound(id)) => {
+                        return Err(WorkspaceError::UnresolvedReference(id));
+                    }
+                    Err(error) => return Err(WorkspaceError::Resource(error)),
+                }
+            }
+
+            // La escritura atómica conserva el JSON original si la conversión,
+            // validación o escritura del temporal falla.
+            self.save(name, &migrated)?;
+            migrated
+        } else {
+            let mut instances = Vec::with_capacity(raw.instances.len());
+            for raw_instance in raw.instances {
+                match (raw_instance.id, raw_instance.source, raw_instance.resource_id) {
+                    (Some(id), Some(source), None) => instances.push(Instance { id, source }),
+                    _ => return Err(WorkspaceError::InvalidInstanceFormat),
+                }
+            }
+            let workspace = Workspace { instances };
+            workspace.validate_instance_ids()?;
+            workspace
+        };
+
+        Ok(workspace)
     }
 
     pub fn save(&self, name: &str, workspace: &Workspace) -> Result<(), WorkspaceError> {
+        workspace.validate_instance_ids()?;
         let path = self.path_for(name)?;
         let temporary_path = self.root.join(format!(".{}.{}.tmp", name, Uuid::now_v7()));
         let content = serde_json::to_vec_pretty(workspace)?;
@@ -200,46 +304,111 @@ impl WorkspaceStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ResourceStore;
 
-    #[test]
-    fn saves_and_loads_workspace_json() {
+    fn setup() -> (tempfile::TempDir, ResourceStore, WorkspaceStore) {
         let dir = tempfile::tempdir().unwrap();
-        let store = WorkspaceStore::new(dir.path()).unwrap();
-
-        let mut workspace = Workspace::new();
-        let id = Uuid::now_v7();
-        workspace.add_resource(id).unwrap();
-
-        store.save("proyecto", &workspace).unwrap();
-
-        let loaded = store.load("proyecto").unwrap();
-        assert_eq!(loaded, workspace);
-
-        let json = fs::read_to_string(dir.path().join("proyecto.json")).unwrap();
-        assert!(json.contains("\"instances\""));
-        assert!(json.contains("\"resource_id\""));
+        let resources = ResourceStore::new(dir.path().join("resources")).unwrap();
+        let workspaces = WorkspaceStore::new(dir.path().join("workspaces")).unwrap();
+        (dir, resources, workspaces)
     }
 
     #[test]
-    fn rejects_duplicate_references() {
-        let mut workspace = Workspace::new();
-        let id = Uuid::now_v7();
+    fn saves_and_loads_workspace_json_with_distinct_instance_identity() {
+        let (_dir, resources, store) = setup();
+        let (resource, _) = resources.create("Recurso", None).unwrap();
 
-        workspace.add_resource(id).unwrap();
+        let mut workspace = Workspace::new();
+        let instance_id = workspace.add_resource(resource.id).unwrap();
+        assert_ne!(instance_id, resource.id);
+
+        store.save("proyecto", &workspace).unwrap();
+        let loaded = store.load("proyecto", &resources).unwrap();
+        assert_eq!(loaded, workspace);
+
+        let json = fs::read_to_string(store.root().join("proyecto.json")).unwrap();
+        assert!(json.contains("\\"id\\""));
+        assert!(json.contains("\\"source\\""));
+        assert!(json.contains(&format!("\\"id\\": \\"{}\\" ", resource.id)) == false);
+        assert!(!json.contains("\\"resource_id\\""));
+    }
+
+    #[test]
+    fn allows_multiple_instances_of_the_same_resource() {
+        let (_dir, resources, store) = setup();
+        let (resource, _) = resources.create("Recurso", None).unwrap();
+
+        let mut workspace = Workspace::new();
+        let first = workspace.add_resource(resource.id).unwrap();
+        let second = workspace.add_resource(resource.id).unwrap();
+
+        assert_ne!(first, second);
+        assert_eq!(workspace.instances.len(), 2);
+        store.save("proyecto", &workspace).unwrap();
+        assert_eq!(store.load("proyecto", &resources).unwrap(), workspace);
+    }
+
+    #[test]
+    fn migrates_legacy_workspace_once_and_persists_instance_ids() {
+        let (_dir, resources, store) = setup();
+        let (resource, _) = resources.create("Antiguo", None).unwrap();
+        let path = store.root().join("proyecto.json");
+        let legacy = format!(
+            "{{\n  \\"instances\\": [{{ \\"resource_id\\": \\"{}\\" }}]\n}}",
+            resource.id
+        );
+        fs::write(&path, &legacy).unwrap();
+
+        let migrated = store.load("proyecto", &resources).unwrap();
+        let instance_id = migrated.instances[0].id;
+        assert_eq!(migrated.instances[0].source.id, resource.id);
+
+        let persisted = fs::read_to_string(&path).unwrap();
+        assert!(!persisted.contains("\\"resource_id\\""));
+        assert!(persisted.contains(&instance_id.to_string()));
+
+        let loaded_again = store.load("proyecto", &resources).unwrap();
+        assert_eq!(loaded_again.instances[0].id, instance_id);
+    }
+
+    #[test]
+    fn does_not_overwrite_legacy_json_when_reference_is_missing() {
+        let (_dir, resources, store) = setup();
+        let path = store.root().join("proyecto.json");
+        let missing_id = Uuid::now_v7();
+        let legacy = format!(
+            "{{\n  \\"instances\\": [{{ \\"resource_id\\": \\"{}\\" }}]\n}}",
+            missing_id
+        );
+        fs::write(&path, &legacy).unwrap();
 
         assert!(matches!(
-            workspace.add_resource(id),
-            Err(WorkspaceError::DuplicateReference(found)) if found == id
+            store.load("proyecto", &resources),
+            Err(WorkspaceError::UnresolvedReference(id)) if id == missing_id
+        ));
+        assert_eq!(fs::read_to_string(&path).unwrap(), legacy);
+    }
+
+    #[test]
+    fn rejects_duplicate_instance_ids() {
+        let (_dir, resources, store) = setup();
+        let (resource, _) = resources.create("Recurso", None).unwrap();
+        let id = Uuid::now_v7();
+        let workspace = Workspace {
+            instances: vec![
+                Instance { id, source: Source { id: resource.id } },
+                Instance { id, source: Source { id: resource.id } },
+            ],
+        };
+
+        assert!(matches!(
+            store.save("proyecto", &workspace),
+            Err(WorkspaceError::DuplicateInstanceId(found)) if found == id
         ));
     }
 
     #[test]
     fn resolves_current_resource_data() {
-        let dir = tempfile::tempdir().unwrap();
-        let resources = ResourceStore::new(dir.path().join("resources")).unwrap();
-        let workspaces = WorkspaceStore::new(dir.path().join("workspaces")).unwrap();
-
+        let (_dir, resources, workspaces) = setup();
         let (resource, _) = resources.create("Antes", None).unwrap();
 
         let mut workspace = Workspace::new();
@@ -256,7 +425,7 @@ mod tests {
             )
             .unwrap();
 
-        let loaded = workspaces.load("prueba").unwrap();
+        let loaded = workspaces.load("prueba", &resources).unwrap();
         let resolved = loaded.resolve(&resources).unwrap();
 
         assert_eq!(resolved.len(), 1);
@@ -265,9 +434,7 @@ mod tests {
 
     #[test]
     fn reports_missing_resource_reference() {
-        let dir = tempfile::tempdir().unwrap();
-        let resources = ResourceStore::new(dir.path()).unwrap();
-
+        let (_dir, resources, workspaces) = setup();
         let mut workspace = Workspace::new();
         let missing_id = Uuid::now_v7();
         workspace.add_resource(missing_id).unwrap();
@@ -280,11 +447,9 @@ mod tests {
 
     #[test]
     fn rejects_workspace_path_traversal() {
-        let dir = tempfile::tempdir().unwrap();
-        let store = WorkspaceStore::new(dir.path()).unwrap();
-
+        let (_dir, resources, store) = setup();
         assert!(matches!(
-            store.load("../otro"),
+            store.load("../otro", &resources),
             Err(WorkspaceError::InvalidName)
         ));
     }
