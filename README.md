@@ -38,7 +38,7 @@ Cada recurso se persiste en un archivo TOML independiente. El segmento administr
 
 Un espacio de trabajo contiene instancias persistidas en JSON. Cada instancia tiene un `id` propio y referencia su recurso de origen mediante `source.id`. Varias instancias pueden compartir el mismo recurso de origen sin compartir identidad. La información descriptiva del recurso no se copia en el espacio de trabajo.
 
-El esquema vigente exige `id` propio y `source.id` en cada instancia. La compatibilidad con `resource_id` se ha eliminado deliberadamente: los JSON antiguos se rechazan sin modificarlos. `management.allocation` es la fuente de verdad para reconstruir el workspace tras una interrupción. Antes de reconciliar, el núcleo valida estrictamente todos los recursos; si alguno es ilegible o hay IDs de instancia asignados a varios recursos, la recuperación se detiene sin reescribir el workspace.
+El esquema vigente exige `id` propio y `source.id` en cada instancia. La compatibilidad con `resource_id` se ha eliminado deliberadamente: los JSON antiguos se rechazan sin modificarlos. `management.allocation` es la fuente de verdad para reconstruir el workspace tras una interrupción. Antes de reconciliar, el núcleo valida estrictamente todos los recursos y exige que cada uno contenga `management.allocation`; si un recurso es ilegible, carece de ese registro o hay IDs asignados a varios recursos, la recuperación se detiene sin reescribir el workspace.
 
 Crear una definición y crear una instancia son operaciones distintas. La CLI delega el ciclo de vida al núcleo: primero confirma la asignación del recurso y después guarda el workspace. Al eliminar, retira primero la asignación y después persiste el workspace.
 
