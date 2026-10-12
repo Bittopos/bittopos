@@ -7,11 +7,11 @@ El proyecto se desarrolla de forma incremental, separando el núcleo reutilizabl
 ## Estado del proyecto
 
 - **Versión del paquete del núcleo:** `0.1.0`.
-- **Línea de desarrollo:** contrato técnico `0.2.0`.
+- **Línea de desarrollo:** contrato técnico `0.3.0` (identidad y persistencia de instancias en implementación).
 - **Interfaz disponible:** CLI `bitto`.
 - **Entorno inicial:** local, incluido Termux en Android.
 
-La versión del paquete indicada en `Cargo.toml` identifica la versión declarada del paquete. El contrato `CONTRATO-0.2.md` documenta el alcance funcional de la siguiente etapa y no implica por sí solo que se haya publicado una versión `0.2.0`.
+La versión del paquete indicada en `Cargo.toml` identifica la versión declarada del paquete. El contrato técnico describe el alcance previsto; no implica por sí solo que todas sus características estén implementadas ni que se haya publicado una versión con ese número.
 
 ## Arquitectura actual
 
@@ -36,7 +36,9 @@ Cada recurso se persiste en un archivo TOML independiente.
 
 ### Espacios de trabajo
 
-Un espacio de trabajo registra referencias a recursos mediante sus identificadores. Se persiste en JSON y no almacena copias de la información descriptiva de los recursos.
+Un espacio de trabajo contiene instancias persistidas en JSON. Cada instancia tiene un `id` propio y referencia su recurso de origen mediante `source.id`. Varias instancias pueden compartir el mismo recurso de origen sin compartir identidad. La información descriptiva del recurso no se copia en el espacio de trabajo.
+
+Al cargar un JSON antiguo con `resource_id`, el núcleo convierte cada referencia al esquema nuevo, asigna identidades propias y valida que los recursos de origen existan. Solo guarda la migración después de validar todas las referencias; si encuentra una referencia inválida, devuelve un error y conserva el archivo original. Los nuevos identificadores quedan persistidos para que no cambien en futuras lecturas.
 
 Crear un recurso y añadirlo a un espacio de trabajo son operaciones distintas en el núcleo. La CLI puede coordinarlas según el comando y sus modificadores.
 
@@ -91,7 +93,7 @@ Consultar un recurso mediante su UUID:
 cargo run -p bitto-cli -- show UUID_DEL_RECURSO
 ```
 
-Añadir un recurso existente al espacio de trabajo:
+Añadir una nueva instancia de un recurso existente al espacio de trabajo (se permite repetir el mismo recurso):
 
 ```bash
 cargo run -p bitto-cli -- add UUID_DEL_RECURSO
@@ -134,7 +136,8 @@ Las comprobaciones deben ejecutarse sobre el estado real del código antes de re
 ## Contratos técnicos
 
 - [CONTRATO-0.1.md](CONTRATO-0.1.md): contrato de la etapa inicial.
-- [CONTRATO-0.2.md](CONTRATO-0.2.md): alcance funcional del núcleo, los recursos, los espacios de trabajo y la CLI en desarrollo.
+- [CONTRATO-0.2.md](CONTRATO-0.2.md): contrato de la etapa previa.
+- [CONTRATO-0.3.md](CONTRATO-0.3.md): modelo previsto de recursos, instancias, segmentos y navegación; varias partes siguen pendientes de implementación.
 
 Los contratos describen las responsabilidades y los criterios de aceptación de cada etapa. Deben mantenerse alineados con la implementación real.
 
