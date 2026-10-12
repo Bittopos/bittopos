@@ -178,7 +178,10 @@ fn run() -> Result<(), String> {
                 println!("El workspace está vacío.");
             } else {
                 for (instance, resource) in workspace.instances.iter().zip(resolved.iter()) {
-                    println!("- {} [{}] — recurso {}", resource.info.title, instance.id, instance.source.id);
+                    println!(
+                        "- {} [{}] — recurso {}",
+                        resource.info.title, instance.id, instance.source.id
+                    );
                 }
             }
         }
