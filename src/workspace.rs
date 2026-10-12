@@ -328,7 +328,8 @@ mod tests {
         let json = fs::read_to_string(store.root().join("proyecto.json")).unwrap();
         assert!(json.contains("\\"id\\""));
         assert!(json.contains("\\"source\\""));
-        assert!(json.contains(&format!("\\"id\\": \\"{}\\" ", resource.id)) == false);
+        assert!(json.contains(&format!("\\"id\\": \\"{}\\"", instance_id)));
+        assert!(json.contains(&format!("\\"id\\": \\"{}\\"", resource.id)));
         assert!(!json.contains("\\"resource_id\\""));
     }
 
