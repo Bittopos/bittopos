@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 use crate::resource::{
-    normalize_description, normalize_name, validate_stored_name, Info, Resource, ResourcePatch,
-    ResourceWarning,
+    normalize_description, normalize_name, validate_stored_name, Info, Management, Resource,
+    ResourcePatch, ResourceWarning,
 };
 
 #[derive(Debug)]
@@ -105,6 +105,7 @@ impl ResourceStore {
         let description = normalize_description(description.map(str::to_owned));
         let resource = Resource {
             id,
+            management: Management::default(),
             info: Info {
                 title: name,
                 description,
@@ -342,6 +343,35 @@ mod tests {
     }
 
     #[test]
+    fn loads_legacy_resource_without_management_with_empty_allocation() {
+        let (_dir, store) = store();
+        let id = Uuid::now_v7();
+        let path = store.path_for(id);
+        fs::write(
+            &path,
+            format!(
+                "id = \\"{id}\\\"\\n\\n[info]\\ntitle = \\"Recurso antiguo\\\"\\ntags = []\\n"
+            ),
+        )
+        .unwrap();
+
+        let resource = store.get(id).unwrap();
+        assert_eq!(resource.info.title, "Recurso antiguo");
+        assert!(resource.management.allocation.is_empty());
+    }
+
+    #[test]
+    fn new_resource_persists_management_with_empty_allocation() {
+        let (_dir, store) = store();
+        let (resource, _) = store.create("Nuevo", None).unwrap();
+        let file = fs::read_to_string(store.path_for(resource.id)).unwrap();
+
+        assert!(file.contains("[management]"));
+        assert!(file.contains("allocation = []"));
+        assert!(resource.management.allocation.is_empty());
+    }
+
+    #[test]
     fn same_name_gets_distinct_ids() {
         let (_dir, store) = store();
         let (a, _) = store.create("Igual", None).unwrap();
@@ -470,6 +500,7 @@ mod tests {
         let id = Uuid::now_v7();
         let resource = Resource {
             id,
+            management: Management::default(),
             info: Info {
                 title: "Temporal preparado".to_owned(),
                 description: None,
