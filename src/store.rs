@@ -132,6 +132,29 @@ impl ResourceStore {
         self.read_file(&path, id)
     }
 
+    /// Lee todos los recursos confirmados y falla si alguno no puede validarse.
+    /// Es deliberadamente estricto: una recuperación no debe confundir un recurso
+    /// ilegible con una asignación vacía.
+    pub(crate) fn all_strict(&self) -> Result<Vec<Resource>, StoreError> {
+        let mut resources = Vec::new();
+        for entry in fs::read_dir(&self.root)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) != Some("toml") {
+                continue;
+            }
+            let stem = path.file_stem().and_then(|s| s.to_str()).ok_or_else(|| {
+                StoreError::InvalidFileName(path.clone())
+            })?;
+            let expected_id = Uuid::parse_str(stem).map_err(|_| {
+                StoreError::InvalidFileName(path.clone())
+            })?;
+            resources.push(self.read_file(&path, expected_id)?);
+        }
+        resources.sort_by_key(|resource| resource.id);
+        Ok(resources)
+    }
+
     /// Registra una identidad de instancia en el espacio administrativo de la definición.
     /// Es una operación de ciclo de vida; no permite editar directamente el segmento
     /// administrativo ni reemplazar la asignación completa.
