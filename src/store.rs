@@ -133,8 +133,9 @@ impl ResourceStore {
     }
 
     /// Registra una identidad de instancia en el espacio administrativo de la definición.
-    /// Es una operación interna del núcleo, no parte de la API pública del recurso.
-    pub(crate) fn register_instance(
+    /// Es una operación de ciclo de vida; no permite editar directamente el segmento
+    /// administrativo ni reemplazar la asignación completa.
+    pub fn register_instance(
         &self,
         resource_id: Uuid,
         instance_id: Uuid,
@@ -165,7 +166,7 @@ impl ResourceStore {
 
     /// Retira una identidad de instancia del registro administrativo.
     /// Devuelve false si el registro ya no contenía esa identidad.
-    pub(crate) fn unregister_instance(
+    pub fn unregister_instance(
         &self,
         resource_id: Uuid,
         instance_id: Uuid,
