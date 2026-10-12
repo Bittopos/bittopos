@@ -20,7 +20,7 @@ El repositorio utiliza un workspace de Cargo con dos paquetes:
 - **`bittopos-core`:** define los recursos, la persistencia y los espacios de trabajo.
 - **`bitto-cli`:** proporciona la interfaz de terminal y coordina las operaciones del núcleo.
 
-La CLI no debe duplicar la lógica de validación ni implementar un sistema de persistencia independiente.
+La CLI no debe duplicar la lógica de validación ni implementar un sistema de persistencia independiente. Dentro del núcleo, `store.rs` gestiona archivos de definiciones, `workspace.rs` representa y persiste el estado del workspace, y `lifecycle.rs` coordina las operaciones de creación, eliminación y recuperación para mantener `allocation` como fuente de verdad.
 
 ## Modelo de datos
 
