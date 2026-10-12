@@ -113,7 +113,7 @@ En 0.3 estos nombres sirven para fijar el modelo y el glosario, pero solo se imp
 
 `source` identifica la definición de la que procede una instancia. Su componente `source.id` contiene el ID del recurso original. Es una referencia al origen, no la identidad de la instancia.
 
-`source.id` es un componente de sistema protegido: las operaciones ordinarias de edición de segmentos, componentes o conceptos no pueden reemplazarlo ni alterarlo. Su cambio solo puede ocurrir mediante operaciones internas explícitas y validadas que formen parte de la creación o migración de una instancia.
+`source.id` es un componente de sistema protegido: las operaciones ordinarias de edición de segmentos, componentes o conceptos no pueden reemplazarlo ni alterarlo. Su cambio solo puede ocurrir mediante operaciones internas explícitas y validadas que formen parte de la creación de una instancia.
 
 La denominación y ubicación de `source.id` se consideran provisionales hasta comprobar su estabilidad durante la implementación, pero constituyen el modelo previsto para esta línea. No debe añadirse un campo permanente paralelo `resource_id` al nuevo esquema.
 
@@ -154,7 +154,7 @@ Son componentes conceptuales reservados para relaciones y referencias. No se imp
 9. Los identificadores internos del sistema no se representan como simples datos de usuario ni se modifican mediante ediciones genéricas de segmentos.
 10. Los alias no forman parte del alcance funcional de 0.3. Si se añaden en el futuro, no sustituirán a los identificadores estables.
 
-La implementación mantiene `allocation` como fuente de verdad para reconstruir el workspace. La creación confirma primero la asignación y luego persiste la instancia; la eliminación retira primero la asignación y luego persiste el workspace. Si el proceso se interrumpe entre ambos pasos, la siguiente reconciliación reconstruye las instancias asignadas y elimina las residuales. La recuperación valida todos los recursos antes de modificar el workspace y se detiene ante archivos ilegibles o IDs asignados a más de un recurso. La restricción actual que impide instanciar dos veces el mismo recurso deberá sustituirse por validación de identidad de instancia, permitiendo varias instancias del mismo origen.
+La implementación mantiene `allocation` como fuente de verdad para reconstruir el workspace. La creación confirma primero la asignación y luego persiste la instancia; la eliminación retira primero la asignación y luego persiste el workspace. Si el proceso se interrumpe entre ambos pasos, la siguiente reconciliación reconstruye las instancias asignadas y elimina las residuales. La recuperación valida todos los recursos antes de modificar el workspace y se detiene ante archivos ilegibles o IDs asignados a más de un recurso. El núcleo permite varias instancias del mismo origen y valida la identidad propia de cada instancia.
 
 ## 6. Herencia y máscaras
 
