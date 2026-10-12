@@ -30,30 +30,12 @@ pub struct Workspace {
     pub instances: Vec<Instance>,
 }
 
-/// Representación de transición para reconocer el esquema anterior sin
-/// deserializarlo directamente como el modelo definitivo.
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawWorkspace {
-    #[serde(default)]
-    instances: Vec<RawInstance>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RawInstance {
-    id: Option<Uuid>,
-    source: Option<Source>,
-    resource_id: Option<Uuid>,
-}
-
 #[derive(Debug)]
 pub enum WorkspaceError {
     Io(io::Error),
     Json(serde_json::Error),
     Resource(StoreError),
     InvalidName,
-    InvalidInstanceFormat,
     NotFound(String),
     UnresolvedReference(Uuid),
     DuplicateInstanceId(Uuid),
@@ -66,10 +48,6 @@ impl std::fmt::Display for WorkspaceError {
             Self::Json(error) => write!(f, "JSON inválido: {error}"),
             Self::Resource(error) => write!(f, "error de recurso: {error}"),
             Self::InvalidName => write!(f, "nombre de workspace inválido"),
-            Self::InvalidInstanceFormat => write!(
-                f,
-                "formato de instancia inválido o mezcla de esquemas antiguo y nuevo"
-            ),
             Self::NotFound(name) => write!(f, "no existe el workspace {name}"),
             Self::UnresolvedReference(id) => {
                 write!(f, "no se puede resolver la referencia al recurso {id}")
@@ -108,7 +86,7 @@ impl Workspace {
 
     /// Crea una instancia nueva de un recurso, incluso si ya hay otras
     /// instancias del mismo recurso en este workspace.
-    pub fn add_resource(&mut self, resource_id: Uuid) -> Result<Uuid, WorkspaceError> {
+    pub(crate) fn add_resource(&mut self, resource_id: Uuid) -> Result<Uuid, WorkspaceError> {
         let instance_id = Uuid::now_v7();
         self.instances.push(Instance {
             id: instance_id,
@@ -118,17 +96,9 @@ impl Workspace {
     }
 
     /// Elimina una instancia por su identidad propia.
-    pub fn remove_instance(&mut self, instance_id: Uuid) -> bool {
+    pub(crate) fn remove_instance(&mut self, instance_id: Uuid) -> bool {
         let previous_len = self.instances.len();
         self.instances.retain(|instance| instance.id != instance_id);
-        self.instances.len() != previous_len
-    }
-
-    /// Elimina todas las instancias cuyo origen sea el recurso indicado.
-    pub fn remove_resource(&mut self, resource_id: Uuid) -> bool {
-        let previous_len = self.instances.len();
-        self.instances
-            .retain(|instance| instance.source.id != resource_id);
         self.instances.len() != previous_len
     }
 
@@ -169,15 +139,10 @@ impl WorkspaceStore {
         &self.root
     }
 
-    /// Carga un workspace. Los JSON antiguos se migran automáticamente solo
-    /// después de convertirlos por completo y validar todos sus recursos de origen.
-    pub fn load(
-        &self,
-        name: &str,
-        resources: &ResourceStore,
-    ) -> Result<Workspace, WorkspaceError> {
+    /// Carga exclusivamente el esquema vigente. Los formatos anteriores se rechazan;
+    /// no se migran ni se sobrescriben automáticamente.
+    pub fn load(&self, name: &str) -> Result<Workspace, WorkspaceError> {
         let path = self.path_for(name)?;
-
         let content = match fs::read_to_string(&path) {
             Ok(content) => content,
             Err(error) if error.kind() == io::ErrorKind::NotFound => {
@@ -186,89 +151,9 @@ impl WorkspaceStore {
             Err(error) => return Err(WorkspaceError::Io(error)),
         };
 
-        let raw: RawWorkspace = serde_json::from_str(&content)?;
-        let is_legacy = !raw.instances.is_empty()
-            && raw.instances.iter().all(|instance| {
-                instance.id.is_none()
-                    && instance.source.is_none()
-                    && instance.resource_id.is_some()
-            });
-
-        let workspace = if is_legacy {
-            let mut migrated = Workspace::new();
-            for raw_instance in raw.instances {
-                let resource_id = raw_instance
-                    .resource_id
-                    .ok_or(WorkspaceError::InvalidInstanceFormat)?;
-                migrated.instances.push(Instance {
-                    id: Uuid::now_v7(),
-                    source: Source { id: resource_id },
-                });
-            }
-            migrated
-        } else {
-            let mut instances = Vec::with_capacity(raw.instances.len());
-            for raw_instance in raw.instances {
-                match (raw_instance.id, raw_instance.source, raw_instance.resource_id) {
-                    (Some(id), Some(source), None) => instances.push(Instance { id, source }),
-                    _ => return Err(WorkspaceError::InvalidInstanceFormat),
-                }
-            }
-            Workspace { instances }
-        };
-
+        let workspace: Workspace = serde_json::from_str(&content)?;
         workspace.validate_instance_ids()?;
-
-        // Validamos todas las referencias antes de cambiar asignaciones o migrar el JSON.
-        for instance in &workspace.instances {
-            match resources.get(instance.source.id) {
-                Ok(_) => {}
-                Err(StoreError::NotFound(id)) => {
-                    return Err(WorkspaceError::UnresolvedReference(id));
-                }
-                Err(error) => return Err(WorkspaceError::Resource(error)),
-            }
-        }
-
-        // Reconcilia el registro administrativo con las instancias del workspace.
-        // Solo se revierten las asignaciones que esta carga acaba de añadir.
-        let added_allocations = Self::ensure_allocations(&workspace, resources)?;
-
-        if is_legacy {
-            // La migración se escribe solo después de validar y reconciliar el registro.
-            if let Err(error) = self.save(name, &workspace) {
-                Self::rollback_allocations(resources, &added_allocations);
-                return Err(error);
-            }
-        }
-
         Ok(workspace)
-    }
-
-    fn ensure_allocations(
-        workspace: &Workspace,
-        resources: &ResourceStore,
-    ) -> Result<Vec<(Uuid, Uuid)>, WorkspaceError> {
-        let mut added = Vec::new();
-
-        for instance in &workspace.instances {
-            match resources.ensure_instance_registered(instance.source.id, instance.id) {
-                Ok(true) => added.push((instance.source.id, instance.id)),
-                Ok(false) => {}
-                Err(error) => {
-                    Self::rollback_allocations(resources, &added);
-                    return Err(WorkspaceError::Resource(error));
-                }
-            }
-        }
-
-        Ok(added)
-    }
-
-    fn rollback_allocations(resources: &ResourceStore, added: &[(Uuid, Uuid)]) {
-        for (resource_id, instance_id) in added.iter().rev() {
-            let _ = resources.unregister_instance(*resource_id, *instance_id);
-        }
     }
 
     pub fn save(&self, name: &str, workspace: &Workspace) -> Result<(), WorkspaceError> {
@@ -356,12 +241,8 @@ mod tests {
         assert_ne!(instance_id, resource.id);
 
         store.save("proyecto", &workspace).unwrap();
-        let loaded = store.load("proyecto", &resources).unwrap();
+        let loaded = store.load("proyecto").unwrap();
         assert_eq!(loaded, workspace);
-        assert_eq!(
-            resources.get(resource.id).unwrap().management.allocation,
-            vec![instance_id]
-        );
 
         let json = fs::read_to_string(store.root().join("proyecto.json")).unwrap();
         assert!(json.contains(r#""id""#));
@@ -383,52 +264,18 @@ mod tests {
         assert_ne!(first, second);
         assert_eq!(workspace.instances.len(), 2);
         store.save("proyecto", &workspace).unwrap();
-        assert_eq!(store.load("proyecto", &resources).unwrap(), workspace);
+        assert_eq!(store.load("proyecto").unwrap(), workspace);
     }
 
     #[test]
-    fn migrates_legacy_workspace_once_and_persists_instance_ids() {
-        let (_dir, resources, store) = setup();
-        let (resource, _) = resources.create("Antiguo", None).unwrap();
+    fn rejects_legacy_resource_id_without_modifying_the_file() {
+        let (_dir, _resources, store) = setup();
         let path = store.root().join("proyecto.json");
-        let legacy = format!(
-            r#"{{ "instances": [{{ "resource_id": "{}" }}] }}"#,
-            resource.id
-        );
-        fs::write(&path, &legacy).unwrap();
+        let legacy = r#"{"instances":[{"resource_id":"00000000-0000-7000-8000-000000000000"}]}"#;
+        fs::write(&path, legacy).unwrap();
 
-        let migrated = store.load("proyecto", &resources).unwrap();
-        let instance_id = migrated.instances[0].id;
-        assert_eq!(migrated.instances[0].source.id, resource.id);
-        assert_eq!(
-            resources.get(resource.id).unwrap().management.allocation,
-            vec![instance_id]
-        );
-
-        let persisted = fs::read_to_string(&path).unwrap();
-        assert!(!persisted.contains(r#""resource_id""#));
-        assert!(persisted.contains(&instance_id.to_string()));
-
-        let loaded_again = store.load("proyecto", &resources).unwrap();
-        assert_eq!(loaded_again.instances[0].id, instance_id);
-    }
-
-    #[test]
-    fn does_not_overwrite_legacy_json_when_reference_is_missing() {
-        let (_dir, resources, store) = setup();
-        let path = store.root().join("proyecto.json");
-        let missing_id = Uuid::now_v7();
-        let legacy = format!(
-            r#"{{ "instances": [{{ "resource_id": "{}" }}] }}"#,
-            missing_id
-        );
-        fs::write(&path, &legacy).unwrap();
-
-        assert!(matches!(
-            store.load("proyecto", &resources),
-            Err(WorkspaceError::UnresolvedReference(id)) if id == missing_id
-        ));
-        assert_eq!(fs::read_to_string(&path).unwrap(), legacy);
+        assert!(matches!(store.load("proyecto"), Err(WorkspaceError::Json(_))));
+        assert_eq!(fs::read_to_string(path).unwrap(), legacy);
     }
 
     #[test]
@@ -468,7 +315,7 @@ mod tests {
             )
             .unwrap();
 
-        let loaded = workspaces.load("prueba", &resources).unwrap();
+        let loaded = workspaces.load("prueba").unwrap();
         let resolved = loaded.resolve(&resources).unwrap();
 
         assert_eq!(resolved.len(), 1);
@@ -492,7 +339,7 @@ mod tests {
     fn rejects_workspace_path_traversal() {
         let (_dir, resources, store) = setup();
         assert!(matches!(
-            store.load("../otro", &resources),
+            store.load("../otro"),
             Err(WorkspaceError::InvalidName)
         ));
     }

@@ -20,7 +20,7 @@ El repositorio utiliza un workspace de Cargo con dos paquetes:
 - **`bittopos-core`:** define los recursos, la persistencia y los espacios de trabajo.
 - **`bitto-cli`:** proporciona la interfaz de terminal y coordina las operaciones del núcleo.
 
-La CLI no debe duplicar la lógica de validación ni implementar un sistema de persistencia independiente.
+La CLI no debe duplicar la lógica de validación ni implementar un sistema de persistencia independiente. Dentro del núcleo, `store.rs` gestiona archivos de definiciones, `workspace.rs` representa y persiste el estado del workspace, y `lifecycle.rs` coordina las operaciones de creación, eliminación y recuperación para mantener `allocation` como fuente de verdad.
 
 ## Modelo de datos
 
@@ -38,9 +38,9 @@ Cada recurso se persiste en un archivo TOML independiente. El segmento administr
 
 Un espacio de trabajo contiene instancias persistidas en JSON. Cada instancia tiene un `id` propio y referencia su recurso de origen mediante `source.id`. Varias instancias pueden compartir el mismo recurso de origen sin compartir identidad. La información descriptiva del recurso no se copia en el espacio de trabajo.
 
-Al cargar un JSON antiguo con `resource_id`, el núcleo convierte cada referencia al esquema nuevo, asigna identidades propias y valida que los recursos de origen existan. Solo guarda la migración después de validar todas las referencias; si encuentra una referencia inválida, devuelve un error y conserva el archivo original. Los nuevos identificadores quedan persistidos para que no cambien en futuras lecturas. Al cargar un workspace, el núcleo también comprueba que las instancias estén registradas en `management.allocation` y completa las asignaciones que falten.
+El esquema vigente exige `id` propio y `source.id` en cada instancia. La compatibilidad con `resource_id` se ha eliminado deliberadamente: los JSON antiguos se rechazan sin modificarlos. `management.allocation` es la fuente de verdad para reconstruir el workspace tras una interrupción. Antes de reconciliar, el núcleo valida estrictamente todos los recursos y exige que cada uno contenga `management.allocation`; si un recurso es ilegible, carece de ese registro o hay IDs asignados a varios recursos, la recuperación se detiene sin reescribir el workspace.
 
-Crear un recurso y añadirlo a un espacio de trabajo son operaciones distintas en el núcleo. La CLI puede coordinarlas según el comando y sus modificadores.
+Crear una definición y crear una instancia son operaciones distintas. La CLI delega el ciclo de vida al núcleo: primero confirma la asignación del recurso y después guarda el workspace. Al eliminar, retira primero la asignación y después persiste el workspace.
 
 ## Almacenamiento local
 

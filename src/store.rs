@@ -21,6 +21,7 @@ pub enum StoreError {
     TemporaryExists(PathBuf),
     PreparedContentMismatch(Uuid),
     AllocationConflict(Uuid),
+    IncompleteManagement(Uuid),
 }
 
 impl std::fmt::Display for StoreError {
@@ -61,6 +62,10 @@ impl std::fmt::Display for StoreError {
                 f,
                 "la instancia {id} ya figura en la asignación del recurso"
             ),
+            Self::IncompleteManagement(id) => write!(
+                f,
+                "el recurso {id} no contiene management.allocation; se detuvo la recuperación para evitar perder instancias"
+            ),
         }
     }
 }
@@ -81,6 +86,18 @@ impl From<toml::de::Error> for StoreError {
     fn from(value: toml::de::Error) -> Self {
         Self::TomlParse(value)
     }
+}
+
+/// Resultado de inspeccionar un temporal abandonado sin modificar ningún archivo.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TemporaryInspection {
+    Missing,
+    /// El temporal existe, pero no puede validarse como una definición completa.
+    Invalid { reason: String },
+    /// El temporal contiene exactamente los mismos bytes que el recurso confirmado.
+    IdenticalToConfirmed,
+    /// El temporal es válido, pero no se puede saber automáticamente si debía confirmarse.
+    ValidUnconfirmed { resource: Resource },
 }
 
 /// Almacén local de recursos. El prototipo presupone un solo proceso escritor.
@@ -132,10 +149,42 @@ impl ResourceStore {
         self.read_file(&path, id)
     }
 
+    /// Lee todos los recursos confirmados y falla si alguno no puede validarse.
+    /// Es deliberadamente estricto: una recuperación no debe confundir un recurso
+    /// ilegible con una asignación vacía.
+    pub(crate) fn all_strict(&self) -> Result<Vec<Resource>, StoreError> {
+        let mut resources = Vec::new();
+        for entry in fs::read_dir(&self.root)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) != Some("toml") {
+                continue;
+            }
+            let stem = path.file_stem().and_then(|s| s.to_str()).ok_or_else(|| {
+                StoreError::InvalidFileName(path.clone())
+            })?;
+            let expected_id = Uuid::parse_str(stem).map_err(|_| {
+                StoreError::InvalidFileName(path.clone())
+            })?;
+            let content = fs::read_to_string(&path)?;
+            let document: toml::Value = toml::from_str(&content)?;
+            if document
+                .get("management")
+                .and_then(|management| management.get("allocation"))
+                .is_none()
+            {
+                return Err(StoreError::IncompleteManagement(expected_id));
+            }
+            resources.push(self.read_file(&path, expected_id)?);
+        }
+        resources.sort_by_key(|resource| resource.id);
+        Ok(resources)
+    }
+
     /// Registra una identidad de instancia en el espacio administrativo de la definición.
     /// Es una operación de ciclo de vida; no permite editar directamente el segmento
     /// administrativo ni reemplazar la asignación completa.
-    pub fn register_instance(
+    pub(crate) fn register_instance(
         &self,
         resource_id: Uuid,
         instance_id: Uuid,
@@ -148,25 +197,9 @@ impl ResourceStore {
         self.write_existing(&resource)
     }
 
-    /// Asegura que la asignación contenga la instancia; devuelve true si la añadió.
-    /// Se usa para reparar/reconstruir el registro al cargar workspaces existentes.
-    pub(crate) fn ensure_instance_registered(
-        &self,
-        resource_id: Uuid,
-        instance_id: Uuid,
-    ) -> Result<bool, StoreError> {
-        let mut resource = self.get(resource_id)?;
-        if resource.management.allocation.contains(&instance_id) {
-            return Ok(false);
-        }
-        resource.management.allocation.push(instance_id);
-        self.write_existing(&resource)?;
-        Ok(true)
-    }
-
     /// Retira una identidad de instancia del registro administrativo.
     /// Devuelve false si el registro ya no contenía esa identidad.
-    pub fn unregister_instance(
+    pub(crate) fn unregister_instance(
         &self,
         resource_id: Uuid,
         instance_id: Uuid,
@@ -211,6 +244,108 @@ impl ResourceStore {
 
         self.write_existing(&resource)?;
         Ok((resource, warnings))
+    }
+
+    /// Inspecciona un temporal abandonado sin promoverlo ni eliminarlo.
+    ///
+    /// Un temporal válido distinto del archivo definitivo sigue siendo ambiguo: puede
+    /// representar una escritura interrumpida antes de confirmar. La decisión de
+    /// promoverlo o descartarlo debe ser explícita.
+    pub fn inspect_temporary(&self, id: Uuid) -> Result<TemporaryInspection, StoreError> {
+        let temporary_path = self.temporary_path_for(id);
+        if !temporary_path.exists() {
+            return Ok(TemporaryInspection::Missing);
+        }
+
+        let candidate = match self.read_file(&temporary_path, id) {
+            Ok(resource) => resource,
+            Err(error) => {
+                return Ok(TemporaryInspection::Invalid {
+                    reason: error.to_string(),
+                });
+            }
+        };
+
+        // read_file permite compatibilidad al leer recursos antiguos; para recuperar
+        // un temporal exigimos el contrato completo de allocation.
+        let content = fs::read_to_string(&temporary_path)?;
+        let document: toml::Value = match toml::from_str(&content) {
+            Ok(document) => document,
+            Err(error) => {
+                return Ok(TemporaryInspection::Invalid {
+                    reason: error.to_string(),
+                });
+            }
+        };
+        if document
+            .get("management")
+            .and_then(|management| management.get("allocation"))
+            .is_none()
+        {
+            return Ok(TemporaryInspection::Invalid {
+                reason: format!(
+                    "el temporal {} no contiene management.allocation",
+                    temporary_path.display()
+                ),
+            });
+        }
+
+        let confirmed_path = self.path_for(id);
+        if confirmed_path.exists() {
+            let confirmed_bytes = fs::read(&confirmed_path)?;
+            let temporary_bytes = fs::read(&temporary_path)?;
+            if confirmed_bytes == temporary_bytes {
+                return Ok(TemporaryInspection::IdenticalToConfirmed);
+            }
+
+            // No sustituimos un archivo definitivo ilegible ni lo interpretamos como
+            // vacío: el estado requiere intervención explícita fuera de esta operación.
+            self.read_file(&confirmed_path, id)?;
+        }
+
+        Ok(TemporaryInspection::ValidUnconfirmed { resource: candidate })
+    }
+
+    /// Promueve explícitamente un temporal válido tras decisión del operador.
+    ///
+    /// Nunca se llama desde recover(): la validez del TOML no demuestra que la operación
+    /// hubiera alcanzado el punto de confirmación antes de una interrupción.
+    pub fn promote_temporary_explicitly(&self, id: Uuid) -> Result<Resource, StoreError> {
+        let temporary_path = self.temporary_path_for(id);
+        if !temporary_path.exists() {
+            return Err(StoreError::NotFound(id));
+        }
+
+        let inspection = self.inspect_temporary(id)?;
+        let resource = match inspection {
+            TemporaryInspection::ValidUnconfirmed { resource } => resource,
+            TemporaryInspection::IdenticalToConfirmed => {
+                // El definitivo ya contiene el mismo contenido; solo se limpia el duplicado.
+                fs::remove_file(&temporary_path)?;
+                return self.get(id);
+            }
+            TemporaryInspection::Missing => return Err(StoreError::NotFound(id)),
+            TemporaryInspection::Invalid { reason } => {
+                return Err(StoreError::Io(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("temporal no recuperable: {reason}"),
+                )));
+            }
+        };
+
+        let replace = self.path_for(id).exists();
+        promote_temporary(&temporary_path, &self.path_for(id), replace)?;
+        Ok(resource)
+    }
+
+    /// Descarta explícitamente un temporal abandonado. No modifica el recurso definitivo.
+    pub fn discard_temporary_explicitly(&self, id: Uuid) -> Result<bool, StoreError> {
+        let temporary_path = self.temporary_path_for(id);
+        match fs::remove_file(temporary_path) {
+            Ok(()) => Ok(true),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+            Err(error) => Err(StoreError::Io(error)),
+        }
     }
 
     /// Recupera todos los TOML válidos. Los archivos inválidos se omiten y generan advertencias.
@@ -416,6 +551,21 @@ mod tests {
         let resource = store.get(id).unwrap();
         assert_eq!(resource.info.title, "Recurso antiguo");
         assert!(resource.management.allocation.is_empty());
+    }
+
+    #[test]
+    fn strict_scan_rejects_resource_without_allocation_before_recovery() {
+        let (_dir, store) = store();
+        let id = Uuid::now_v7();
+        fs::write(
+            store.path_for(id),
+            format!("id = \"{id}\"\n\n[info]\ntitle = \"Antiguo\"\ntags = []\n"),
+        ).unwrap();
+
+        assert!(matches!(
+            store.all_strict(),
+            Err(StoreError::IncompleteManagement(found)) if found == id
+        ));
     }
 
     #[test]
@@ -625,6 +775,73 @@ mod tests {
         assert_eq!(warnings.len(), 1);
         assert!(warnings[0].contains("no se recuperó automáticamente"));
         assert!(store.path_for(resource.id).exists());
+        assert!(temporary_path.exists());
+    }
+
+    #[test]
+    fn temporary_inspection_never_promotes_valid_unconfirmed_content() {
+        let (_dir, store) = store();
+        let (confirmed, _) = store.create("Confirmado", None).unwrap();
+        let mut candidate = confirmed.clone();
+        candidate.info.title = "Borrador".to_owned();
+        let temporary_path = store.temporary_path_for(confirmed.id);
+        fs::write(&temporary_path, toml::to_string(&candidate).unwrap()).unwrap();
+
+        let inspection = store.inspect_temporary(confirmed.id).unwrap();
+        assert!(matches!(
+            inspection,
+            TemporaryInspection::ValidUnconfirmed { resource } if resource == candidate
+        ));
+        assert_eq!(store.get(confirmed.id).unwrap(), confirmed);
+        assert!(temporary_path.exists());
+    }
+
+    #[test]
+    fn explicit_temporary_promotion_validates_and_replaces_confirmed_file() {
+        let (_dir, store) = store();
+        let (confirmed, _) = store.create("Confirmado", None).unwrap();
+        let mut candidate = confirmed.clone();
+        candidate.info.title = "Candidato recuperado".to_owned();
+        let temporary_path = store.temporary_path_for(confirmed.id);
+        fs::write(&temporary_path, toml::to_string(&candidate).unwrap()).unwrap();
+
+        let promoted = store.promote_temporary_explicitly(confirmed.id).unwrap();
+        assert_eq!(promoted, candidate);
+        assert_eq!(store.get(confirmed.id).unwrap(), candidate);
+        assert!(!temporary_path.exists());
+    }
+
+    #[test]
+    fn explicit_temporary_discard_preserves_confirmed_file() {
+        let (_dir, store) = store();
+        let (confirmed, _) = store.create("Confirmado", None).unwrap();
+        let confirmed_path = store.path_for(confirmed.id);
+        let before = fs::read(&confirmed_path).unwrap();
+        let temporary_path = store.temporary_path_for(confirmed.id);
+        fs::write(&temporary_path, "temporal incompleto").unwrap();
+
+        assert!(store.discard_temporary_explicitly(confirmed.id).unwrap());
+        assert!(!temporary_path.exists());
+        assert_eq!(fs::read(confirmed_path).unwrap(), before);
+        assert!(!store.discard_temporary_explicitly(confirmed.id).unwrap());
+    }
+
+    #[test]
+    fn explicit_temporary_promotion_rejects_missing_allocation() {
+        let (_dir, store) = store();
+        let (confirmed, _) = store.create("Confirmado", None).unwrap();
+        let temporary_path = store.temporary_path_for(confirmed.id);
+        fs::write(
+            &temporary_path,
+            format!(
+                "id = \"{}\"\n\n[info]\ntitle = \"Sin allocation\"\ntags = []\n",
+                confirmed.id
+            ),
+        )
+        .unwrap();
+
+        assert!(store.promote_temporary_explicitly(confirmed.id).is_err());
+        assert_eq!(store.get(confirmed.id).unwrap(), confirmed);
         assert!(temporary_path.exists());
     }
 
