@@ -62,6 +62,10 @@ impl std::fmt::Display for StoreError {
                 f,
                 "la instancia {id} ya figura en la asignación del recurso"
             ),
+            Self::IncompleteManagement(id) => write!(
+                f,
+                "el recurso {id} no contiene management.allocation; se detuvo la recuperación para evitar perder instancias"
+            ),
         }
     }
 }
