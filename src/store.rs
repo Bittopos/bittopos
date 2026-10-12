@@ -172,7 +172,7 @@ impl ResourceStore {
     /// Registra una identidad de instancia en el espacio administrativo de la definición.
     /// Es una operación de ciclo de vida; no permite editar directamente el segmento
     /// administrativo ni reemplazar la asignación completa.
-    pub fn register_instance(
+    pub(crate) fn register_instance(
         &self,
         resource_id: Uuid,
         instance_id: Uuid,
@@ -185,25 +185,9 @@ impl ResourceStore {
         self.write_existing(&resource)
     }
 
-    /// Asegura que la asignación contenga la instancia; devuelve true si la añadió.
-    /// Se usa para reparar/reconstruir el registro al cargar workspaces existentes.
-    pub(crate) fn ensure_instance_registered(
-        &self,
-        resource_id: Uuid,
-        instance_id: Uuid,
-    ) -> Result<bool, StoreError> {
-        let mut resource = self.get(resource_id)?;
-        if resource.management.allocation.contains(&instance_id) {
-            return Ok(false);
-        }
-        resource.management.allocation.push(instance_id);
-        self.write_existing(&resource)?;
-        Ok(true)
-    }
-
     /// Retira una identidad de instancia del registro administrativo.
     /// Devuelve false si el registro ya no contenía esa identidad.
-    pub fn unregister_instance(
+    pub(crate) fn unregister_instance(
         &self,
         resource_id: Uuid,
         instance_id: Uuid,
