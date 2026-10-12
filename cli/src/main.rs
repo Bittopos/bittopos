@@ -126,7 +126,7 @@ fn run() -> Result<(), String> {
                 }
             }
 
-            if !no_instance {
+            let instance_id = if !no_instance {
                 let mut workspace = load_workspace(&workspaces, &resources)?;
 
                 let instance_id = workspace
@@ -142,9 +142,15 @@ fn run() -> Result<(), String> {
                             resource.info.title, resource.id, error
                         )
                     })?;
-            }
+                Some(instance_id)
+            } else {
+                None
+            };
 
             println!("Recurso creado: {} ({})", resource.info.title, resource.id);
+            if let Some(instance_id) = instance_id {
+                println!("Instancia creada en el workspace: {instance_id}");
+            }
         }
 
         Command::Show { id: Some(id) } => {
@@ -163,7 +169,7 @@ fn run() -> Result<(), String> {
         }
 
         Command::Show { id: None } => {
-            let workspace = load_workspace(&workspaces)?;
+            let workspace = load_workspace(&workspaces, &resources)?;
             let resolved = workspace
                 .resolve(&resources)
                 .map_err(|error| error.to_string())?;
@@ -181,7 +187,7 @@ fn run() -> Result<(), String> {
             // Comprobamos que el recurso exista antes de registrar la referencia.
             let resource = resources.get(id).map_err(|error| error.to_string())?;
 
-            let mut workspace = load_workspace(&workspaces)?;
+            let mut workspace = load_workspace(&workspaces, &resources)?;
 
             let instance_id = workspace
                 .add_resource(id)
