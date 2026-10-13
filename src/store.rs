@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::resource::{
     normalize_description, normalize_name, validate_stored_name, Info, Management, Resource,
-    ResourcePatch, ResourceWarning,
+    ResourceError, ResourcePatch, ResourceWarning,
 };
 
 #[derive(Debug)]
@@ -72,6 +72,14 @@ impl std::fmt::Display for StoreError {
 
 impl std::error::Error for StoreError {}
 
+impl From<ResourceError> for StoreError {
+    fn from(value: ResourceError) -> Self {
+        match value {
+            ResourceError::InvalidName => Self::InvalidName,
+        }
+    }
+}
+
 impl From<io::Error> for StoreError {
     fn from(value: io::Error) -> Self {
         Self::Io(value)
@@ -121,7 +129,7 @@ impl ResourceStore {
         name: &str,
         description: Option<&str>,
     ) -> Result<(Resource, Vec<ResourceWarning>), StoreError> {
-        let (name, _) = normalize_name(name)?;
+        let (name, _) = normalize_name(name).map_err(StoreError::from)?;
         let mut warnings = Vec::new();
         let id = Uuid::now_v7();
         let description = normalize_description(description.map(str::to_owned));
@@ -491,7 +499,7 @@ impl ResourceStore {
                 found: resource.id,
             });
         }
-        validate_stored_name(&resource.info.title)?;
+        validate_stored_name(&resource.info.title).map_err(StoreError::from)?;
         Ok(resource)
     }
 }

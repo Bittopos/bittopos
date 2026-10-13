@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::store::StoreError;
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Resource {
     /// Identidad estable del recurso.
@@ -53,20 +51,20 @@ pub enum ResourceWarning {
     LeadingSpaces { id: Uuid },
 }
 
-pub(crate) fn normalize_name(name: &str) -> Result<(String, Vec<ResourceWarning>), StoreError> {
+pub(crate) fn normalize_name(name: &str) -> Result<(String, Vec<ResourceWarning>), ResourceError> {
     let normalized = name.trim_end_matches(' ').to_owned();
 
     if normalized.is_empty() {
-        return Err(StoreError::InvalidName);
+        return Err(ResourceError::InvalidName);
     }
 
     // Los espacios iniciales se conservan por ahora.
     Ok((normalized, Vec::new()))
 }
 
-pub(crate) fn validate_stored_name(name: &str) -> Result<(), StoreError> {
+pub(crate) fn validate_stored_name(name: &str) -> Result<(), ResourceError> {
     if name.is_empty() || name.trim_matches(' ').is_empty() {
-        return Err(StoreError::InvalidName);
+        return Err(ResourceError::InvalidName);
     }
 
     Ok(())
@@ -74,4 +72,34 @@ pub(crate) fn validate_stored_name(name: &str) -> Result<(), StoreError> {
 
 pub(crate) fn normalize_description(description: Option<String>) -> Option<String> {
     description.filter(|value| !value.is_empty())
+}
+
+
+/// Error produced by resource-domain validation, independent of persistence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ResourceError {
+    InvalidName,
+}
+
+impl std::fmt::Display for ResourceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidName => write!(f, "el nombre no puede estar vacío ni contener solo espacios"),
+        }
+    }
+}
+
+impl std::error::Error for ResourceError {}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn name_validation_reports_domain_error_without_storage_types() {
+        assert_eq!(normalize_name("   ").unwrap_err(), ResourceError::InvalidName);
+        assert_eq!(validate_stored_name("   ").unwrap_err(), ResourceError::InvalidName);
+        assert!(normalize_name("valid name").is_ok());
+    }
 }
