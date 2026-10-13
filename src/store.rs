@@ -580,6 +580,39 @@ mod tests {
     }
 
     #[test]
+    fn reads_legacy_allocation_and_writes_structural_on_next_update() {
+        let (_dir, store) = store();
+        let id = Uuid::now_v7();
+        let instance_id = Uuid::now_v7();
+        let path = store.path_for(id);
+        fs::write(
+            &path,
+            format!(
+                "id = \"{id}\"\n\n[management]\nallocation = [\"{instance_id}\"]\n\n[info]\ntitle = \"Legado\"\ntags = []\n"
+            ),
+        )
+        .unwrap();
+
+        let loaded = store.get(id).unwrap();
+        assert_eq!(loaded.management.structural, vec![instance_id]);
+
+        store
+            .update(
+                id,
+                ResourcePatch {
+                    title: Some("Actualizado".to_owned()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+
+        let persisted = fs::read_to_string(path).unwrap();
+        assert!(persisted.contains("structural = ["));
+        assert!(!persisted.contains("allocation = ["));
+        assert_eq!(store.get(id).unwrap().management.structural, vec![instance_id]);
+    }
+
+    #[test]
     fn structural_registry_registers_and_unregisters_instance_ids() {
         let (_dir, store) = store();
         let (resource, _) = store.create("Asignación", None).unwrap();
