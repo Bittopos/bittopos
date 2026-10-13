@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::process;
 
 use bittopos_core::{
-    create_instance, reconcile_workspace, remove_instance, ResourcePatch, ResourceStore,
+    create_instance, reconcile_workspace, remove_instance, Instance, ResourcePatch, ResourceStore,
     Workspace, WorkspaceStore,
 };
 use clap::{Parser, Subcommand};
@@ -153,12 +153,12 @@ fn run() -> Result<(), String> {
         Command::Remove { id } => {
             remove_instance(&resources, &workspaces, WORKSPACE_FILE, id)
                 .map_err(|error| error.to_string())?;
-            println!("Instancia eliminada: {id}");
+            println!("Instancia removida: {id}");
         }
         Command::Recover => {
             println!(
                 "Workspace consistente: {} instancia(s).",
-                startup_workspace.instances.len()
+                startup_workspace.all_instances().len()
             );
         }
     }
@@ -178,16 +178,25 @@ fn print_workspace(
     workspace: &Workspace,
     resources: &ResourceStore,
 ) -> Result<(), String> {
-    let resolved = workspace.resolve(resources).map_err(|error| error.to_string())?;
-    if resolved.is_empty() {
+    if workspace.all_instances().is_empty() {
         println!("El workspace está vacío.");
-    } else {
-        for (instance, resource) in workspace.instances.iter().zip(resolved.iter()) {
-            println!(
-                "- {} [{}] — recurso {}",
-                resource.info.title, instance.id, instance.source.id
-            );
-        }
+        return Ok(());
+    }
+    print_instances(workspace.instances(), resources, 0)
+}
+
+fn print_instances(
+    instances: &[Instance],
+    resources: &ResourceStore,
+    depth: usize,
+) -> Result<(), String> {
+    for instance in instances {
+        let resource = resources.get(instance.source.id).map_err(|error| error.to_string())?;
+        println!(
+            "{}- {} [{}] — recurso {}",
+            "  ".repeat(depth), resource.info.title, instance.id, instance.source.id
+        );
+        print_instances(instance.children(), resources, depth + 1)?;
     }
     Ok(())
 }
