@@ -34,3 +34,40 @@ pub(crate) fn atomic_write(
     OpenOptions::new().read(true).open(parent)?.sync_all()?;
     Ok(())
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn atomically_writes_content_and_replaces_destination() {
+        let dir = tempfile::tempdir().unwrap();
+        let destination = dir.path().join("state.json");
+        let temporary = dir.path().join(".state.tmp");
+
+        atomic_write(&temporary, &destination, b"first").unwrap();
+        assert_eq!(fs::read(&destination).unwrap(), b"first");
+
+        let temporary = dir.path().join(".state-next.tmp");
+        atomic_write(&temporary, &destination, b"second").unwrap();
+        assert_eq!(fs::read(&destination).unwrap(), b"second");
+        assert!(!temporary.exists());
+    }
+
+    #[test]
+    fn refuses_to_overwrite_an_existing_temporary_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let destination = dir.path().join("state.json");
+        let temporary = dir.path().join(".state.tmp");
+        fs::write(&destination, b"confirmed").unwrap();
+        fs::write(&temporary, b"unconfirmed").unwrap();
+
+        let error = atomic_write(&temporary, &destination, b"replacement").unwrap_err();
+
+        assert_eq!(error.kind(), io::ErrorKind::AlreadyExists);
+        assert_eq!(fs::read(&destination).unwrap(), b"confirmed");
+        assert_eq!(fs::read(&temporary).unwrap(), b"unconfirmed");
+    }
+}
