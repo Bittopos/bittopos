@@ -417,7 +417,7 @@ mod tests {
     fn rejects_legacy_flat_workspace_without_modifying_the_file() {
         let (_dir, _resources, store) = setup();
         let path = store.root().join("proyecto.json");
-        let legacy = r#"{\"instances\":[]}"#;
+        let legacy = r#"{"instances":[]}"#;
         fs::write(&path, legacy).unwrap();
         assert!(matches!(store.load("proyecto"), Err(WorkspaceError::Json(_))));
         assert_eq!(fs::read_to_string(path).unwrap(), legacy);
