@@ -20,8 +20,8 @@ pub enum StoreError {
     IdNotFirstLine(PathBuf),
     TemporaryExists(PathBuf),
     PreparedContentMismatch(Uuid),
-    AllocationConflict(Uuid),
-    IncompleteManagement(Uuid),
+    StructuralConflict(Uuid),
+    IncompleteStructural(Uuid),
 }
 
 impl std::fmt::Display for StoreError {
@@ -58,13 +58,13 @@ impl std::fmt::Display for StoreError {
                 f,
                 "el contenido temporal preparado no coincide con el recurso esperado {id}"
             ),
-            Self::AllocationConflict(id) => write!(
+            Self::StructuralConflict(id) => write!(
                 f,
                 "la instancia {id} ya figura en la asignación del recurso"
             ),
-            Self::IncompleteManagement(id) => write!(
+            Self::IncompleteStructural(id) => write!(
                 f,
-                "el recurso {id} no contiene management.allocation; se detuvo la recuperación para evitar perder instancias"
+                "el recurso {id} no contiene management.structural; se detuvo la recuperación para evitar perder instancias"
             ),
         }
     }
@@ -170,10 +170,10 @@ impl ResourceStore {
             let document: toml::Value = toml::from_str(&content)?;
             if document
                 .get("management")
-                .and_then(|management| management.get("allocation"))
+                .and_then(|management| management.get("structural").or_else(|| management.get("allocation")))
                 .is_none()
             {
-                return Err(StoreError::IncompleteManagement(expected_id));
+                return Err(StoreError::IncompleteStructural(expected_id));
             }
             resources.push(self.read_file(&path, expected_id)?);
         }
@@ -190,10 +190,10 @@ impl ResourceStore {
         instance_id: Uuid,
     ) -> Result<(), StoreError> {
         let mut resource = self.get(resource_id)?;
-        if resource.management.allocation.contains(&instance_id) {
-            return Err(StoreError::AllocationConflict(instance_id));
+        if resource.management.structural.contains(&instance_id) {
+            return Err(StoreError::StructuralConflict(instance_id));
         }
-        resource.management.allocation.push(instance_id);
+        resource.management.structural.push(instance_id);
         self.write_existing(&resource)
     }
 
@@ -207,13 +207,13 @@ impl ResourceStore {
         let mut resource = self.get(resource_id)?;
         let Some(position) = resource
             .management
-            .allocation
+            .structural
             .iter()
             .position(|id| *id == instance_id)
         else {
             return Ok(false);
         };
-        resource.management.allocation.remove(position);
+        resource.management.structural.remove(position);
         self.write_existing(&resource)?;
         Ok(true)
     }
@@ -267,7 +267,7 @@ impl ResourceStore {
         };
 
         // read_file permite compatibilidad al leer recursos antiguos; para recuperar
-        // un temporal exigimos el contrato completo de allocation.
+        // un temporal exigimos el contrato completo de structural.
         let content = fs::read_to_string(&temporary_path)?;
         let document: toml::Value = match toml::from_str(&content) {
             Ok(document) => document,
@@ -279,12 +279,12 @@ impl ResourceStore {
         };
         if document
             .get("management")
-            .and_then(|management| management.get("allocation"))
+            .and_then(|management| management.get("structural").or_else(|| management.get("allocation")))
             .is_none()
         {
             return Ok(TemporaryInspection::Invalid {
                 reason: format!(
-                    "el temporal {} no contiene management.allocation",
+                    "el temporal {} no contiene management.structural",
                     temporary_path.display()
                 ),
             });
@@ -536,7 +536,7 @@ mod tests {
     }
 
     #[test]
-    fn loads_legacy_resource_without_management_with_empty_allocation() {
+    fn loads_legacy_resource_without_management_with_empty_structural_registry() {
         let (_dir, store) = store();
         let id = Uuid::now_v7();
         let path = store.path_for(id);
@@ -550,11 +550,11 @@ mod tests {
 
         let resource = store.get(id).unwrap();
         assert_eq!(resource.info.title, "Recurso antiguo");
-        assert!(resource.management.allocation.is_empty());
+        assert!(resource.management.structural.is_empty());
     }
 
     #[test]
-    fn strict_scan_rejects_resource_without_allocation_before_recovery() {
+    fn strict_scan_rejects_resource_without_structural_registry_before_recovery() {
         let (_dir, store) = store();
         let id = Uuid::now_v7();
         fs::write(
@@ -564,37 +564,70 @@ mod tests {
 
         assert!(matches!(
             store.all_strict(),
-            Err(StoreError::IncompleteManagement(found)) if found == id
+            Err(StoreError::IncompleteStructural(found)) if found == id
         ));
     }
 
     #[test]
-    fn new_resource_persists_management_with_empty_allocation() {
+    fn new_resource_persists_management_with_empty_structural_registry() {
         let (_dir, store) = store();
         let (resource, _) = store.create("Nuevo", None).unwrap();
         let file = fs::read_to_string(store.path_for(resource.id)).unwrap();
 
         assert!(file.contains("[management]"));
-        assert!(file.contains("allocation = []"));
-        assert!(resource.management.allocation.is_empty());
+        assert!(file.contains("structural = []"));
+        assert!(resource.management.structural.is_empty());
     }
 
     #[test]
-    fn allocation_registers_and_unregisters_instance_ids() {
+    fn reads_legacy_allocation_and_writes_structural_on_next_update() {
+        let (_dir, store) = store();
+        let id = Uuid::now_v7();
+        let instance_id = Uuid::now_v7();
+        let path = store.path_for(id);
+        fs::write(
+            &path,
+            format!(
+                "id = \"{id}\"\n\n[management]\nallocation = [\"{instance_id}\"]\n\n[info]\ntitle = \"Legado\"\ntags = []\n"
+            ),
+        )
+        .unwrap();
+
+        let loaded = store.get(id).unwrap();
+        assert_eq!(loaded.management.structural, vec![instance_id]);
+
+        store
+            .update(
+                id,
+                ResourcePatch {
+                    title: Some("Actualizado".to_owned()),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+
+        let persisted = fs::read_to_string(path).unwrap();
+        assert!(persisted.contains("structural = ["));
+        assert!(!persisted.contains("allocation = ["));
+        assert_eq!(store.get(id).unwrap().management.structural, vec![instance_id]);
+    }
+
+    #[test]
+    fn structural_registry_registers_and_unregisters_instance_ids() {
         let (_dir, store) = store();
         let (resource, _) = store.create("Asignación", None).unwrap();
         let instance_id = Uuid::now_v7();
 
         store.register_instance(resource.id, instance_id).unwrap();
-        assert_eq!(store.get(resource.id).unwrap().management.allocation, vec![instance_id]);
+        assert_eq!(store.get(resource.id).unwrap().management.structural, vec![instance_id]);
 
         assert!(store.unregister_instance(resource.id, instance_id).unwrap());
-        assert!(store.get(resource.id).unwrap().management.allocation.is_empty());
+        assert!(store.get(resource.id).unwrap().management.structural.is_empty());
         assert!(!store.unregister_instance(resource.id, instance_id).unwrap());
     }
 
     #[test]
-    fn allocation_rejects_duplicate_instance_ids() {
+    fn structural_registry_rejects_duplicate_instance_ids() {
         let (_dir, store) = store();
         let (resource, _) = store.create("Asignación", None).unwrap();
         let instance_id = Uuid::now_v7();
@@ -602,9 +635,9 @@ mod tests {
         store.register_instance(resource.id, instance_id).unwrap();
         assert!(matches!(
             store.register_instance(resource.id, instance_id),
-            Err(StoreError::AllocationConflict(id)) if id == instance_id
+            Err(StoreError::StructuralConflict(id)) if id == instance_id
         ));
-        assert_eq!(store.get(resource.id).unwrap().management.allocation, vec![instance_id]);
+        assert_eq!(store.get(resource.id).unwrap().management.structural, vec![instance_id]);
     }
 
     #[test]
@@ -827,14 +860,14 @@ mod tests {
     }
 
     #[test]
-    fn explicit_temporary_promotion_rejects_missing_allocation() {
+    fn explicit_temporary_promotion_rejects_missing_structural_registry() {
         let (_dir, store) = store();
         let (confirmed, _) = store.create("Confirmado", None).unwrap();
         let temporary_path = store.temporary_path_for(confirmed.id);
         fs::write(
             &temporary_path,
             format!(
-                "id = \"{}\"\n\n[info]\ntitle = \"Sin allocation\"\ntags = []\n",
+                "id = \"{}\"\n\n[info]\ntitle = \"Sin structural\"\ntags = []\n",
                 confirmed.id
             ),
         )

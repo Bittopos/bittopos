@@ -18,7 +18,7 @@ Principios:
 
 1. Separar el espacio de definición del espacio de instanciación.
 2. Mantener separadas la identidad de un recurso y la identidad de cada instancia de ese recurso.
-3. Distinguir la contención estructural de las asignaciones, relaciones y referencias.
+3. Distinguir `semantic.allocation` (contención directa) de `management.structural` (registro de identidades de instancia), así como de relaciones y referencias.
 4. Permitir que una instancia conserve o sobreponga propiedades mediante máscaras sin modificar accidentalmente la definición original.
 5. Consultar el almacenamiento bajo demanda, evitando cargar toda la estructura en memoria solo para mostrarla.
 6. Mantener el núcleo independiente de la CLI, del servidor HTTP y de la interfaz web.
@@ -40,7 +40,7 @@ Definición identificable y persistente. Cada recurso posee un identificador est
 
 ### 2.4. Instance
 
-Aparición concreta de un recurso. Cada instancia tiene un identificador propio `id`, distinto del ID del recurso original. El identificador de instancia se almacena como campo de nivel superior, fuera de los segmentos, igual que `Resource.id` en la definición. La instancia identifica además su recurso de origen mediante `source.id`. Varias instancias pueden proceder del mismo recurso y deben distinguirse por su propio `id`. La instancia puede tener segmentos propios o segmentos máscara.
+Aparición concreta de un recurso. Cada instancia tiene un identificador propio `id`, distinto del ID del recurso original. El identificador de instancia se almacena como campo de nivel superior, fuera de los segmentos. `Instance.id` identifica la instancia; `source.id` referencia el mismo identificador de recurso que `Resource.id`, aunque se encuentre en una ubicación distinta. La instancia identifica además su recurso de origen mediante `source.id`. Varias instancias pueden proceder del mismo recurso y deben distinguirse por su propio `id`. La instancia puede tener segmentos propios o segmentos máscara.
 
 ### 2.5. Segment
 
@@ -58,20 +58,20 @@ Un segmento de instancia que no corresponde a un segmento definido en el recurso
 
 ### 2.7. Concept
 
-Unidad de datos de usuario compuesta por una clave y un valor. El valor puede ser un arreglo. En esta versión, un Concept no contiene recursivamente otros Concept como estructura arbitraria.
+Unidad de información compuesta por una clave y un valor. Por ejemplo, `title` y `description` son conceptos dentro del segmento `info`: cada uno representa una pieza de información con su propio significado. El valor puede ser un arreglo. En esta versión, un Concept no contiene recursivamente otros Concept como estructura arbitraria.
 
 Los datos del sistema —por ejemplo, identificadores de recursos, instancias, relaciones o referencias— se representan mediante componentes especializados, no como Concept de usuario.
 
-El contrato de implementación deberá fijar el conjunto de tipos admitidos para los valores de Concept. No se debe asumir que todos los valores son cadenas.
+El contrato de implementación deberá fijar el conjunto de tipos admitidos para los valores de Concept. No se debe asumir que todos los valores son cadenas. Este modelo conceptual no obliga a implementar un motor genérico dinámico: los conceptos pueden representarse mediante campos tipados del lenguaje y serializarse con las herramientas correspondientes.
 
 ### 2.8. Component
 
 Estructura especializada que representa datos del sistema o una organización semántica concreta dentro de un segmento. Los componentes pueden contener identificadores u otras estructuras tipadas.
 
-### 2.9. Contención, asignación, relación y referencia
+### 2.9. Contención, registro de instancias, relación y referencia
 
 - **Contención:** expresa la composición estructural de un objeto mediante otros objetos.
-- **Asignación:** registra en el espacio de definición identificadores asignados, incluidas las identidades de las instancias creadas a partir de un recurso.
+- **Registro de instancias:** `management.structural` registra en el espacio de definición las identidades de las instancias creadas a partir de un recurso.
 - **Relación:** expresa una conexión semántica entre elementos, distinta de la contención.
 - **Referencia:** identifica o apunta a otro elemento sin implicar por sí misma contención.
 
@@ -91,9 +91,9 @@ Posición persistente de navegación. Puede ser la raíz del espacio de trabajo 
 
 Segmento de sistema para responsabilidades administrativas globales de la definición del recurso, incluidas privacidad, permisos globales y demás propiedades de gestión. El campo superior `Resource.id` permanece fuera de los segmentos y no se hereda como identidad de una instancia.
 
-`management` se administra desde el espacio de definición. Una instancia no puede utilizar operaciones ordinarias para leer o modificar componentes de gestión global ni cambiar la definición de origen. Cuando el contrato permita una máscara de otra propiedad de `management`, esta solo podrá producir un comportamiento local de la instancia; nunca modificará la definición original. `management.allocation` es una excepción estricta: no puede consultarse, modificarse ni enmascararse desde el espacio de instanciación.
+`management` se administra desde el espacio de definición. Una instancia no puede utilizar operaciones ordinarias para leer o modificar componentes de gestión global ni cambiar la definición de origen. Cuando el contrato permita una máscara de otra propiedad de `management`, esta solo podrá producir un comportamiento local de la instancia; nunca modificará la definición original. `management.structural` es una excepción estricta: no puede consultarse, modificarse ni enmascararse desde el espacio de instanciación.
 
-El componente `allocation` pertenece a `management`, porque registra las identidades de las instancias asignadas a una definición. No describe los objetos que un recurso contiene. Sus cambios son operaciones controladas del sistema asociadas al ciclo de vida de las instancias.
+El componente `management.structural` registra las identidades de las instancias creadas a partir de una definición. No describe los objetos que una instancia contiene. Sus cambios son operaciones controladas del sistema asociadas al ciclo de vida de las instancias.
 
 ### 3.2. `info`
 
@@ -103,7 +103,7 @@ Segmento de sistema para información descriptiva de un recurso. En el modelo ac
 
 Segmento de sistema para la organización semántica de un recurso. Los componentes conceptuales previstos incluyen:
 
-- `structural`: contención directa.
+- `allocation`: contención directa.
 - `relational`: relaciones semánticas.
 - `referential`: referencias a otros elementos.
 
@@ -115,27 +115,29 @@ En 0.3 estos nombres sirven para fijar el modelo y el glosario, pero solo se imp
 
 `source.id` es un componente de sistema protegido: las operaciones ordinarias de edición de segmentos, componentes o conceptos no pueden reemplazarlo ni alterarlo. Su cambio solo puede ocurrir mediante operaciones internas explícitas y validadas que formen parte de la creación de una instancia.
 
-La denominación y ubicación de `source.id` se consideran provisionales hasta comprobar su estabilidad durante la implementación, pero constituyen el modelo previsto para esta línea. No debe añadirse un campo permanente paralelo `resource_id` al nuevo esquema.
+Aunque `source.id` se almacena dentro de la instancia y `Resource.id` en el nivel superior del recurso, ambos representan conceptualmente el mismo identificador del recurso de origen. La instancia conserva su identidad independiente en `Instance.id`. No debe añadirse un campo permanente paralelo `resource_id` al nuevo esquema.
 
 ## 4. Componentes y reglas de uso
 
-### 4.1. `allocation`
+### 4.1. `structural`
 
-`allocation` pertenece a `management` y al espacio de definición. Registra los identificadores asignados a las instancias creadas a partir de un recurso. Sirve para conservar la correspondencia entre la definición y las identidades de sus instancias y facilita la validación y recuperación ante fallos.
+`structural` pertenece a `management` y al espacio de definición. Registra los identificadores de las instancias creadas a partir de un recurso. Mantiene la correspondencia entre una definición y las identidades de sus instancias y facilita la validación y recuperación ante fallos.
 
-La identidad de cada instancia es independiente del ID del recurso original. No se debe inferir la identidad de una instancia a partir del ID de su recurso. Cada instancia mantiene `id` propio y referencia el origen mediante `source.id`.
+La identidad de cada instancia es independiente del ID del recurso original. No se debe inferir la identidad de una instancia a partir del ID de su recurso. Cada instancia mantiene un `id` propio y referencia el origen mediante `source.id`.
 
-`allocation` es un componente administrativo reservado al sistema: no puede leerse, modificarse ni enmascararse mediante la interfaz del espacio de instanciación. Su modificación debe corresponder a operaciones controladas de creación, recuperación o eliminación de instancias en el espacio de definición.
+`structural` es un componente administrativo reservado al sistema: no puede leerse, modificarse ni enmascararse mediante la interfaz del espacio de instanciación. Su modificación corresponde a operaciones controladas de creación, recuperación o eliminación de instancias en el espacio de definición.
 
-En esta versión, `allocation` no representa contención ni almacena los identificadores de los objetos que contiene una instancia. La implementación de relaciones y referencias generales queda fuera del alcance.
+En esta versión, `structural` no representa contención ni almacena los identificadores de los objetos que contiene una instancia. Es un registro de ciclo de vida asociado a la definición.
 
-### 4.2. `structural`
+### 4.2. `allocation`
 
-`structural` expresa qué objetos contiene directamente una instancia. Registra solo el primer nivel de contención; los descendientes se descubren recorriendo la estructura, no duplicando todos sus IDs en el padre.
+`allocation` pertenece a `semantic` y expresa qué objetos contiene directamente una instancia. Registra solo los IDs de los hijos directos; no almacena copias completas de sus definiciones ni duplica en el padre todos los IDs de los descendientes.
 
-Aunque la contención se considera universal y conceptualmente puede existir en el espacio de definición o en el de instanciación, **en 0.3 solo se utilizará en instancias**. No se implementará la contención estructural global en recursos originales, ya que podría afectar a todas sus instancias.
+Aunque la contención se considera universal y conceptualmente puede existir en el espacio de definición o en el de instanciación, **en 0.3 solo se utilizará en instancias**. No se implementará la contención semántica global en recursos originales, ya que podría afectar a todas sus instancias.
 
-La interfaz podrá presentar esta operación al usuario con expresiones sencillas, como guardar un objeto dentro de otro. No debe exigir que el usuario conozca el término técnico `structural`.
+La interfaz podrá presentar esta operación al usuario con expresiones sencillas, como guardar un objeto dentro de otro. No debe exigir que el usuario conozca el término técnico `allocation`.
+
+La representación JSON del mapa de contención del espacio de trabajo se definirá en un paso posterior, antes de implementar este componente. En este contrato solo queda fijada su responsabilidad semántica: representar la contención directa mediante identificadores. La recuperación del mapa de contención, el tratamiento de ciclos y la navegación quedan fuera del primer incremento de diseño.
 
 ### 4.3. `relational` y `referential`
 
@@ -149,12 +151,12 @@ Son componentes conceptuales reservados para relaciones y referencias. No se imp
 4. Varias instancias pueden compartir `source.id`, pero nunca la misma identidad de instancia dentro del ámbito de unicidad definido por el sistema.
 5. Crear una instancia no crea una nueva definición de recurso.
 6. Crear o modificar datos propios de una instancia no debe modificar accidentalmente la definición original.
-7. `allocation` registra en la definición las identidades asignadas a sus instancias.
+7. `management.structural` registra en la definición las identidades de sus instancias.
 8. El contexto de navegación identifica una instancia, no solo el recurso de origen.
 9. Los identificadores internos del sistema no se representan como simples datos de usuario ni se modifican mediante ediciones genéricas de segmentos.
 10. Los alias no forman parte del alcance funcional de 0.3. Si se añaden en el futuro, no sustituirán a los identificadores estables.
 
-La implementación mantiene `allocation` como fuente de verdad para reconstruir el workspace. La creación confirma primero la asignación y luego persiste la instancia; la eliminación retira primero la asignación y luego persiste el workspace. Si el proceso se interrumpe entre ambos pasos, la siguiente reconciliación reconstruye las instancias asignadas y elimina las residuales. La recuperación valida todos los recursos antes de modificar el workspace, exige que cada recurso tenga `management.allocation` y se detiene ante archivos ilegibles, registros ausentes o IDs asignados a más de un recurso. El núcleo permite varias instancias del mismo origen y valida la identidad propia de cada instancia.
+La implementación mantiene `management.structural` como fuente de verdad para reconstruir el workspace. La creación registra primero el ID de la instancia en la definición y luego persiste la instancia; la eliminación retira primero ese registro y luego persiste el workspace. Si el proceso se interrumpe entre ambos pasos, la siguiente reconciliación reconstruye las instancias asignadas y elimina las residuales. La recuperación valida todos los recursos antes de modificar el workspace, exige que cada recurso tenga `management.structural` y se detiene ante archivos ilegibles, registros ausentes o IDs asignados a más de un recurso. El núcleo permite varias instancias del mismo origen y valida la identidad propia de cada instancia.
 
 ## 6. Herencia y máscaras
 
@@ -178,7 +180,7 @@ Algunos segmentos y propiedades pueden estar sujetos a reglas especiales que lim
 
 ### 6.4. Privacidad y permisos
 
-La gestión global de la definición y los permisos efectivos de una instancia son conceptos distintos. Cuando una propiedad de `management` admita máscara, esta solo crea un comportamiento local y no cambia la definición de origen. `management.allocation` nunca admite acceso ni máscara desde una instancia. El sistema completo de autorización no forma parte de 0.3.
+La gestión global de la definición y los permisos efectivos de una instancia son conceptos distintos. Cuando una propiedad de `management` admita máscara, esta solo crea un comportamiento local y no cambia la definición de origen. `management.structural` nunca admite acceso ni máscara desde una instancia. El sistema completo de autorización no forma parte de 0.3.
 
 La política provisional permite que las instancias sean accesibles por terceros cuando se solicita la máscara de permisos correspondiente. Esto no debe interpretarse como autorización universal para modificar la definición original. La edición, la edición mediante referencias y la administración avanzada de permisos quedan fuera de alcance.
 
@@ -195,8 +197,8 @@ La persistencia deberá permitir distinguir, como mínimo:
 - Definiciones de recursos.
 - Identidades y estado de instancias.
 - Referencia `source.id` al recurso de origen.
-- Contención directa de cada instancia.
-- Registro de asignaciones de instancia asociado a cada definición.
+- Contención directa de cada instancia mediante `semantic.allocation`.
+- Registro `management.structural` de identidades de instancia asociado a cada definición.
 - Contexto de navegación persistente.
 
 El formato físico debe evitar duplicar sin necesidad la definición original. El espacio de trabajo por defecto no implica la existencia de perfiles, proyectos ni cuentas. Estos conceptos quedan fuera de esta versión.
@@ -217,7 +219,7 @@ Reglas:
 5. Al retroceder, no se debe ofrecer un destino inexistente como posición válida.
 6. La navegación se persiste mediante una operación explícita; reiniciar el programa no la restablece automáticamente.
 7. El contexto actual es local y único. Su diseño no debe impedir que en el futuro se separe por perfil, proyecto, dispositivo y sesión.
-8. Solo las instancias con componente `structural` y la raiz misma del espacio de trabajo pueden ser destino de navegación.
+8. Solo las instancias con el componente `semantic.allocation` y la raíz misma del espacio de trabajo pueden ser destino de navegación.
 
 La expiración de sesiones, la navegación sincronizada entre dispositivos y la resolución de conflictos futuros no se implementan en 0.3.
 
@@ -283,11 +285,11 @@ Esta organización es una dirección de diseño, no una afirmación de que todos
 - Introducir el segmento de instancia `source` con el componente protegido `source.id`.
 - Permitir múltiples instancias del mismo recurso, diferenciadas por `Instance.id`.
 - Rechazar JSON antiguos que contengan `resource_id`; no existe migración automática.
-- Restringir `management.allocation` al espacio de definición.
+- Restringir `management.structural` al espacio de definición.
 - Distinguir el espacio de definición del espacio de instanciación.
 - Definir los segmentos `management`, `info` y `semantic`.
-- Ubicar `allocation` en `management`.
-- Definir `structural` como componente de contención directa.
+- Ubicar `management.structural` en el espacio de definición como registro de identidades de instancia.
+- Definir `semantic.allocation` como componente de contención directa.
 - Mantener la identidad del recurso separada de la identidad de la instancia.
 - Establecer reglas de herencia, máscaras y sobreposición de propiedades.
 - Persistir el estado necesario para las instancias y la navegación.
@@ -297,7 +299,7 @@ Esta organización es una dirección de diseño, no una afirmación de que todos
 
 ### Excluido o aplazado
 
-- Contención estructural global en definiciones originales.
+- Contención mediante `semantic.allocation` en definiciones originales.
 - Implementación completa de relaciones y referencias.
 - Alias de recursos e instancias.
 - Edición por referencias y edición avanzada.
@@ -319,9 +321,9 @@ La línea 0.3 podrá considerarse coherente con este contrato cuando las impleme
 - [ ] `source.id` referencia el recurso de origen y no puede modificarse mediante operaciones genéricas de edición.
 - [ ] Varias instancias pueden referenciar el mismo recurso y distinguirse por su propio ID.
 - [ ] Los JSON con `resource_id` se rechazan sin modificarlos.
-- [ ] `management.allocation` no puede consultarse, modificarse ni enmascararse desde el espacio de instanciación.
-- [ ] `allocation` se mantiene separado de la contención y registra las identidades de instancia asociadas a la definición.
-- [ ] `structural` registra solo los hijos directos de una instancia.
+- [ ] `management.structural` no puede consultarse, modificarse ni enmascararse desde el espacio de instanciación.
+- [ ] `management.structural` se mantiene separado de la contención y registra las identidades de instancia asociadas a la definición.
+- [ ] `semantic.allocation` registra solo los hijos directos de una instancia.
 - [ ] La modificación de datos particulares de una instancia no modifica accidentalmente la definición original.
 - [ ] Las máscaras distinguen las propiedades heredadas de las protegidas o sobrepuestas.
 - [ ] La eliminación de una máscara no destruye silenciosamente datos propios de la instancia.
@@ -339,7 +341,7 @@ Estos criterios describen lo que debe verificarse; no afirman que la implementac
 
 La implementación de este contrato debe terminar con una revisión explícita de fallas de seguridad evidentes o aparentes. La revisión deberá registrar los riesgos observados, las condiciones para reproducirlos, el impacto posible, las mitigaciones implementadas y los problemas que queden pendientes. No debe afirmarse que el sistema es seguro únicamente porque la interfaz ordinaria rechace operaciones prohibidas.
 
-Como mínimo, se revisarán los caminos alternativos de escritura, la protección de `Resource.id`, `Instance.id` y `source.id`, el aislamiento de la definición original, el acceso a `management.allocation`, la validación de archivos cargados, el rechazo del esquema JSON obsoleto, las referencias inexistentes y los estados parciales ante fallos de persistencia. La edición manual directa de los archivos locales queda fuera de la responsabilidad de la aplicación, pero los archivos que esta cargue deben validarse antes de confiar en su contenido.
+Como mínimo, se revisarán los caminos alternativos de escritura, la protección de `Resource.id`, `Instance.id` y `source.id`, el aislamiento de la definición original, el acceso a `management.structural`, la validación de archivos cargados, el rechazo del esquema JSON obsoleto, las referencias inexistentes y los estados parciales ante fallos de persistencia. La edición manual directa de los archivos locales queda fuera de la responsabilidad de la aplicación, pero los archivos que esta cargue deben validarse antes de confiar en su contenido.
 
 Esta sección establece una revisión pendiente de la implementación; no afirma que se haya realizado una auditoría ni que se hayan encontrado o descartado vulnerabilidades.
 

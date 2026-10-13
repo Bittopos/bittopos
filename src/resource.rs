@@ -19,8 +19,8 @@ pub struct Resource {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct Management {
     /// Identidades de instancias creadas a partir de esta definición.
-    #[serde(default)]
-    pub(crate) allocation: Vec<Uuid>,
+    #[serde(default, alias = "allocation")]
+    pub(crate) structural: Vec<Uuid>,
 }
 
 /// Información descriptiva del recurso.

@@ -81,7 +81,7 @@ fn run() -> Result<(), String> {
     let workspaces =
         WorkspaceStore::new(&paths.workspaces).map_err(|error| error.to_string())?;
 
-    // Toda invocación comienza reconciliando el workspace con allocation.
+    // Toda invocación comienza reconciliando el workspace con management.structural.
     let (startup_workspace, startup_report) =
         reconcile_workspace(&resources, &workspaces, WORKSPACE_FILE)
             .map_err(|error| error.to_string())?;
