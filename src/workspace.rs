@@ -419,6 +419,14 @@ mod tests {
     }
 
     #[test]
+    fn workspace_listing_ignores_hidden_journal_files() {
+        let (_dir, _resources, store) = setup();
+        fs::write(store.root().join(".proyecto.journal.json"), "{}").unwrap();
+        fs::write(store.root().join("proyecto.json"), r#"{"content":{"instances":[]}}"#).unwrap();
+        assert_eq!(store.list().unwrap(), vec!["proyecto".to_owned()]);
+    }
+
+    #[test]
     fn rejects_legacy_flat_workspace_without_modifying_the_file() {
         let (_dir, _resources, store) = setup();
         let path = store.root().join("proyecto.json");
