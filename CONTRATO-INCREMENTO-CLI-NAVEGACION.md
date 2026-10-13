@@ -171,4 +171,4 @@ Estas exclusiones son límites del incremento, no restricciones permanentes para
 
 ---
 
-**Fin de la propuesta de contrato para el incremento de CLI básica y navegación persistente.**
+**Fin del contrato del incremento de CLI básica y navegación persistente.**
