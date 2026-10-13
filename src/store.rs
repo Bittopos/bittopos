@@ -207,7 +207,7 @@ impl ResourceStore {
         let mut resource = self.get(resource_id)?;
         let Some(position) = resource
             .management
-            .allocation
+            .structural
             .iter()
             .position(|id| *id == instance_id)
         else {
@@ -536,7 +536,7 @@ mod tests {
     }
 
     #[test]
-    fn loads_legacy_resource_without_management_with_empty_allocation() {
+    fn loads_legacy_resource_without_management_with_empty_structural_registry() {
         let (_dir, store) = store();
         let id = Uuid::now_v7();
         let path = store.path_for(id);
@@ -554,7 +554,7 @@ mod tests {
     }
 
     #[test]
-    fn strict_scan_rejects_resource_without_allocation_before_recovery() {
+    fn strict_scan_rejects_resource_without_structural_registry_before_recovery() {
         let (_dir, store) = store();
         let id = Uuid::now_v7();
         fs::write(
@@ -827,14 +827,14 @@ mod tests {
     }
 
     #[test]
-    fn explicit_temporary_promotion_rejects_missing_allocation() {
+    fn explicit_temporary_promotion_rejects_missing_structural_registry() {
         let (_dir, store) = store();
         let (confirmed, _) = store.create("Confirmado", None).unwrap();
         let temporary_path = store.temporary_path_for(confirmed.id);
         fs::write(
             &temporary_path,
             format!(
-                "id = \"{}\"\n\n[info]\ntitle = \"Sin allocation\"\ntags = []\n",
+                "id = \"{}\"\n\n[info]\ntitle = \"Sin structural\"\ntags = []\n",
                 confirmed.id
             ),
         )
