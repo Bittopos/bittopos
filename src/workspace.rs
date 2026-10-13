@@ -157,9 +157,9 @@ impl Workspace {
         }
         let parent = find_mut_in(&mut self.content.instances, parent_id)
             .ok_or(WorkspaceError::ParentNotFound(parent_id))?;
+        let child_id = instance.id;
         parent.content.get_or_insert_with(Content::default).instances.push(instance);
-        parent.semantic.get_or_insert_with(Semantic::default).allocation
-            .push(parent.content.as_ref().unwrap().instances.last().unwrap().id);
+        parent.semantic.get_or_insert_with(Semantic::default).allocation.push(child_id);
         Ok(())
     }
 
@@ -193,8 +193,10 @@ fn find_in(instances: &[Instance], id: Uuid) -> Option<&Instance> {
 fn find_mut_in(instances: &mut [Instance], id: Uuid) -> Option<&mut Instance> {
     for instance in instances {
         if instance.id == id { return Some(instance); }
-        if let Some(found) = find_mut_in(instance.content.get_or_insert_with(Content::default).instances.as_mut_slice(), id) {
-            return Some(found);
+        if let Some(content) = instance.content.as_mut() {
+            if let Some(found) = find_mut_in(content.instances.as_mut_slice(), id) {
+                return Some(found);
+            }
         }
     }
     None
@@ -224,12 +226,21 @@ fn remove_from(instances: &mut Vec<Instance>, id: Uuid) -> Result<Option<Instanc
     }
 
     for parent in instances.iter_mut() {
-        if let Some(removed) = remove_from(parent.content.get_or_insert_with(Content::default).instances.as_mut(), id)? {
-            if let Some(semantic) = parent.semantic.as_mut() {
-                semantic.allocation.retain(|child_id| *child_id != id);
+        if let Some(content) = parent.content.as_mut() {
+            if let Some(index) = content.instances.iter().position(|child| child.id == id) {
+                if !content.instances[index].children().is_empty() {
+                    return Err(WorkspaceError::InstanceHasChildren(id));
+                }
+                let removed = content.instances.remove(index);
+                if let Some(semantic) = parent.semantic.as_mut() {
+                    semantic.allocation.retain(|child_id| *child_id != id);
+                }
+                parent.normalize_empty_children();
+                return Ok(Some(removed));
             }
-            parent.normalize_empty_children();
-            return Ok(Some(removed));
+            if let Some(removed) = remove_from(&mut content.instances, id)? {
+                return Ok(Some(removed));
+            }
         }
     }
     Ok(None)
