@@ -227,15 +227,107 @@ fn validate_instances(instances: &[Instance], seen: &mut HashSet<Uuid>) -> Resul
 
 #[cfg(test)]
 mod tests {
- use super::*;
- #[test] fn workspace_domain_validation_needs_no_persistence() {
-  let id=Uuid::now_v7(); let w=Workspace{content:Content{instances:vec![Instance::new(id,Uuid::now_v7()),Instance::new(id,Uuid::now_v7())]}};
-  assert_eq!(w.validate(),Err(WorkspaceModelError::DuplicateInstanceId(id)));
- }
- #[test] fn rejects_semantic_physical_mismatch() {
-  let mut root=Instance::new(Uuid::now_v7(),Uuid::now_v7());
-  root.content=Some(Content{instances:vec![Instance::new(Uuid::now_v7(),Uuid::now_v7())]});
-  root.semantic=Some(Semantic{allocation:vec![Uuid::now_v7()]});
-  assert!(matches!(Workspace{content:Content{instances:vec![root]}}.validate(),Err(WorkspaceModelError::InvalidContainment(_))));
- }
+    use super::*;
+
+    #[test]
+    fn workspace_model_rejects_duplicate_instance_ids() {
+        let id = Uuid::now_v7();
+        let workspace = Workspace {
+            content: Content {
+                instances: vec![
+                    Instance::new(id, Uuid::now_v7()),
+                    Instance::new(id, Uuid::now_v7()),
+                ],
+            },
+        };
+
+        assert_eq!(
+            workspace.validate(),
+            Err(WorkspaceModelError::DuplicateInstanceId(id))
+        );
+    }
+
+    #[test]
+    fn workspace_model_rejects_semantic_physical_mismatch() {
+        let mut root = Instance::new(Uuid::now_v7(), Uuid::now_v7());
+        root.content = Some(Content {
+            instances: vec![Instance::new(Uuid::now_v7(), Uuid::now_v7())],
+        });
+        root.semantic = Some(Semantic {
+            allocation: vec![Uuid::now_v7()],
+        });
+
+        let workspace = Workspace {
+            content: Content {
+                instances: vec![root],
+            },
+        };
+
+        assert!(matches!(
+            workspace.validate(),
+            Err(WorkspaceModelError::InvalidContainment(_))
+        ));
+    }
+
+    #[test]
+    fn removing_leaf_updates_physical_and_semantic_containment() {
+        let resource_id = Uuid::now_v7();
+        let child_id = Uuid::now_v7();
+        let leaf_id = Uuid::now_v7();
+
+        let mut child = Instance::new(child_id, resource_id);
+        child.content = Some(Content {
+            instances: vec![Instance::new(leaf_id, resource_id)],
+        });
+        child.semantic = Some(Semantic {
+            allocation: vec![leaf_id],
+        });
+
+        let mut root = Instance::new(Uuid::now_v7(), resource_id);
+        root.content = Some(Content {
+            instances: vec![child],
+        });
+        root.semantic = Some(Semantic {
+            allocation: vec![child_id],
+        });
+
+        let mut workspace = Workspace {
+            content: Content {
+                instances: vec![root],
+            },
+        };
+
+        workspace.remove_leaf(leaf_id).unwrap();
+        workspace.validate().unwrap();
+
+        assert!(workspace.find_instance(leaf_id).is_none());
+        assert!(workspace.find_instance(child_id).unwrap().children().is_empty());
+        assert!(workspace.find_instance(child_id).unwrap().child_ids().is_empty());
+    }
+
+    #[test]
+    fn cannot_remove_instance_that_has_children() {
+        let resource_id = Uuid::now_v7();
+        let child_id = Uuid::now_v7();
+        let mut root = Instance::new(Uuid::now_v7(), resource_id);
+        root.content = Some(Content {
+            instances: vec![Instance::new(child_id, resource_id)],
+        });
+        root.semantic = Some(Semantic {
+            allocation: vec![child_id],
+        });
+
+        let mut workspace = Workspace {
+            content: Content {
+                instances: vec![root],
+            },
+        };
+        let root_id = workspace.content.instances[0].id;
+
+        assert!(matches!(
+            workspace.remove_leaf(root_id),
+            Err(WorkspaceModelError::InstanceHasChildren(id)) if id == root_id
+        ));
+        assert!(workspace.find_instance(child_id).is_some());
+    }
 }
