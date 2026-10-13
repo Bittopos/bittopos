@@ -75,8 +75,8 @@ fn journal_path(workspaces: &WorkspaceStore, workspace_name: &str) -> Result<Pat
         || workspace_name == "."
         || workspace_name == ".."
         || workspace_name.contains('/')
-        || workspace_name.contains('\\\\')
-        || workspace_name.contains('\\0')
+        || workspace_name.contains('\\')
+        || workspace_name.contains('\0')
     {
         return Err(WorkspaceError::InvalidName);
     }
