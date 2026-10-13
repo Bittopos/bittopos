@@ -388,8 +388,10 @@ mod tests {
         let workspace = Workspace { content: Content { instances: vec![Instance::new(Uuid::now_v7(), resource.id)] } };
         store.save("proyecto", &workspace).unwrap();
         let json = fs::read_to_string(store.root().join("proyecto.json")).unwrap();
-        assert!(!json.contains("\"semantic\""));
-        assert!(!json.contains("\"content\""));
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let leaf = &value["content"]["instances"][0];
+        assert!(leaf.get("semantic").is_none());
+        assert!(leaf.get("content").is_none());
     }
 
     #[test]
