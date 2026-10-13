@@ -20,7 +20,7 @@ El repositorio utiliza un workspace de Cargo con dos paquetes:
 - **`bittopos-core`:** define los recursos, la persistencia y los espacios de trabajo.
 - **`bitto-cli`:** proporciona la interfaz de terminal y coordina las operaciones del núcleo.
 
-La CLI no debe duplicar la lógica de validación ni implementar un sistema de persistencia independiente. Dentro del núcleo, `store.rs` gestiona archivos de definiciones, `workspace.rs` representa y persiste el estado del workspace, y `lifecycle.rs` coordina las operaciones de creación, eliminación y recuperación para mantener `allocation` como fuente de verdad.
+La CLI no debe duplicar la lógica de validación ni implementar un sistema de persistencia independiente. Dentro del núcleo, `store.rs` gestiona archivos de definiciones, `workspace.rs` representa y persiste el estado recursivo del workspace, y `lifecycle.rs` coordina instanciación, remoción y recuperación mediante un journal duradero.
 
 ## Modelo de datos
 
@@ -36,11 +36,11 @@ Cada recurso se persiste en un archivo TOML independiente. El segmento administr
 
 ### Espacios de trabajo
 
-Un espacio de trabajo contiene instancias persistidas en JSON. Cada instancia tiene un `id` propio y referencia su recurso de origen mediante `source.id`. Varias instancias pueden compartir el mismo recurso de origen sin compartir identidad. La información descriptiva del recurso no se copia en el espacio de trabajo.
+Un espacio de trabajo contiene instancias persistidas en JSON bajo `content.instances`. Cada instancia tiene un `id` propio y referencia su recurso de origen mediante `source.id`. Sus hijos completos se almacenan recursivamente en `content.instances`, mientras `semantic.allocation` contiene los IDs de sus hijos directos. Ambas vistas deben coincidir en contenido y orden; los componentes vacíos pueden omitirse. Varias instancias pueden compartir un recurso de origen sin compartir identidad.
 
 El esquema vigente exige `id` propio y `source.id` en cada instancia. La compatibilidad con `resource_id` se ha eliminado deliberadamente: los JSON antiguos se rechazan sin modificarlos. `management.structural` es la fuente de verdad para reconstruir el workspace tras una interrupción. Antes de reconciliar, el núcleo valida estrictamente todos los recursos y exige que cada uno contenga `management.structural`; si un recurso es ilegible, carece de ese registro o hay IDs asignados a varios recursos, la recuperación se detiene sin reescribir el workspace.
 
-Crear una definición y crear una instancia son operaciones distintas. La CLI delega el ciclo de vida al núcleo: primero confirma la asignación del recurso y después guarda el workspace. Al eliminar, retira primero la asignación y después persiste el workspace.
+Crear una definición y crear una instancia son operaciones distintas. La CLI delega el ciclo de vida al núcleo, que usa el orden `journal → recurso TOML → workspace JSON → retirar journal`. La remoción solo admite hojas, localizadas recursivamente, y conserva la definición del recurso; la eliminación destructiva del recurso es una operación independiente y queda aplazada.
 
 ## Almacenamiento local
 
