@@ -71,8 +71,15 @@ enum PendingOperation {
 }
 
 fn journal_path(workspaces: &WorkspaceStore, workspace_name: &str) -> Result<PathBuf, WorkspaceError> {
-    // Reutiliza la misma validación de nombre del workspace.
-    let _ = workspaces.load(workspace_name);
+    if workspace_name.trim().is_empty()
+        || workspace_name == "."
+        || workspace_name == ".."
+        || workspace_name.contains('/')
+        || workspace_name.contains('\\\\')
+        || workspace_name.contains('\\0')
+    {
+        return Err(WorkspaceError::InvalidName);
+    }
     Ok(workspaces.root().join(format!(".{workspace_name}.journal.json")))
 }
 
@@ -112,10 +119,6 @@ fn apply_pending(
     workspace_name: &str,
     operation: PendingOperation,
 ) -> Result<(), LifecycleError> {
-    let (instance, parent_id) = match &operation {
-        PendingOperation::Create { instance, parent_id } | PendingOperation::Remove { instance, parent_id } => (instance, *parent_id),
-    };
-
     match operation {
         PendingOperation::Create { instance, parent_id } => {
             let resource = resources.get(instance.source.id)?;
