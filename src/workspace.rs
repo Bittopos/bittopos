@@ -165,7 +165,30 @@ impl Workspace {
 
     /// Remueve una instancia hoja a cualquier profundidad. Nunca elimina descendientes implícitamente.
     pub(crate) fn remove_leaf(&mut self, id: Uuid) -> Result<Instance, WorkspaceError> {
-        remove_from(&mut self.content.instances, id)?.ok_or(WorkspaceError::InstanceNotFound(id))
+        let parent_id = self.parent_of(id);
+        if let Some(parent_id) = parent_id {
+            let parent = find_mut_in(&mut self.content.instances, parent_id)
+                .ok_or(WorkspaceError::ParentNotFound(parent_id))?;
+            let content = parent.content.as_mut().ok_or(WorkspaceError::InstanceNotFound(id))?;
+            let index = content.instances.iter().position(|child| child.id == id)
+                .ok_or(WorkspaceError::InstanceNotFound(id))?;
+            if !content.instances[index].children().is_empty() {
+                return Err(WorkspaceError::InstanceHasChildren(id));
+            }
+            let removed = content.instances.remove(index);
+            if let Some(semantic) = parent.semantic.as_mut() {
+                semantic.allocation.retain(|child_id| *child_id != id);
+            }
+            parent.normalize_empty_children();
+            Ok(removed)
+        } else {
+            let index = self.content.instances.iter().position(|instance| instance.id == id)
+                .ok_or(WorkspaceError::InstanceNotFound(id))?;
+            if !self.content.instances[index].children().is_empty() {
+                return Err(WorkspaceError::InstanceHasChildren(id));
+            }
+            Ok(self.content.instances.remove(index))
+        }
     }
 
     pub fn resolve(&self, resources: &ResourceStore) -> Result<Vec<Resource>, WorkspaceError> {
@@ -215,35 +238,6 @@ fn collect_instances<'a>(instances: &'a [Instance], output: &mut Vec<&'a Instanc
         output.push(instance);
         collect_instances(instance.children(), output);
     }
-}
-
-fn remove_from(instances: &mut Vec<Instance>, id: Uuid) -> Result<Option<Instance>, WorkspaceError> {
-    if let Some(index) = instances.iter().position(|instance| instance.id == id) {
-        if !instances[index].children().is_empty() {
-            return Err(WorkspaceError::InstanceHasChildren(id));
-        }
-        return Ok(Some(instances.remove(index)));
-    }
-
-    for parent in instances.iter_mut() {
-        if let Some(content) = parent.content.as_mut() {
-            if let Some(index) = content.instances.iter().position(|child| child.id == id) {
-                if !content.instances[index].children().is_empty() {
-                    return Err(WorkspaceError::InstanceHasChildren(id));
-                }
-                let removed = content.instances.remove(index);
-                if let Some(semantic) = parent.semantic.as_mut() {
-                    semantic.allocation.retain(|child_id| *child_id != id);
-                }
-                parent.normalize_empty_children();
-                return Ok(Some(removed));
-            }
-            if let Some(removed) = remove_from(&mut content.instances, id)? {
-                return Ok(Some(removed));
-            }
-        }
-    }
-    Ok(None)
 }
 
 fn validate_instances(instances: &[Instance], seen: &mut HashSet<Uuid>) -> Result<(), WorkspaceError> {
