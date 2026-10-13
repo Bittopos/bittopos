@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::persistence::atomic_write;
-use crate::{Resource, ResourceStore, StoreError};
 
 /// Segmento físico que contiene instancias completas.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -80,14 +79,35 @@ pub struct Workspace {
     pub content: Content,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WorkspaceModelError {
+    DuplicateInstanceId(Uuid),
+    InvalidContainment(String),
+    InstanceNotFound(Uuid),
+    InstanceHasChildren(Uuid),
+    ParentNotFound(Uuid),
+}
+
+impl std::fmt::Display for WorkspaceModelError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DuplicateInstanceId(id) => write!(f, "el ID de instancia {id} está duplicado en el workspace"),
+            Self::InvalidContainment(reason) => write!(f, "contención inválida: {reason}"),
+            Self::InstanceNotFound(id) => write!(f, "no existe la instancia {id}"),
+            Self::InstanceHasChildren(id) => write!(f, "no se puede remover la instancia {id}: todavía contiene instancias hijas"),
+            Self::ParentNotFound(id) => write!(f, "no existe la instancia padre {id}"),
+        }
+    }
+}
+
+impl std::error::Error for WorkspaceModelError {}
+
 #[derive(Debug)]
 pub enum WorkspaceError {
     Io(io::Error),
     Json(serde_json::Error),
-    Resource(StoreError),
     InvalidName,
     NotFound(String),
-    UnresolvedReference(Uuid),
     DuplicateInstanceId(Uuid),
     InvalidContainment(String),
     InstanceNotFound(Uuid),
@@ -100,10 +120,8 @@ impl std::fmt::Display for WorkspaceError {
         match self {
             Self::Io(error) => write!(f, "error de E/S: {error}"),
             Self::Json(error) => write!(f, "JSON inválido: {error}"),
-            Self::Resource(error) => write!(f, "error de recurso: {error}"),
             Self::InvalidName => write!(f, "nombre de workspace inválido"),
             Self::NotFound(name) => write!(f, "no existe el workspace {name}"),
-            Self::UnresolvedReference(id) => write!(f, "no se puede resolver la referencia al recurso {id}"),
             Self::DuplicateInstanceId(id) => write!(f, "el ID de instancia {id} está duplicado en el workspace"),
             Self::InvalidContainment(reason) => write!(f, "contención inválida: {reason}"),
             Self::InstanceNotFound(id) => write!(f, "no existe la instancia {id}"),
@@ -115,14 +133,23 @@ impl std::fmt::Display for WorkspaceError {
 
 impl std::error::Error for WorkspaceError {}
 
+impl From<WorkspaceModelError> for WorkspaceError {
+    fn from(error: WorkspaceModelError) -> Self {
+        match error {
+            WorkspaceModelError::DuplicateInstanceId(id) => Self::DuplicateInstanceId(id),
+            WorkspaceModelError::InvalidContainment(reason) => Self::InvalidContainment(reason),
+            WorkspaceModelError::InstanceNotFound(id) => Self::InstanceNotFound(id),
+            WorkspaceModelError::InstanceHasChildren(id) => Self::InstanceHasChildren(id),
+            WorkspaceModelError::ParentNotFound(id) => Self::ParentNotFound(id),
+        }
+    }
+}
+
 impl From<io::Error> for WorkspaceError {
     fn from(error: io::Error) -> Self { Self::Io(error) }
 }
 impl From<serde_json::Error> for WorkspaceError {
     fn from(error: serde_json::Error) -> Self { Self::Json(error) }
-}
-impl From<StoreError> for WorkspaceError {
-    fn from(error: StoreError) -> Self { Self::Resource(error) }
 }
 
 impl Workspace {
@@ -144,20 +171,20 @@ impl Workspace {
         output
     }
 
-    pub(crate) fn insert_root(&mut self, instance: Instance) -> Result<(), WorkspaceError> {
+    pub(crate) fn insert_root(&mut self, instance: Instance) -> Result<(), WorkspaceModelError> {
         if self.find_instance(instance.id).is_some() {
-            return Err(WorkspaceError::DuplicateInstanceId(instance.id));
+            return Err(WorkspaceModelError::DuplicateInstanceId(instance.id));
         }
         self.content.instances.push(instance);
         Ok(())
     }
 
-    pub(crate) fn insert_child(&mut self, parent_id: Uuid, instance: Instance) -> Result<(), WorkspaceError> {
+    pub(crate) fn insert_child(&mut self, parent_id: Uuid, instance: Instance) -> Result<(), WorkspaceModelError> {
         if self.find_instance(instance.id).is_some() {
-            return Err(WorkspaceError::DuplicateInstanceId(instance.id));
+            return Err(WorkspaceModelError::DuplicateInstanceId(instance.id));
         }
         let parent = find_mut_in(&mut self.content.instances, parent_id)
-            .ok_or(WorkspaceError::ParentNotFound(parent_id))?;
+            .ok_or(WorkspaceModelError::ParentNotFound(parent_id))?;
         let child_id = instance.id;
         parent.content.get_or_insert_with(Content::default).instances.push(instance);
         parent.semantic.get_or_insert_with(Semantic::default).allocation.push(child_id);
@@ -165,16 +192,16 @@ impl Workspace {
     }
 
     /// Remueve una instancia hoja a cualquier profundidad. Nunca elimina descendientes implícitamente.
-    pub(crate) fn remove_leaf(&mut self, id: Uuid) -> Result<Instance, WorkspaceError> {
+    pub(crate) fn remove_leaf(&mut self, id: Uuid) -> Result<Instance, WorkspaceModelError> {
         let parent_id = self.parent_of(id);
         if let Some(parent_id) = parent_id {
             let parent = find_mut_in(&mut self.content.instances, parent_id)
-                .ok_or(WorkspaceError::ParentNotFound(parent_id))?;
-            let content = parent.content.as_mut().ok_or(WorkspaceError::InstanceNotFound(id))?;
+                .ok_or(WorkspaceModelError::ParentNotFound(parent_id))?;
+            let content = parent.content.as_mut().ok_or(WorkspaceModelError::InstanceNotFound(id))?;
             let index = content.instances.iter().position(|child| child.id == id)
-                .ok_or(WorkspaceError::InstanceNotFound(id))?;
+                .ok_or(WorkspaceModelError::InstanceNotFound(id))?;
             if !content.instances[index].children().is_empty() {
-                return Err(WorkspaceError::InstanceHasChildren(id));
+                return Err(WorkspaceModelError::InstanceHasChildren(id));
             }
             let removed = content.instances.remove(index);
             if let Some(semantic) = parent.semantic.as_mut() {
@@ -184,23 +211,15 @@ impl Workspace {
             Ok(removed)
         } else {
             let index = self.content.instances.iter().position(|instance| instance.id == id)
-                .ok_or(WorkspaceError::InstanceNotFound(id))?;
+                .ok_or(WorkspaceModelError::InstanceNotFound(id))?;
             if !self.content.instances[index].children().is_empty() {
-                return Err(WorkspaceError::InstanceHasChildren(id));
+                return Err(WorkspaceModelError::InstanceHasChildren(id));
             }
             Ok(self.content.instances.remove(index))
         }
     }
 
-    pub fn resolve(&self, resources: &ResourceStore) -> Result<Vec<Resource>, WorkspaceError> {
-        self.all_instances().into_iter().map(|instance| match resources.get(instance.source.id) {
-            Ok(resource) => Ok(resource),
-            Err(StoreError::NotFound(id)) => Err(WorkspaceError::UnresolvedReference(id)),
-            Err(error) => Err(WorkspaceError::Resource(error)),
-        }).collect()
-    }
-
-    pub fn validate(&self) -> Result<(), WorkspaceError> {
+    pub fn validate(&self) -> Result<(), WorkspaceModelError> {
         let mut seen = HashSet::new();
         validate_instances(&self.content.instances, &mut seen)
     }
@@ -241,29 +260,29 @@ fn collect_instances<'a>(instances: &'a [Instance], output: &mut Vec<&'a Instanc
     }
 }
 
-fn validate_instances(instances: &[Instance], seen: &mut HashSet<Uuid>) -> Result<(), WorkspaceError> {
+fn validate_instances(instances: &[Instance], seen: &mut HashSet<Uuid>) -> Result<(), WorkspaceModelError> {
     for instance in instances {
         if !seen.insert(instance.id) {
-            return Err(WorkspaceError::DuplicateInstanceId(instance.id));
+            return Err(WorkspaceModelError::DuplicateInstanceId(instance.id));
         }
         let children = instance.children();
         let allocation = instance.child_ids();
         if children.is_empty() {
             if !allocation.is_empty() {
-                return Err(WorkspaceError::InvalidContainment(format!(
+                return Err(WorkspaceModelError::InvalidContainment(format!(
                     "la instancia {} registra hijos semánticos pero no contiene hijos físicos", instance.id
                 )));
             }
             continue;
         }
         if instance.semantic.is_none() {
-            return Err(WorkspaceError::InvalidContainment(format!(
+            return Err(WorkspaceModelError::InvalidContainment(format!(
                 "la instancia {} contiene hijos físicos, pero falta semantic.allocation", instance.id
             )));
         }
         let child_ids: Vec<_> = children.iter().map(|child| child.id).collect();
         if allocation != child_ids.as_slice() {
-            return Err(WorkspaceError::InvalidContainment(format!(
+            return Err(WorkspaceModelError::InvalidContainment(format!(
                 "semantic.allocation no coincide en contenido y orden con content.instances para {}", instance.id
             )));
         }
@@ -291,12 +310,12 @@ impl WorkspaceStore {
             Err(error) => return Err(WorkspaceError::Io(error)),
         };
         let workspace: Workspace = serde_json::from_str(&content)?;
-        workspace.validate()?;
+        workspace.validate().map_err(WorkspaceError::from)?;
         Ok(workspace)
     }
 
     pub fn save(&self, name: &str, workspace: &Workspace) -> Result<(), WorkspaceError> {
-        workspace.validate()?;
+        workspace.validate().map_err(WorkspaceError::from)?;
         let path = self.path_for(name)?;
         let temporary_path = self.root.join(format!(".{name}.{}.tmp", Uuid::now_v7()));
         let content = serde_json::to_vec_pretty(workspace)?;
@@ -334,6 +353,7 @@ impl WorkspaceStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ResourceStore;
     use std::fs;
 
     fn setup() -> (tempfile::TempDir, ResourceStore, WorkspaceStore) {
@@ -341,6 +361,24 @@ mod tests {
         let resources = ResourceStore::new(dir.path().join("resources")).unwrap();
         let workspaces = WorkspaceStore::new(dir.path().join("workspaces")).unwrap();
         (dir, resources, workspaces)
+    }
+
+    #[test]
+    fn workspace_domain_validation_needs_no_persistence() {
+        let duplicate_id = Uuid::now_v7();
+        let workspace = Workspace {
+            content: Content {
+                instances: vec![
+                    Instance::new(duplicate_id, Uuid::now_v7()),
+                    Instance::new(duplicate_id, Uuid::now_v7()),
+                ],
+            },
+        };
+
+        assert_eq!(
+            workspace.validate(),
+            Err(WorkspaceModelError::DuplicateInstanceId(duplicate_id))
+        );
     }
 
     #[test]
@@ -458,7 +496,7 @@ mod tests {
         root.semantic = Some(Semantic { allocation: vec![child_id] });
         let mut workspace = Workspace { content: Content { instances: vec![root] } };
         let parent_id = workspace.content.instances[0].id;
-        assert!(matches!(workspace.remove_leaf(parent_id), Err(WorkspaceError::InstanceHasChildren(id)) if id == parent_id));
+        assert!(matches!(workspace.remove_leaf(parent_id), Err(WorkspaceModelError::InstanceHasChildren(id)) if id == parent_id));
         assert!(workspace.find_instance(child_id).is_some());
     }
 }

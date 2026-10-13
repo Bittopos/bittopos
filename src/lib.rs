@@ -15,4 +15,4 @@ pub use lifecycle::{create_instance, create_instance_under, reconcile_workspace,
 pub use navigation::{NavigationError, NavigationState, NavigationStore};
 pub use resource::{Info, Resource, ResourcePatch, ResourceWarning};
 pub use store::{ResourceStore, StoreError, TemporaryInspection};
-pub use workspace::{Content, Instance, Semantic, Source, Workspace, WorkspaceError, WorkspaceStore};
+pub use workspace::{Content, Instance, Semantic, Source, Workspace, WorkspaceError, WorkspaceModelError, WorkspaceStore};
