@@ -9,8 +9,8 @@ pub enum LifecycleError {
     Resource(StoreError),
     Workspace(WorkspaceError),
     InstanceNotFound(Uuid),
-    DuplicateAllocationId(Uuid),
-    AllocationMissing { resource_id: Uuid, instance_id: Uuid },
+    DuplicateStructuralId(Uuid),
+    StructuralMissing { resource_id: Uuid, instance_id: Uuid },
 }
 
 impl fmt::Display for LifecycleError {
@@ -19,12 +19,12 @@ impl fmt::Display for LifecycleError {
             Self::Resource(error) => write!(f, "error de recurso: {error}"),
             Self::Workspace(error) => write!(f, "error de workspace: {error}"),
             Self::InstanceNotFound(id) => write!(f, "no existe la instancia {id}"),
-            Self::DuplicateAllocationId(id) => {
-                write!(f, "la instancia {id} está asignada a más de un recurso")
+            Self::DuplicateStructuralId(id) => {
+                write!(f, "la instancia {id} está registrada en más de un recurso")
             }
-            Self::AllocationMissing { resource_id, instance_id } => write!(
+            Self::StructuralMissing { resource_id, instance_id } => write!(
                 f,
-                "la instancia {instance_id} no figura en allocation del recurso {resource_id}"
+                "la instancia {instance_id} no figura en structural del recurso {resource_id}"
             ),
         }
     }
@@ -67,9 +67,9 @@ pub fn reconcile_workspace(
     let mut allocated: HashMap<Uuid, Uuid> = HashMap::new();
 
     for resource in &definitions {
-        for instance_id in &resource.management.allocation {
+        for instance_id in &resource.management.structural {
             if allocated.insert(*instance_id, resource.id).is_some() {
-                return Err(LifecycleError::DuplicateAllocationId(*instance_id));
+                return Err(LifecycleError::DuplicateStructuralId(*instance_id));
             }
         }
     }
@@ -166,7 +166,7 @@ pub fn remove_instance(
         .ok_or(LifecycleError::InstanceNotFound(instance_id))?;
 
     if !resources.unregister_instance(instance.source.id, instance_id)? {
-        return Err(LifecycleError::AllocationMissing {
+        return Err(LifecycleError::StructuralMissing {
             resource_id: instance.source.id,
             instance_id,
         });
@@ -234,7 +234,7 @@ mod tests {
 
         let id = create_instance(&resources, &workspaces, "proyecto", resource.id).unwrap();
 
-        assert_eq!(resources.get(resource.id).unwrap().management.allocation, vec![id]);
+        assert_eq!(resources.get(resource.id).unwrap().management.structural, vec![id]);
         assert_eq!(workspaces.load("proyecto").unwrap().instances[0].id, id);
     }
 
@@ -246,7 +246,7 @@ mod tests {
 
         remove_instance(&resources, &workspaces, "proyecto", id).unwrap();
 
-        assert!(resources.get(resource.id).unwrap().management.allocation.is_empty());
+        assert!(resources.get(resource.id).unwrap().management.structural.is_empty());
         assert!(workspaces.load("proyecto").unwrap().instances.is_empty());
     }
 
@@ -274,7 +274,7 @@ mod tests {
 
         assert!(matches!(
             reconcile_workspace(&resources, &workspaces, "proyecto"),
-            Err(LifecycleError::DuplicateAllocationId(id)) if id == instance_id
+            Err(LifecycleError::DuplicateStructuralId(id)) if id == instance_id
         ));
     }
 }
