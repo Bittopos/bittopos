@@ -1,7 +1,7 @@
 use std::{fs,io,path::{Path,PathBuf}};
 use serde::{Deserialize,Serialize}; use uuid::Uuid; use crate::persistence::atomic_write;
 use crate::workspace_model::{Content,Instance,Semantic,Source,Workspace,WorkspaceModelError};
-#[derive(Debug,Clone,Default,PartialEq,Eq,Serialize,Deserialize)]#[serde(deny_unknown_fields)]struct DContent{#[serde(default)]instances:Vec<DInstance>}
+#[derive(Debug,Clone,Default,PartialEq,Eq,Serialize,Deserialize)]#[serde(deny_unknown_fields)]struct DContent{#[serde(default)]instances:Vec<PersistedInstance>}
 #[derive(Debug,Clone,Default,PartialEq,Eq,Serialize,Deserialize)]#[serde(deny_unknown_fields)]struct DSemantic{#[serde(default,skip_serializing_if="Vec::is_empty")]allocation:Vec<Uuid>}
 #[derive(Debug,Clone,PartialEq,Eq,Serialize,Deserialize)]#[serde(deny_unknown_fields)]struct DSource{id:Uuid}
 #[derive(Debug,Clone,PartialEq,Eq,Serialize,Deserialize)]#[serde(deny_unknown_fields)]pub(crate)struct PersistedInstance{pub(crate)id:Uuid,source:DSource,#[serde(default,skip_serializing_if="Option::is_none")]semantic:Option<DSemantic>,#[serde(default,skip_serializing_if="Option::is_none")]content:Option<DContent>}
