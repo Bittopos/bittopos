@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::persistence::atomic_write;
+use crate::workspace::PersistedInstance;
 use crate::{Instance, ResourceStore, StoreError, Workspace, WorkspaceError, WorkspaceModelError, WorkspaceStore};
 
 #[derive(Debug)]
@@ -65,11 +66,11 @@ impl RecoveryReport {
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 enum PendingOperation {
     Create {
-        instance: Instance,
+        instance: PersistedInstance,
         parent_id: Option<Uuid>,
     },
     Remove {
-        instance: Instance,
+        instance: PersistedInstance,
         parent_id: Option<Uuid>,
     },
 }
@@ -124,7 +125,8 @@ fn apply_pending(
     operation: PendingOperation,
 ) -> Result<(), LifecycleError> {
     match operation {
-        PendingOperation::Create { instance, parent_id } => {
+        PendingOperation::Create { instance: persisted_instance, parent_id } => {
+            let instance = Instance::try_from(persisted_instance)?;
             let resource = resources.get(instance.source.id)?;
             if !resource.management.structural.contains(&instance.id) {
                 resources.register_instance(instance.source.id, instance.id)?;
@@ -145,7 +147,8 @@ fn apply_pending(
             workspace.validate()?;
             workspaces.save(workspace_name, &workspace)?;
         }
-        PendingOperation::Remove { instance, parent_id } => {
+        PendingOperation::Remove { instance: persisted_instance, parent_id } => {
+            let instance = Instance::try_from(persisted_instance)?;
             let resource = resources.get(instance.source.id)?;
             let registered = resource.management.structural.contains(&instance.id);
             let mut workspace = load_workspace_or_empty(workspaces, workspace_name)?;
@@ -272,7 +275,7 @@ pub fn create_instance_under(
         if workspace.find_instance(parent).is_none() { return Err(LifecycleError::ParentRequired); }
     }
     let instance = Instance::new(Uuid::now_v7(), resource_id);
-    let operation = PendingOperation::Create { instance: instance.clone(), parent_id };
+    let operation = PendingOperation::Create { instance: PersistedInstance::from(instance.clone()), parent_id };
     persist_journal(workspaces, workspace_name, &operation)?;
     apply_pending(resources, workspaces, workspace_name, operation)?;
     Ok(instance.id)
@@ -296,7 +299,7 @@ pub fn remove_instance(
     if !resource.management.structural.contains(&instance_id) {
         return Err(LifecycleError::StructuralMissing { resource_id: instance.source.id, instance_id });
     }
-    let operation = PendingOperation::Remove { instance, parent_id };
+    let operation = PendingOperation::Remove { instance: PersistedInstance::from(instance), parent_id };
     persist_journal(workspaces, workspace_name, &operation)?;
     apply_pending(resources, workspaces, workspace_name, operation)
 }
@@ -349,7 +352,7 @@ mod tests {
         let (_dir, resources, workspaces) = setup();
         let (resource, _) = resources.create("Recurso", None).unwrap();
         let instance = Instance::new(Uuid::now_v7(), resource.id);
-        persist_journal(&workspaces, "proyecto", &PendingOperation::Create { instance: instance.clone(), parent_id: None }).unwrap();
+        persist_journal(&workspaces, "proyecto", &PendingOperation::Create { instance: PersistedInstance::from(instance.clone()), parent_id: None }).unwrap();
         resources.register_instance(resource.id, instance.id).unwrap();
         let (workspace, report) = reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
         assert!(workspace.find_instance(instance.id).is_some());
@@ -365,7 +368,7 @@ mod tests {
         let child_id = create_instance_under(&resources, &workspaces, "proyecto", resource.id, Some(root_id)).unwrap();
         let workspace = workspaces.load("proyecto").unwrap();
         let child = workspace.find_instance(child_id).unwrap().clone();
-        let operation = PendingOperation::Remove { instance: child, parent_id: Some(root_id) };
+        let operation = PendingOperation::Remove { instance: PersistedInstance::from(child), parent_id: Some(root_id) };
         persist_journal(&workspaces, "proyecto", &operation).unwrap();
         resources.unregister_instance(resource.id, child_id).unwrap();
 
