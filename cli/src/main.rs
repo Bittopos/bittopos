@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use std::process;
 
 use bittopos_core::{
-    create_instance, reconcile_workspace, remove_instance, Instance, ResourcePatch, ResourceStore,
-    Workspace, WorkspaceStore,
+    create_instance_under, reconcile_workspace, remove_instance, Instance, NavigationState,
+    NavigationStore, ResourcePatch, ResourceStore, Workspace, WorkspaceStore,
 };
 use clap::{Parser, Subcommand};
 use uuid::Uuid;
@@ -20,7 +20,7 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Crea una definición y, salvo --no-instance, una instancia en el workspace.
+    /// Crea una definición y, salvo --no-instance, una instancia en la ubicación actual.
     Create {
         title: String,
         #[arg(long)]
@@ -30,13 +30,23 @@ enum Command {
         #[arg(long)]
         no_instance: bool,
     },
-    /// Muestra las instancias del workspace o consulta una definición por UUID.
+    /// Muestra el árbol completo o consulta una definición por UUID.
     Show { id: Option<Uuid> },
-    /// Crea una instancia de una definición existente.
+    /// Lista las instancias hijas directas de la ubicación actual.
+    Ls,
+    /// Entra en una instancia hija de la ubicación actual.
+    Enter { id: Uuid },
+    /// Sube a la instancia padre; desde la raíz permanece en la raíz.
+    Up,
+    /// Vuelve a la raíz del espacio de trabajo.
+    Root,
+    /// Muestra la ubicación de navegación actual.
+    Pwd,
+    /// Crea una instancia de una definición existente dentro de la ubicación actual.
     Add { id: Uuid },
-    /// Elimina una instancia por su UUID propio.
+    /// Elimina una instancia hoja por su UUID propio.
     Remove { id: Uuid },
-    /// Reconstruye el workspace a partir de las asignaciones confirmadas.
+    /// Verifica y recupera el workspace a partir de los registros confirmados.
     Recover,
 }
 
@@ -80,12 +90,20 @@ fn run() -> Result<(), String> {
     let resources = ResourceStore::new(&paths.resources).map_err(|error| error.to_string())?;
     let workspaces =
         WorkspaceStore::new(&paths.workspaces).map_err(|error| error.to_string())?;
+    let navigation = NavigationStore::new(&paths.workspaces);
 
-    // Toda invocación comienza reconciliando el workspace con management.structural.
+    // Toda invocación reconcilia primero la persistencia del workspace.
     let (startup_workspace, startup_report) =
         reconcile_workspace(&resources, &workspaces, WORKSPACE_FILE)
             .map_err(|error| error.to_string())?;
     report_recovery(startup_report.restored, startup_report.removed);
+
+    let (mut nav_state, navigation_reset) = navigation
+        .load_validated(&startup_workspace)
+        .map_err(|error| error.to_string())?;
+    if navigation_reset {
+        eprintln!("La ubicación guardada ya no existe; navegación restablecida a la raíz.");
+    }
 
     match command {
         Command::Create {
@@ -116,10 +134,15 @@ fn run() -> Result<(), String> {
             let instance_id = if no_instance {
                 None
             } else {
-                Some(create_instance(&resources, &workspaces, WORKSPACE_FILE, resource.id)
-                    .map_err(|error| format!(
-                        "el recurso se creó, pero no se pudo crear su instancia: {error}"
-                    ))?)
+                Some(create_instance_under(
+                    &resources,
+                    &workspaces,
+                    WORKSPACE_FILE,
+                    resource.id,
+                    nav_state.current_instance,
+                ).map_err(|error| format!(
+                    "el recurso se creó, pero no se pudo crear su instancia: {error}"
+                ))?)
             };
 
             println!("Recurso creado: {} ({})", resource.info.title, resource.id);
@@ -141,10 +164,60 @@ fn run() -> Result<(), String> {
         Command::Show { id: None } => {
             print_workspace(&startup_workspace, &resources)?;
         }
+        Command::Ls => {
+            let children = match nav_state.current_instance {
+                None => startup_workspace.instances(),
+                Some(id) => startup_workspace
+                    .find_instance(id)
+                    .ok_or_else(|| format!("la ubicación actual ya no existe: {id}"))?
+                    .children(),
+            };
+            if children.is_empty() {
+                println!("No hay instancias en esta ubicación.");
+            } else {
+                print_instances(children, &resources, 0)?;
+            }
+        }
+        Command::Enter { id } => {
+            let children = match nav_state.current_instance {
+                None => startup_workspace.instances(),
+                Some(parent_id) => startup_workspace
+                    .find_instance(parent_id)
+                    .ok_or_else(|| format!("no existe la ubicación actual: {parent_id}"))?
+                    .children(),
+            };
+            if !children.iter().any(|child| child.id == id) {
+                return Err(format!(
+                    "la instancia {id} no es hija directa de la ubicación actual; usa 'bitto ls' para consultar las opciones"
+                ));
+            }
+            nav_state.current_instance = Some(id);
+            navigation.save(&nav_state).map_err(|error| error.to_string())?;
+            print_location(&nav_state, &startup_workspace, &resources)?;
+        }
+        Command::Up => {
+            nav_state.current_instance = nav_state.current_instance
+                .and_then(|id| startup_workspace.parent_of(id));
+            navigation.save(&nav_state).map_err(|error| error.to_string())?;
+            print_location(&nav_state, &startup_workspace, &resources)?;
+        }
+        Command::Root => {
+            nav_state = NavigationState::default();
+            navigation.save(&nav_state).map_err(|error| error.to_string())?;
+            println!("Ubicación actual: raíz del espacio de trabajo.");
+        }
+        Command::Pwd => {
+            print_location(&nav_state, &startup_workspace, &resources)?;
+        }
         Command::Add { id } => {
             let resource = resources.get(id).map_err(|error| error.to_string())?;
-            let instance_id = create_instance(&resources, &workspaces, WORKSPACE_FILE, id)
-                .map_err(|error| error.to_string())?;
+            let instance_id = create_instance_under(
+                &resources,
+                &workspaces,
+                WORKSPACE_FILE,
+                id,
+                nav_state.current_instance,
+            ).map_err(|error| error.to_string())?;
             println!(
                 "Instancia añadida: {} — recurso {} (instancia {})",
                 resource.info.title, resource.id, instance_id
@@ -153,6 +226,11 @@ fn run() -> Result<(), String> {
         Command::Remove { id } => {
             remove_instance(&resources, &workspaces, WORKSPACE_FILE, id)
                 .map_err(|error| error.to_string())?;
+            if nav_state.current_instance == Some(id) {
+                nav_state = NavigationState::default();
+                navigation.save(&nav_state).map_err(|error| error.to_string())?;
+                println!("La ubicación eliminada era la actual; navegación restablecida a la raíz.");
+            }
             println!("Instancia removida: {id}");
         }
         Command::Recover => {
@@ -172,6 +250,23 @@ fn report_recovery(restored: usize, removed: usize) {
             "Recuperación aplicada: {restored} instancia(s) reconstruida(s), {removed} instancia(s) residual(es) eliminada(s)."
         );
     }
+}
+
+fn print_location(
+    state: &NavigationState,
+    workspace: &Workspace,
+    resources: &ResourceStore,
+) -> Result<(), String> {
+    match state.current_instance {
+        None => println!("Ubicación actual: raíz del espacio de trabajo."),
+        Some(id) => {
+            let instance = workspace.find_instance(id)
+                .ok_or_else(|| format!("no existe la ubicación actual: {id}"))?;
+            let resource = resources.get(instance.source.id).map_err(|error| error.to_string())?;
+            println!("Ubicación actual: {} [{}]", resource.info.title, instance.id);
+        }
+    }
+    Ok(())
 }
 
 fn print_workspace(
