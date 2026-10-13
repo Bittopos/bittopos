@@ -6,9 +6,8 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{
-    Instance, ResourceStore, StoreError, Workspace, WorkspaceError, WorkspaceStore,
-};
+use crate::persistence::atomic_write;
+use crate::{Instance, ResourceStore, StoreError, Workspace, WorkspaceError, WorkspaceStore};
 
 #[derive(Debug)]
 pub enum LifecycleError {
@@ -87,7 +86,7 @@ fn persist_journal(workspaces: &WorkspaceStore, workspace_name: &str, operation:
     let path = journal_path(workspaces, workspace_name)?;
     let temp = workspaces.root().join(format!(".journal.{}.tmp", Uuid::now_v7()));
     let bytes = serde_json::to_vec_pretty(operation).map_err(LifecycleError::JournalJson)?;
-    crate::workspace::atomic_write(&temp, &path, &bytes)?;
+    atomic_write(&temp, &path, &bytes).map_err(LifecycleError::JournalIo)?;
     Ok(())
 }
 
