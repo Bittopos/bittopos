@@ -58,11 +58,11 @@ Un segmento de instancia que no corresponde a un segmento definido en el recurso
 
 ### 2.7. Concept
 
-Unidad de datos de usuario compuesta por una clave y un valor. El valor puede ser un arreglo. En esta versión, un Concept no contiene recursivamente otros Concept como estructura arbitraria.
+Unidad de información compuesta por una clave y un valor. Por ejemplo, `title` y `description` son conceptos dentro del segmento `info`: cada uno representa una pieza de información con su propio significado. El valor puede ser un arreglo. En esta versión, un Concept no contiene recursivamente otros Concept como estructura arbitraria.
 
 Los datos del sistema —por ejemplo, identificadores de recursos, instancias, relaciones o referencias— se representan mediante componentes especializados, no como Concept de usuario.
 
-El contrato de implementación deberá fijar el conjunto de tipos admitidos para los valores de Concept. No se debe asumir que todos los valores son cadenas.
+El contrato de implementación deberá fijar el conjunto de tipos admitidos para los valores de Concept. No se debe asumir que todos los valores son cadenas. Este modelo conceptual no obliga a implementar un motor genérico dinámico: los conceptos pueden representarse mediante campos tipados del lenguaje y serializarse con las herramientas correspondientes.
 
 ### 2.8. Component
 
