@@ -368,7 +368,7 @@ mod tests {
     #[test]
     fn refuses_to_reconcile_corrupt_journal() {
         let (_dir, resources, workspaces) = setup();
-        let (resource, _) = resources.create("Recurso", None).unwrap();
+        let (_resource, _) = resources.create("Recurso", None).unwrap();
         let path = workspaces.root().join(".proyecto.journal.json");
         fs::write(&path, "corrupto").unwrap();
         assert!(matches!(reconcile_workspace(&resources, &workspaces, "proyecto"), Err(LifecycleError::JournalJson(_))));
