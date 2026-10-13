@@ -501,15 +501,20 @@ impl ResourceStore {
 fn promote_temporary(temporary_path: &Path, path: &Path, replace: bool) -> Result<(), StoreError> {
     if replace {
         // En el entorno objetivo (Termux/Linux), rename en el mismo sistema de archivos
-        // sustituye el destino sin exponer un archivo parcialmente escrito.
-        // Las garantías concretas dependen de la plataforma y del sistema de archivos.
+        // sustituye el destino sin exponer una escritura parcial.
         fs::rename(temporary_path, path)?;
     } else {
         // hard_link evita reemplazar un destino que aparezca después de la comprobación.
-        // El temporal y el destino están en el mismo directorio/sistema de archivos.
         fs::hard_link(temporary_path, path)?;
-        let _ = fs::remove_file(temporary_path);
+        fs::remove_file(temporary_path)?;
     }
+
+    // Sincroniza también la entrada de directorio: sync_all del archivo temporal por sí
+    // solo no garantiza que el cambio de nombre sobreviva a una interrupción del sistema.
+    let parent = path.parent().ok_or_else(|| StoreError::Io(io::Error::new(
+        io::ErrorKind::InvalidInput, "la ruta del recurso no tiene directorio padre"
+    )))?;
+    OpenOptions::new().read(true).open(parent)?.sync_all()?;
     Ok(())
 }
 
