@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::persistence::atomic_write;
-use crate::ResourceStore;
 
 /// Segmento físico que contiene instancias completas.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -182,7 +181,7 @@ impl Workspace {
 
     pub(crate) fn insert_child(&mut self, parent_id: Uuid, instance: Instance) -> Result<(), WorkspaceModelError> {
         if self.find_instance(instance.id).is_some() {
-            return Err(WorkspaceError::DuplicateInstanceId(instance.id));
+            return Err(WorkspaceModelError::DuplicateInstanceId(instance.id));
         }
         let parent = find_mut_in(&mut self.content.instances, parent_id)
             .ok_or(WorkspaceModelError::ParentNotFound(parent_id))?;
@@ -197,10 +196,10 @@ impl Workspace {
         let parent_id = self.parent_of(id);
         if let Some(parent_id) = parent_id {
             let parent = find_mut_in(&mut self.content.instances, parent_id)
-                .ok_or(WorkspaceError::ParentNotFound(parent_id))?;
+                .ok_or(WorkspaceModelError::ParentNotFound(parent_id))?;
             let content = parent.content.as_mut().ok_or(WorkspaceModelError::InstanceNotFound(id))?;
             let index = content.instances.iter().position(|child| child.id == id)
-                .ok_or(WorkspaceError::InstanceNotFound(id))?;
+                .ok_or(WorkspaceModelError::InstanceNotFound(id))?;
             if !content.instances[index].children().is_empty() {
                 return Err(WorkspaceModelError::InstanceHasChildren(id));
             }
