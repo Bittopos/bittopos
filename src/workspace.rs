@@ -1,6 +1,6 @@
 use std::collections::HashSet;
-use std::fs::{self, OpenOptions};
-use std::io::{self, Write};
+use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -330,22 +330,13 @@ impl WorkspaceStore {
     }
 }
 
-pub(crate) fn atomic_write(temporary_path: &Path, destination: &Path, content: &[u8]) -> Result<(), WorkspaceError> {
-    let parent = destination.parent().ok_or(WorkspaceError::InvalidName)?;
-    let mut file = OpenOptions::new().write(true).create_new(true).open(temporary_path)?;
-    file.write_all(content)?;
-    file.sync_all()?;
-    drop(file);
-    fs::rename(temporary_path, destination)?;
-    FileSync::sync_directory(parent)?;
+pub(crate) fn atomic_write(
+    temporary_path: &Path,
+    destination: &Path,
+    content: &[u8],
+) -> Result<(), WorkspaceError> {
+    crate::persistence::atomic_replace(temporary_path, destination, content)?;
     Ok(())
-}
-
-struct FileSync;
-impl FileSync {
-    fn sync_directory(path: &Path) -> io::Result<()> {
-        OpenOptions::new().read(true).open(path)?.sync_all()
-    }
 }
 
 #[cfg(test)]
