@@ -364,6 +364,24 @@ mod tests {
     }
 
     #[test]
+    fn workspace_domain_validation_needs_no_persistence() {
+        let duplicate_id = Uuid::now_v7();
+        let workspace = Workspace {
+            content: Content {
+                instances: vec![
+                    Instance::new(duplicate_id, Uuid::now_v7()),
+                    Instance::new(duplicate_id, Uuid::now_v7()),
+                ],
+            },
+        };
+
+        assert_eq!(
+            workspace.validate(),
+            Err(WorkspaceModelError::DuplicateInstanceId(duplicate_id))
+        );
+    }
+
+    #[test]
     fn serializes_recursive_physical_and_semantic_containment() {
         let (_dir, resources, store) = setup();
         let (root_resource, _) = resources.create("Raíz", None).unwrap();
