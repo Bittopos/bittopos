@@ -64,11 +64,11 @@ pub fn reconcile_workspace(
     workspace_name: &str,
 ) -> Result<(Workspace, RecoveryReport), LifecycleError> {
     let definitions = resources.all_strict()?;
-    let mut allocated: HashMap<Uuid, Uuid> = HashMap::new();
+    let mut structural_ids: HashMap<Uuid, Uuid> = HashMap::new();
 
     for resource in &definitions {
         for instance_id in &resource.management.structural {
-            if allocated.insert(*instance_id, resource.id).is_some() {
+            if structural_ids.insert(*instance_id, resource.id).is_some() {
                 return Err(LifecycleError::DuplicateStructuralId(*instance_id));
             }
         }
@@ -86,7 +86,7 @@ pub fn reconcile_workspace(
 
     if let Some(workspace) = &existing {
         for instance in &workspace.instances {
-            match allocated.get(&instance.id) {
+            match structural_ids.get(&instance.id) {
                 Some(source_id) if *source_id == instance.source.id => {
                     reconciled.instances.push(instance.clone());
                     seen.insert(instance.id);
@@ -100,7 +100,7 @@ pub fn reconcile_workspace(
         }
     }
 
-    let mut missing: Vec<_> = allocated
+    let mut missing: Vec<_> = structural_ids
         .iter()
         .filter(|(instance_id, _)| !seen.contains(*instance_id))
         .map(|(instance_id, source_id)| (*instance_id, *source_id))
@@ -264,7 +264,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_instance_allocated_to_two_resources() {
+    fn rejects_instance_registered_to_two_resources() {
         let (_dir, resources, workspaces) = setup();
         let (first, _) = resources.create("Uno", None).unwrap();
         let (second, _) = resources.create("Dos", None).unwrap();
