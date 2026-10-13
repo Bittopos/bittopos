@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::persistence::atomic_write;
-use crate::{Instance, ResourceStore, StoreError, Workspace, WorkspaceError, WorkspaceStore};
+use crate::{Instance, ResourceStore, StoreError, Workspace, WorkspaceError, WorkspaceModelError, WorkspaceStore};
 
 #[derive(Debug)]
 pub enum LifecycleError {
@@ -45,6 +45,11 @@ impl From<StoreError> for LifecycleError {
 }
 impl From<WorkspaceError> for LifecycleError {
     fn from(error: WorkspaceError) -> Self { Self::Workspace(error) }
+}
+impl From<WorkspaceModelError> for LifecycleError {
+    fn from(error: WorkspaceModelError) -> Self {
+        Self::Workspace(WorkspaceError::from(error))
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
