@@ -154,6 +154,10 @@ git diff
 
 Las comprobaciones deben ejecutarse sobre el estado real del código antes de registrar un incremento.
 
+## Arquitectura y refactorización
+
+El plan de separación entre modelo, aplicación, persistencia, recuperación e interfaces, junto con un inventario del código actual y una secuencia de trabajo verificable, se documenta en [ARQUITECTURA.md](ARQUITECTURA.md). Este documento describe el destino arquitectónico; no implica que la refactorización ya esté implementada.
+
 ## Contratos técnicos
 
 - [CONTRATO-0.1.md](CONTRATO-0.1.md): contrato de la etapa inicial.
