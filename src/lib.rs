@@ -9,7 +9,7 @@ mod resource;
 mod store;
 mod workspace;
 
-pub use lifecycle::{create_instance, reconcile_workspace, remove_instance, LifecycleError, RecoveryReport};
+pub use lifecycle::{create_instance, create_instance_under, reconcile_workspace, remove_instance, LifecycleError, RecoveryReport};
 pub use resource::{Info, Resource, ResourcePatch, ResourceWarning};
 pub use store::{ResourceStore, StoreError, TemporaryInspection};
-pub use workspace::{Instance, Source, Workspace, WorkspaceError, WorkspaceStore};
+pub use workspace::{Content, Instance, Semantic, Source, Workspace, WorkspaceError, WorkspaceStore};
