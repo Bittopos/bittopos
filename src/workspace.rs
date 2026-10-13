@@ -419,6 +419,15 @@ mod tests {
     }
 
     #[test]
+    fn empty_workspace_persists_root_instances_array() {
+        let (_dir, _resources, store) = setup();
+        store.save("proyecto", &Workspace::new()).unwrap();
+        let json = fs::read_to_string(store.root().join("proyecto.json")).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(value["content"]["instances"], serde_json::json!([]));
+    }
+
+    #[test]
     fn workspace_listing_ignores_hidden_journal_files() {
         let (_dir, _resources, store) = setup();
         fs::write(store.root().join(".proyecto.journal.json"), "{}").unwrap();
