@@ -443,7 +443,13 @@ impl ResourceStore {
 
         // Prepare bytes durably, then validate the serialized resource before promotion.
         let prepared = (|| -> Result<(), StoreError> {
-            crate::persistence::write_new_file(&temporary_path, content.as_bytes())?;
+            crate::persistence::write_new_file(&temporary_path, content.as_bytes()).map_err(|error| {
+                if error.kind() == io::ErrorKind::AlreadyExists {
+                    StoreError::TemporaryExists(temporary_path.clone())
+                } else {
+                    StoreError::Io(error)
+                }
+            })?;
 
             let checked = self.read_file(&temporary_path, resource.id)?;
             if checked != *resource {
