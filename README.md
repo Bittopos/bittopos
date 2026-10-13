@@ -36,7 +36,7 @@ Cada recurso se persiste en un archivo TOML independiente. El segmento administr
 
 ### Espacios de trabajo
 
-Un espacio de trabajo contiene instancias persistidas en JSON. Cada instancia tiene un `id` propio y referencia su recurso de origen mediante `source.id`. Varias instancias pueden compartir el mismo recurso de origen sin compartir identidad. La información descriptiva del recurso no se copia en el espacio de trabajo.
+Un espacio de trabajo contiene instancias persistidas en JSON bajo `content.instances`. Cada instancia tiene un `id` propio y referencia su recurso de origen mediante `source.id`. Sus hijos completos se almacenan recursivamente en `content.instances`, mientras `semantic.allocation` contiene los IDs de sus hijos directos. Ambas vistas deben coincidir en contenido y orden; los componentes vacíos pueden omitirse. Varias instancias pueden compartir un recurso de origen sin compartir identidad.
 
 El esquema recursivo propuesto para el siguiente incremento define `Workspace.content.instances` como la lista de instancias raíz. Cada instancia contendrá `content.instances` con sus hijos completos y `semantic.allocation` con los IDs de esos mismos hijos directos. Cuando existen hijos, ambos componentes deben coincidir en contenido y orden. Si no hay hijos, cualquiera puede omitirse o ser un arreglo vacío. Este esquema aún no está implementado en el código actual; se especifica en [CONTRATO-0.3.md](CONTRATO-0.3.md).
 
