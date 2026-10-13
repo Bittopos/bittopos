@@ -107,7 +107,7 @@ Segmento de sistema para la organización semántica de un recurso. Los componen
 - `relational`: relaciones semánticas.
 - `referential`: referencias a otros elementos.
 
-En 0.3 estos nombres sirven para fijar el modelo y el glosario, pero solo se implementará la funcionalidad estructural expresamente incluida en el alcance. Las relaciones y referencias avanzadas quedan aplazadas.
+En este incremento se especifican `semantic.allocation` y `content.instances` como las dos representaciones coordinadas de la contención de instancias. La implementación debe seguir este contrato; no se afirma que ya esté presente en el código. Las relaciones y referencias avanzadas (`relational` y `referential`) quedan aplazadas.
 
 ### 3.4. `content` (segmento de workspace e instancia)
 
