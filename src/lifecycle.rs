@@ -354,6 +354,29 @@ mod tests {
     }
 
     #[test]
+    fn journal_recovers_removal_after_resource_write() {
+        let (_dir, resources, workspaces) = setup();
+        let (resource, _) = resources.create("Recurso", None).unwrap();
+        let root_id = create_instance(&resources, &workspaces, "proyecto", resource.id).unwrap();
+        let child_id = create_instance_under(&resources, &workspaces, "proyecto", resource.id, Some(root_id)).unwrap();
+        let workspace = workspaces.load("proyecto").unwrap();
+        let child = workspace.find_instance(child_id).unwrap().clone();
+        let operation = PendingOperation::Remove { instance: child, parent_id: Some(root_id) };
+        persist_journal(&workspaces, "proyecto", &operation).unwrap();
+        resources.unregister_instance(resource.id, child_id).unwrap();
+
+        let (recovered, report) = reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
+
+        assert_eq!(report.removed, 1);
+        assert!(recovered.find_instance(child_id).is_none());
+        let root = recovered.find_instance(root_id).unwrap();
+        assert!(root.children().is_empty());
+        assert!(root.child_ids().is_empty());
+        assert!(!resources.get(resource.id).unwrap().management.structural.contains(&child_id));
+        assert!(!journal_path(&workspaces, "proyecto").unwrap().exists());
+    }
+
+    #[test]
     fn does_not_guess_missing_parent_without_journal() {
         let (_dir, resources, workspaces) = setup();
         let (resource, _) = resources.create("Recurso", None).unwrap();
