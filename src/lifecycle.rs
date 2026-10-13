@@ -143,18 +143,37 @@ fn apply_pending(
         }
         PendingOperation::Remove { instance, parent_id } => {
             let resource = resources.get(instance.source.id)?;
-            if resource.management.structural.contains(&instance.id) {
-                resources.unregister_instance(instance.source.id, instance.id)?;
-            }
+            let registered = resource.management.structural.contains(&instance.id);
             let mut workspace = load_workspace_or_empty(workspaces, workspace_name)?;
-            if let Some(existing) = workspace.find_instance(instance.id) {
-                if existing.source.id != instance.source.id || workspace.parent_of(instance.id) != parent_id {
+            let existing = workspace.find_instance(instance.id).cloned();
+
+            match (registered, existing) {
+                (true, None) => {
+                    // Si el registro sigue presente pero la instancia física no existe,
+                    // no podemos afirmar que la remoción se haya completado.
                     return Err(LifecycleError::JournalConflict(format!(
-                        "la instancia {} ya no coincide con el origen o padre registrado", instance.id
+                        "la instancia {} sigue registrada, pero no existe en el workspace", instance.id
                     )));
                 }
-                workspace.remove_leaf(instance.id)?;
-                workspaces.save(workspace_name, &workspace)?;
+                (false, None) => {
+                    // Ambos efectos ya se aplicaron; solo queda retirar el journal.
+                }
+                (is_registered, Some(existing)) => {
+                    if existing.source.id != instance.source.id || workspace.parent_of(instance.id) != parent_id {
+                        return Err(LifecycleError::JournalConflict(format!(
+                            "la instancia {} ya no coincide con el origen o padre registrado", instance.id
+                        )));
+                    }
+                    if !existing.children().is_empty() {
+                        return Err(LifecycleError::Workspace(WorkspaceError::InstanceHasChildren(instance.id)));
+                    }
+                    // Validar la ubicación y que sea hoja antes de tocar el recurso.
+                    if is_registered {
+                        resources.unregister_instance(instance.source.id, instance.id)?;
+                    }
+                    workspace.remove_leaf(instance.id)?;
+                    workspaces.save(workspace_name, &workspace)?;
+                }
             }
         }
     }
