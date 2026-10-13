@@ -20,7 +20,7 @@ El repositorio utiliza un workspace de Cargo con dos paquetes:
 - **`bittopos-core`:** define los recursos, la persistencia y los espacios de trabajo.
 - **`bitto-cli`:** proporciona la interfaz de terminal y coordina las operaciones del núcleo.
 
-La CLI no debe duplicar la lógica de validación ni implementar un sistema de persistencia independiente. Dentro del núcleo, `store.rs` gestiona archivos de definiciones, `workspace.rs` representa y persiste el estado del workspace, y `lifecycle.rs` coordina las operaciones de creación, eliminación y recuperación para mantener `allocation` como fuente de verdad.
+La CLI no debe duplicar la lógica de validación ni implementar un sistema de persistencia independiente. Dentro del núcleo, `store.rs` gestiona archivos de definiciones, `workspace.rs` representa y persiste el estado del workspace, y `lifecycle.rs` coordina las operaciones de creación, eliminación y recuperación. La implementación actual todavía conserva una lista plana de instancias; la contención recursiva descrita en el contrato es el siguiente incremento de diseño y no debe confundirse con funcionalidad ya implementada.
 
 ## Modelo de datos
 
@@ -38,7 +38,9 @@ Cada recurso se persiste en un archivo TOML independiente. El segmento administr
 
 Un espacio de trabajo contiene instancias persistidas en JSON. Cada instancia tiene un `id` propio y referencia su recurso de origen mediante `source.id`. Varias instancias pueden compartir el mismo recurso de origen sin compartir identidad. La información descriptiva del recurso no se copia en el espacio de trabajo.
 
-El esquema vigente exige `id` propio y `source.id` en cada instancia. La compatibilidad con `resource_id` se ha eliminado deliberadamente: los JSON antiguos se rechazan sin modificarlos. `management.structural` es la fuente de verdad para reconstruir el workspace tras una interrupción. Antes de reconciliar, el núcleo valida estrictamente todos los recursos y exige que cada uno contenga `management.structural`; si un recurso es ilegible, carece de ese registro o hay IDs asignados a varios recursos, la recuperación se detiene sin reescribir el workspace.
+El esquema recursivo propuesto para el siguiente incremento define `Workspace.content.instances` como la lista de instancias raíz. Cada instancia contendrá `content.instances` con sus hijos completos y `semantic.allocation` con los IDs de esos mismos hijos directos. Ambos arreglos deben coincidir en contenido y orden, incluso cuando estén vacíos. Este esquema aún no está implementado en el código actual; se especifica en [CONTRATO-0.3.md](CONTRATO-0.3.md).
+
+El esquema vigente exige `id` propio y `source.id` en cada instancia. La compatibilidad con `resource_id` se ha eliminado deliberadamente: los JSON antiguos se rechazan sin modificarlos. `management.structural` registra las identidades de instancias por recurso de origen, pero no contiene información de padres e hijos y, por sí solo, no permite reconstruir el árbol. Antes de reconciliar, el núcleo valida estrictamente todos los recursos y exige que cada uno contenga `management.structural`; si un recurso es ilegible, carece de ese registro o hay IDs asignados a varios recursos, la recuperación se detiene sin reescribir el workspace.
 
 Crear una definición y crear una instancia son operaciones distintas. La CLI delega el ciclo de vida al núcleo: primero confirma la asignación del recurso y después guarda el workspace. Al eliminar, retira primero la asignación y después persiste el workspace.
 
