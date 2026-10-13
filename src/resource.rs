@@ -64,7 +64,7 @@ pub(crate) fn normalize_name(name: &str) -> Result<(String, Vec<ResourceWarning>
 
 pub(crate) fn validate_stored_name(name: &str) -> Result<(), ResourceError> {
     if name.is_empty() || name.trim_matches(' ').is_empty() {
-        return Err(StoreError::InvalidName);
+        return Err(ResourceError::InvalidName);
     }
 
     Ok(())
