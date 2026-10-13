@@ -20,7 +20,7 @@ El repositorio utiliza un workspace de Cargo con dos paquetes:
 - **`bittopos-core`:** define los recursos, la persistencia y los espacios de trabajo.
 - **`bitto-cli`:** proporciona la interfaz de terminal y coordina las operaciones del núcleo.
 
-La CLI no debe duplicar la lógica de validación ni implementar un sistema de persistencia independiente. Dentro del núcleo, `store.rs` gestiona archivos de definiciones, `workspace.rs` representa y persiste el estado del workspace, y `lifecycle.rs` coordina las operaciones de creación, eliminación y recuperación. La implementación actual todavía conserva una lista plana de instancias; la contención recursiva descrita en el contrato es el siguiente incremento de diseño y no debe confundirse con funcionalidad ya implementada.
+La CLI no debe duplicar la lógica de validación ni implementar un sistema de persistencia independiente. Dentro del núcleo, `store.rs` gestiona archivos de definiciones, `workspace.rs` representa y persiste el estado del workspace, y `lifecycle.rs` coordina instanciación, remoción y recuperación mediante un journal duradero. `workspace.rs` implementa la contención recursiva y valida la coherencia entre las instancias físicas y sus IDs semánticos.
 
 ## Modelo de datos
 
@@ -38,11 +38,11 @@ Cada recurso se persiste en un archivo TOML independiente. El segmento administr
 
 Un espacio de trabajo contiene instancias persistidas en JSON. Cada instancia tiene un `id` propio y referencia su recurso de origen mediante `source.id`. Varias instancias pueden compartir el mismo recurso de origen sin compartir identidad. La información descriptiva del recurso no se copia en el espacio de trabajo.
 
-El esquema recursivo propuesto para el siguiente incremento define `Workspace.content.instances` como la lista de instancias raíz. Cada instancia contendrá `content.instances` con sus hijos completos y `semantic.allocation` con los IDs de esos mismos hijos directos. Cuando existen hijos, ambos componentes deben coincidir en contenido y orden. Si no hay hijos, cualquiera puede omitirse o ser un arreglo vacío. Este esquema aún no está implementado en el código actual; se especifica en [CONTRATO-0.3.md](CONTRATO-0.3.md).
+`Workspace.content.instances` contiene las instancias raíz. Cada instancia puede contener sus hijos completos en `content.instances` y los IDs de esos hijos directos en `semantic.allocation`. Si hay hijos, ambas vistas deben coincidir exactamente en contenido y orden; si no hay hijos, los componentes pueden omitirse o ser arreglos vacíos. La remoción busca instancias recursivamente, permite retirar solo hojas y mantiene la definición del recurso de origen. El contrato se encuentra en [CONTRATO-0.3.md](CONTRATO-0.3.md).
 
 El esquema actualmente implementado exige `id` propio y `source.id` en cada instancia. La compatibilidad con `resource_id` se ha eliminado deliberadamente: los JSON antiguos se rechazan sin modificarlos. `management.structural` registra las identidades de instancias por recurso de origen, pero no contiene información de padres e hijos y, por sí solo, no permite reconstruir el árbol. Antes de reconciliar, el núcleo valida estrictamente todos los recursos y exige que cada uno contenga `management.structural`; si un recurso es ilegible, carece de ese registro o hay IDs asignados a varios recursos, la recuperación se detiene sin reescribir el workspace.
 
-Crear una definición y crear una instancia son operaciones distintas. En el código actual, la CLI delega el ciclo de vida al núcleo: primero confirma el registro en el recurso y después guarda el workspace. El contrato define un journal duradero y el orden de escritura journal → recurso TOML → workspace JSON → retirar journal. La remoción de instancia elimina su asignación y su aparición en el workspace, pero conserva el recurso de origen; la eliminación destructiva del recurso es una operación diferente y queda aplazada. Todo esto sigue siendo diseño documental, no funcionalidad ya implementada.
+Crear una definición y crear una instancia son operaciones distintas. En el código actual, la CLI delega el ciclo de vida al núcleo: primero confirma el registro en el recurso y después guarda el workspace. El núcleo usa un journal duradero y el orden de escritura journal → recurso TOML → workspace JSON → retirar journal. La remoción de instancia elimina su asignación y su aparición en el workspace, pero conserva el recurso de origen; la eliminación destructiva del recurso es una operación diferente y queda aplazada.
 
 ## Almacenamiento local
 
