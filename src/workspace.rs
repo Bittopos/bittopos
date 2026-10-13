@@ -308,10 +308,13 @@ impl WorkspaceStore {
         for entry in fs::read_dir(&self.root)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
-                if let Some(name) = path.file_stem().and_then(|stem| stem.to_str()) {
-                    names.push(name.to_owned());
-                }
+            let is_internal = path.file_name().and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with('.'));
+            if is_internal || path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+                continue;
+            }
+            if let Some(name) = path.file_stem().and_then(|stem| stem.to_str()) {
+                names.push(name.to_owned());
             }
         }
         names.sort();
