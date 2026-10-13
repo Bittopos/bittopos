@@ -5,6 +5,7 @@
 //! de la identidad del recurso de origen.
 
 mod lifecycle;
+mod persistence;
 mod resource;
 mod store;
 mod workspace;
