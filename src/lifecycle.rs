@@ -129,7 +129,7 @@ pub fn reconcile_workspace(
 }
 
 /// Registra primero la asignación. Si el guardado del workspace falla,
-/// la siguiente reconciliación reconstruirá la instancia desde allocation.
+/// la siguiente reconciliación reconstruirá la instancia desde management.structural.
 pub fn create_instance(
     resources: &ResourceStore,
     workspaces: &WorkspaceStore,
@@ -190,7 +190,7 @@ mod tests {
     }
 
     #[test]
-    fn recovers_creation_interrupted_after_allocation_commit() {
+    fn recovers_creation_interrupted_after_structural_commit() {
         let (_dir, resources, workspaces) = setup();
         let (resource, _) = resources.create("Origen", None).unwrap();
         let instance_id = Uuid::now_v7();
@@ -207,7 +207,7 @@ mod tests {
     }
 
     #[test]
-    fn recovers_deletion_interrupted_after_allocation_commit() {
+    fn recovers_deletion_interrupted_after_structural_commit() {
         let (_dir, resources, workspaces) = setup();
         let (resource, _) = resources.create("Origen", None).unwrap();
         let instance_id = Uuid::now_v7();
