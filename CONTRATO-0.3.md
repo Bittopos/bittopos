@@ -79,7 +79,7 @@ Estos conceptos no son intercambiables y no deben almacenarse bajo una única re
 
 ### 2.10. Workspace
 
-Contexto de trabajo local que organiza las instancias utilizadas. En esta versión existe un espacio de trabajo por defecto; no existe todavía un sistema completo de perfiles o proyectos.
+Contexto de trabajo local que organiza las instancias utilizadas. Su segmento `content` contiene `instances`, una lista de instancias raíz. En esta versión existe un espacio de trabajo por defecto; no existe todavía un sistema completo de perfiles o proyectos.
 
 ### 2.11. Navigation context
 
@@ -109,7 +109,13 @@ Segmento de sistema para la organización semántica de un recurso. Los componen
 
 En 0.3 estos nombres sirven para fijar el modelo y el glosario, pero solo se implementará la funcionalidad estructural expresamente incluida en el alcance. Las relaciones y referencias avanzadas quedan aplazadas.
 
-### 3.4. `source` (segmento de instancia)
+### 3.4. `content` (segmento de workspace e instancia)
+
+`content.instances` contiene físicamente las instancias hijas directas. En el `Workspace`, contiene las instancias raíz; dentro de cada `Instance`, contiene sus hijos directos completos y cada hijo puede volver a contener su propio `content.instances`. La estructura es recursiva y expresa la contención física del árbol.
+
+`content.instances` no sustituye a `semantic.allocation`: almacena los objetos hijos completos, mientras `semantic.allocation` registra únicamente sus IDs directos. Ambos deben mantenerse consistentes.
+
+### 3.5. `source` (segmento de instancia)
 
 `source` identifica la definición de la que procede una instancia. Su componente `source.id` contiene el ID del recurso original. Es una referencia al origen, no la identidad de la instancia.
 
@@ -137,11 +143,26 @@ Aunque la contención se considera universal y conceptualmente puede existir en 
 
 La interfaz podrá presentar esta operación al usuario con expresiones sencillas, como guardar un objeto dentro de otro. No debe exigir que el usuario conozca el término técnico `allocation`.
 
-La representación JSON del mapa de contención del espacio de trabajo se definirá en un paso posterior, antes de implementar este componente. En este contrato solo queda fijada su responsabilidad semántica: representar la contención directa mediante identificadores. La recuperación del mapa de contención, el tratamiento de ciclos y la navegación quedan fuera del primer incremento de diseño.
+`semantic.allocation` y `content.instances` representan deliberadamente dos vistas complementarias de la misma contención directa:
+
+- `semantic.allocation`: lista de IDs de los hijos directos de una instancia, sin copiar sus datos.
+- `content.instances`: lista de esos mismos hijos como instancias completas, anidadas físicamente en el JSON.
+
+La lista de IDs de `semantic.allocation` debe coincidir, en el mismo orden, con los valores `id` de `content.instances`. Una instancia hoja debe representar ambas listas como arreglos vacíos. Los dos campos son obligatorios en el esquema 0.3; no deben omitirse por estar vacíos.
+
+La contención solo se aplica a instancias, nunca a las definiciones de recursos originales. El árbol físico no puede contener una instancia más de una vez, repetir IDs, contenerse a sí misma ni formar ciclos. Cada instancia debe tener un único padre físico como máximo; las instancias raíz solo aparecen en `Workspace.content.instances`. Las relaciones y referencias que no sean contención pertenecen a componentes futuros y no alteran estas reglas.
 
 ### 4.3. `relational` y `referential`
 
 Son componentes conceptuales reservados para relaciones y referencias. No se implementarán como funcionalidades completas en esta versión. Su futura incorporación no debe obligar a reinterpretar la contención como una relación genérica.
+
+### 4.4. `content.instances` y consistencia de la contención
+
+`content.instances` es el componente físico que almacena instancias completas. En el workspace aparece bajo `content.instances` y contiene las raíces del árbol; en cada instancia aparece bajo `content.instances` y contiene recursivamente sus hijos directos.
+
+Para cada instancia, el sistema debe validar que `semantic.allocation` y `content.instances` describan exactamente los mismos hijos directos y en el mismo orden. No basta con que ambos contengan IDs válidos: una discrepancia es un estado inválido y no debe corregirse silenciosamente eligiendo una de las representaciones.
+
+La identidad de instancia debe ser única en todo el workspace, no solo entre hermanos. Una instancia no puede aparecer a la vez como raíz y como descendiente ni tener más de un padre. El árbol físico no puede tener ciclos. Antes de persistir o aceptar un workspace cargado, el núcleo debe validar estas invariantes y referencias a recursos de origen.
 
 ## 5. Identidad, definición e instancia
 
@@ -156,7 +177,9 @@ Son componentes conceptuales reservados para relaciones y referencias. No se imp
 9. Los identificadores internos del sistema no se representan como simples datos de usuario ni se modifican mediante ediciones genéricas de segmentos.
 10. Los alias no forman parte del alcance funcional de 0.3. Si se añaden en el futuro, no sustituirán a los identificadores estables.
 
-La implementación mantiene `management.structural` como fuente de verdad para reconstruir el workspace. La creación registra primero el ID de la instancia en la definición y luego persiste la instancia; la eliminación retira primero ese registro y luego persiste el workspace. Si el proceso se interrumpe entre ambos pasos, la siguiente reconciliación reconstruye las instancias asignadas y elimina las residuales. La recuperación valida todos los recursos antes de modificar el workspace, exige que cada recurso tenga `management.structural` y se detiene ante archivos ilegibles, registros ausentes o IDs asignados a más de un recurso. El núcleo permite varias instancias del mismo origen y valida la identidad propia de cada instancia.
+`management.structural` es el registro administrativo de las identidades de instancia asociadas a cada recurso de origen; no contiene la jerarquía de padres e hijos. La jerarquía y la contención se conservan en el estado JSON mediante `content.instances` y `semantic.allocation`. Por tanto, `management.structural` por sí solo no permite reconstruir el árbol completo.
+
+La creación y eliminación deben mantener coordinados el registro del recurso y el workspace. La recuperación puede reconciliar discrepancias solo cuando puede hacerlo sin inventar la ubicación de una instancia ni aplanar el árbol. Si una interrupción deja una instancia registrada cuyo padre no puede determinarse, el sistema debe informar un error de recuperación explícito en vez de convertirla silenciosamente en raíz. El protocolo duradero de intención/recuperación que garantice esto debe implementarse y probarse junto con las operaciones recursivas. La recuperación valida todos los recursos antes de modificar el workspace, exige `management.structural` en cada recurso y rechaza IDs registrados en más de un recurso.
 
 ## 6. Herencia y máscaras
 
@@ -186,7 +209,37 @@ La política provisional permite que las instancias sean accesibles por terceros
 
 ## 7. Espacio de trabajo y persistencia
 
-Los recursos individuales se persisten en TOML; el espacio de trabajo, las identidades de instancia y su estado se persisten en JSON. TOML se mantiene como formato de las definiciones individuales para evitar duplicar en cada instancia toda la definición de origen. JSON se utiliza para representar la estructura del espacio de trabajo y también será el formato de exportación estructural previsto.
+Los recursos individuales se persisten en TOML; el espacio de trabajo y el árbol de instancias se persisten en JSON. TOML se mantiene como formato de las definiciones individuales para evitar duplicar en cada instancia toda la definición de origen. JSON representa la estructura física del workspace y también es el formato de exportación estructural previsto.
+
+El objeto raíz del workspace contiene `content.instances`, un arreglo de instancias raíz. Cada instancia contiene `id`, `source.id`, `semantic.allocation` y `content.instances`. Los hijos completos se anidan recursivamente dentro de `content.instances`; `semantic.allocation` conserva solo los IDs de los hijos directos. Ambos componentes deben existir incluso cuando la instancia no tenga hijos, en cuyo caso ambos arreglos estarán vacíos.
+
+Ejemplo ilustrativo de una instancia raíz con una hija:
+
+```json
+{
+  "content": {
+    "instances": [
+      {
+        "id": "instancia-A",
+        "source": { "id": "recurso-A" },
+        "semantic": { "allocation": ["instancia-B"] },
+        "content": {
+          "instances": [
+            {
+              "id": "instancia-B",
+              "source": { "id": "recurso-B" },
+              "semantic": { "allocation": [] },
+              "content": { "instances": [] }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
+```
+
+Los IDs del ejemplo son ilustrativos, no UUIDs literales del formato real.
 
 En el nuevo esquema, el recurso mantiene `id` en el nivel superior de su TOML. Cada instancia mantiene `id` propio en el nivel superior del JSON y `source.id` dentro del segmento `source`. No se conserva `resource_id` como campo permanente paralelo.
 
@@ -197,7 +250,8 @@ La persistencia deberá permitir distinguir, como mínimo:
 - Definiciones de recursos.
 - Identidades y estado de instancias.
 - Referencia `source.id` al recurso de origen.
-- Contención directa de cada instancia mediante `semantic.allocation`.
+- Árbol físico recursivo mediante `content.instances`, tanto desde la raíz del workspace como dentro de cada instancia.
+- IDs de hijos directos mediante `semantic.allocation`, consistentes con el árbol físico.
 - Registro `management.structural` de identidades de instancia asociado a cada definición.
 - Contexto de navegación persistente.
 
@@ -289,7 +343,9 @@ Esta organización es una dirección de diseño, no una afirmación de que todos
 - Distinguir el espacio de definición del espacio de instanciación.
 - Definir los segmentos `management`, `info` y `semantic`.
 - Ubicar `management.structural` en el espacio de definición como registro de identidades de instancia.
-- Definir `semantic.allocation` como componente de contención directa.
+- Definir `semantic.allocation` como componente de contención directa por IDs de hijos.
+- Introducir `content.instances` como almacenamiento físico recursivo de instancias completas.
+- Validar la consistencia entre `semantic.allocation` y `content.instances`, la unicidad global de IDs y la ausencia de ciclos o múltiples padres.
 - Mantener la identidad del recurso separada de la identidad de la instancia.
 - Establecer reglas de herencia, máscaras y sobreposición de propiedades.
 - Persistir el estado necesario para las instancias y la navegación.
@@ -323,7 +379,13 @@ La línea 0.3 podrá considerarse coherente con este contrato cuando las impleme
 - [ ] Los JSON con `resource_id` se rechazan sin modificarlos.
 - [ ] `management.structural` no puede consultarse, modificarse ni enmascararse desde el espacio de instanciación.
 - [ ] `management.structural` se mantiene separado de la contención y registra las identidades de instancia asociadas a la definición.
-- [ ] `semantic.allocation` registra solo los hijos directos de una instancia.
+- [ ] `semantic.allocation` registra solo los IDs de los hijos directos de una instancia.
+- [ ] `Workspace.content.instances` contiene las instancias raíz y cada `Instance.content.instances` contiene recursivamente sus hijos completos.
+- [ ] `semantic.allocation` y `content.instances` existen incluso en hojas y describen los mismos hijos directos, en el mismo orden.
+- [ ] Los IDs de instancia son únicos en todo el workspace; ninguna instancia aparece más de una vez en el árbol ni tiene más de un padre.
+- [ ] El árbol físico no contiene ciclos y toda instancia anidada tiene una referencia `source.id` válida.
+- [ ] Una discrepancia entre `semantic.allocation` y `content.instances` se rechaza explícitamente, sin corregirla silenciosamente.
+- [ ] La recuperación no aplana instancias ni inventa padres cuando `management.structural` no permite conocer la jerarquía.
 - [ ] La modificación de datos particulares de una instancia no modifica accidentalmente la definición original.
 - [ ] Las máscaras distinguen las propiedades heredadas de las protegidas o sobrepuestas.
 - [ ] La eliminación de una máscara no destruye silenciosamente datos propios de la instancia.
