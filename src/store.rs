@@ -1,5 +1,5 @@
-use std::fs::{self, OpenOptions};
-use std::io::{self, Write};
+use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
@@ -441,24 +441,9 @@ impl ResourceStore {
             )));
         }
 
-        let mut temporary_file = match OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary_path)
-        {
-            Ok(file) => file,
-            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
-                return Err(StoreError::TemporaryExists(temporary_path));
-            }
-            Err(error) => return Err(StoreError::Io(error)),
-        };
-
-        // Fase 1: preparar y validar. Si falla, el temporal no se considera recuperable
-        // y se intenta limpiar; la limpieza no debe ocultar el error original.
+        // Prepare bytes durably, then validate the serialized resource before promotion.
         let prepared = (|| -> Result<(), StoreError> {
-            temporary_file.write_all(content.as_bytes())?;
-            temporary_file.sync_all()?;
-            drop(temporary_file);
+            crate::persistence::write_new_file(&temporary_path, content.as_bytes())?;
 
             let checked = self.read_file(&temporary_path, resource.id)?;
             if checked != *resource {
@@ -500,21 +485,10 @@ impl ResourceStore {
 /// En caso de error no elimina el temporal: el llamador puede conservarlo para inspección.
 fn promote_temporary(temporary_path: &Path, path: &Path, replace: bool) -> Result<(), StoreError> {
     if replace {
-        // En el entorno objetivo (Termux/Linux), rename en el mismo sistema de archivos
-        // sustituye el destino sin exponer una escritura parcial.
-        fs::rename(temporary_path, path)?;
+        crate::persistence::replace_file(temporary_path, path)?;
     } else {
-        // hard_link evita reemplazar un destino que aparezca después de la comprobación.
-        fs::hard_link(temporary_path, path)?;
-        fs::remove_file(temporary_path)?;
+        crate::persistence::install_new_file(temporary_path, path)?;
     }
-
-    // Sincroniza también la entrada de directorio: sync_all del archivo temporal por sí
-    // solo no garantiza que el cambio de nombre sobreviva a una interrupción del sistema.
-    let parent = path.parent().ok_or_else(|| StoreError::Io(io::Error::new(
-        io::ErrorKind::InvalidInput, "la ruta del recurso no tiene directorio padre"
-    )))?;
-    OpenOptions::new().read(true).open(parent)?.sync_all()?;
     Ok(())
 }
 
