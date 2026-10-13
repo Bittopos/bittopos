@@ -1,11 +1,12 @@
 use std::collections::HashSet;
-use std::fs::{self, OpenOptions};
-use std::io::{self, Write};
+use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::persistence::atomic_write;
 use crate::{Resource, ResourceStore, StoreError};
 
 /// Segmento físico que contiene instancias completas.
@@ -327,24 +328,6 @@ impl WorkspaceStore {
             return Err(WorkspaceError::InvalidName);
         }
         Ok(self.root.join(format!("{name}.json")))
-    }
-}
-
-pub(crate) fn atomic_write(temporary_path: &Path, destination: &Path, content: &[u8]) -> Result<(), WorkspaceError> {
-    let parent = destination.parent().ok_or(WorkspaceError::InvalidName)?;
-    let mut file = OpenOptions::new().write(true).create_new(true).open(temporary_path)?;
-    file.write_all(content)?;
-    file.sync_all()?;
-    drop(file);
-    fs::rename(temporary_path, destination)?;
-    FileSync::sync_directory(parent)?;
-    Ok(())
-}
-
-struct FileSync;
-impl FileSync {
-    fn sync_directory(path: &Path) -> io::Result<()> {
-        OpenOptions::new().read(true).open(path)?.sync_all()
     }
 }
 
