@@ -17,10 +17,10 @@ La versión del paquete indicada en `Cargo.toml` identifica la versión declarad
 
 El repositorio utiliza un workspace de Cargo con dos paquetes:
 
-- **`bittopos-core`:** define los recursos, la persistencia y los espacios de trabajo.
+- **`bittopos-core`:** define recursos, instancias, persistencia, navegación y espacios de trabajo.
 - **`bitto-cli`:** proporciona la interfaz de terminal y coordina las operaciones del núcleo.
 
-La CLI no debe duplicar la lógica de validación ni implementar un sistema de persistencia independiente. Dentro del núcleo, `store.rs` gestiona archivos de definiciones, `workspace.rs` representa y persiste el estado del workspace, y `lifecycle.rs` coordina las operaciones de creación, eliminación y recuperación. La implementación actual todavía conserva una lista plana de instancias; la contención recursiva descrita en el contrato es el siguiente incremento de diseño y no debe confundirse con funcionalidad ya implementada.
+La CLI delega las reglas de identidad, contención y ciclo de vida al núcleo. `store.rs` gestiona las definiciones de recursos; `workspace.rs` representa y persiste el árbol recursivo; `lifecycle.rs` coordina la creación, remoción y recuperación de instancias; `navigation.rs` persiste la ubicación actual en TOML. La separación conceptual completa de `Resource`, `Segment` y las demás entidades queda pendiente de una refactorización posterior.
 
 ## Modelo de datos
 
@@ -38,7 +38,7 @@ Cada recurso se persiste en un archivo TOML independiente. El segmento administr
 
 Un espacio de trabajo contiene instancias persistidas en JSON bajo `content.instances`. Cada instancia tiene un `id` propio y referencia su recurso de origen mediante `source.id`. Sus hijos completos se almacenan recursivamente en `content.instances`, mientras `semantic.allocation` contiene los IDs de sus hijos directos. Ambas vistas deben coincidir en contenido y orden; los componentes vacíos pueden omitirse. Varias instancias pueden compartir un recurso de origen sin compartir identidad.
 
-El esquema recursivo propuesto para el siguiente incremento define `Workspace.content.instances` como la lista de instancias raíz. Cada instancia contendrá `content.instances` con sus hijos completos y `semantic.allocation` con los IDs de esos mismos hijos directos. Cuando existen hijos, ambos componentes deben coincidir en contenido y orden. Si no hay hijos, cualquiera puede omitirse o ser un arreglo vacío. Este esquema aún no está implementado en el código actual; se especifica en [CONTRATO-0.3.md](CONTRATO-0.3.md).
+El esquema recursivo define `Workspace.content.instances` como la lista de instancias raíz. Cada instancia contiene `content.instances` con sus hijos completos y `semantic.allocation` con los IDs de esos mismos hijos directos. Cuando existen hijos, ambos componentes deben coincidir en contenido y orden. Si no hay hijos, cualquiera puede omitirse o ser un arreglo vacío. Las reglas completas se especifican en [CONTRATO-0.3.md](CONTRATO-0.3.md).
 
 El esquema actualmente implementado exige `id` propio y `source.id` en cada instancia. La compatibilidad con `resource_id` se ha eliminado deliberadamente: los JSON antiguos se rechazan sin modificarlos. `management.structural` registra las identidades de instancias por recurso de origen, pero no contiene información de padres e hijos y, por sí solo, no permite reconstruir el árbol. Antes de reconciliar, el núcleo valida estrictamente todos los recursos y exige que cada uno contenga `management.structural`; si un recurso es ilegible, carece de ese registro o hay IDs asignados a varios recursos, la recuperación se detiene sin reescribir el workspace.
 
@@ -68,7 +68,7 @@ Mostrar la ayuda:
 cargo run -p bitto-cli -- --help
 ```
 
-Crear un recurso y añadirlo al espacio de trabajo por defecto:
+Crear un recurso y añadir su instancia en la ubicación actual (en la raíz, si no se ha navegado a otra instancia):
 
 ```bash
 cargo run -p bitto-cli -- create "Aprender Rust" \
@@ -95,11 +95,30 @@ Consultar un recurso mediante su UUID:
 cargo run -p bitto-cli -- show UUID_DEL_RECURSO
 ```
 
-Añadir una nueva instancia de un recurso existente al espacio de trabajo (se permite repetir el mismo recurso):
+Añadir una instancia de un recurso existente dentro de la ubicación actual (se permite repetir el mismo recurso):
 
 ```bash
 cargo run -p bitto-cli -- add UUID_DEL_RECURSO
 ```
+
+### Navegación
+
+La ubicación actual se guarda en `workspaces/navigation.toml`, separada del árbol de instancias. La raíz se representa con un contexto vacío. Los comandos disponibles para navegar son:
+
+```bash
+# Mostrar los hijos directos de la ubicación actual
+cargo run -p bitto-cli -- ls
+
+# Entrar en una instancia hija (UUID propio de instancia)
+cargo run -p bitto-cli -- enter UUID_DE_INSTANCIA
+
+# Subir al padre, volver a la raíz o consultar la ubicación actual
+cargo run -p bitto-cli -- up
+cargo run -p bitto-cli -- root
+cargo run -p bitto-cli -- pwd
+```
+
+`show` sin UUID continúa mostrando el árbol completo; `show UUID` consulta una definición de recurso. Al crear o añadir una instancia, esta se guarda dentro de la ubicación actual. Si la ubicación guardada ya no existe, la navegación se restablece a la raíz. Un archivo TOML malformado produce un error explícito y no se sobrescribe automáticamente.
 
 El nombre `proyecto.json` es una convención provisional para el archivo del espacio de trabajo por defecto, no una implementación de proyectos o perfiles.
 
