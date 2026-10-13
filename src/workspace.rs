@@ -211,9 +211,9 @@ impl Workspace {
             Ok(removed)
         } else {
             let index = self.content.instances.iter().position(|instance| instance.id == id)
-                .ok_or(WorkspaceError::InstanceNotFound(id))?;
+                .ok_or(WorkspaceModelError::InstanceNotFound(id))?;
             if !self.content.instances[index].children().is_empty() {
-                return Err(WorkspaceError::InstanceHasChildren(id));
+                return Err(WorkspaceModelError::InstanceHasChildren(id));
             }
             Ok(self.content.instances.remove(index))
         }
@@ -263,7 +263,7 @@ fn collect_instances<'a>(instances: &'a [Instance], output: &mut Vec<&'a Instanc
 fn validate_instances(instances: &[Instance], seen: &mut HashSet<Uuid>) -> Result<(), WorkspaceModelError> {
     for instance in instances {
         if !seen.insert(instance.id) {
-            return Err(WorkspaceError::DuplicateInstanceId(instance.id));
+            return Err(WorkspaceModelError::DuplicateInstanceId(instance.id));
         }
         let children = instance.children();
         let allocation = instance.child_ids();
@@ -276,13 +276,13 @@ fn validate_instances(instances: &[Instance], seen: &mut HashSet<Uuid>) -> Resul
             continue;
         }
         if instance.semantic.is_none() {
-            return Err(WorkspaceError::InvalidContainment(format!(
+            return Err(WorkspaceModelError::InvalidContainment(format!(
                 "la instancia {} contiene hijos físicos, pero falta semantic.allocation", instance.id
             )));
         }
         let child_ids: Vec<_> = children.iter().map(|child| child.id).collect();
         if allocation != child_ids.as_slice() {
-            return Err(WorkspaceError::InvalidContainment(format!(
+            return Err(WorkspaceModelError::InvalidContainment(format!(
                 "semantic.allocation no coincide en contenido y orden con content.instances para {}", instance.id
             )));
         }
