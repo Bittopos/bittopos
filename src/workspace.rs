@@ -12,7 +12,7 @@ use crate::{Resource, ResourceStore, StoreError};
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Content {
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub instances: Vec<Instance>,
 }
 
