@@ -6,6 +6,7 @@
 
 mod lifecycle;
 mod navigation;
+mod persistence;
 mod resource;
 mod store;
 mod workspace;
