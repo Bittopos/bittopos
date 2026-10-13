@@ -90,3 +90,16 @@ impl std::fmt::Display for ResourceError {
 }
 
 impl std::error::Error for ResourceError {}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn name_validation_reports_domain_error_without_storage_types() {
+        assert_eq!(normalize_name("   ").unwrap_err(), ResourceError::InvalidName);
+        assert_eq!(validate_stored_name("   ").unwrap_err(), ResourceError::InvalidName);
+        assert!(normalize_name("valid name").is_ok());
+    }
+}
