@@ -1,6 +1,6 @@
 # Bittopos — Contrato del incremento: CLI básica y navegación persistente
 
-**Estado:** propuesta para revisión; no implica que las funcionalidades descritas estén implementadas.  
+**Estado:** contrato del incremento; debe mantenerse alineado con la implementación y sus pruebas.  
 **Base conceptual:** contrato técnico 0.3.0.  
 **Alcance:** preparar una base operativa para comenzar el frontend, sin completar el MVP ni la beta.
 
@@ -86,7 +86,17 @@ El incremento debe consolidar un conjunto mínimo y coherente de operaciones par
 - Recuperar la ubicación persistida al iniciar la aplicación.
 - Remover instancias cuando la operación esté permitida por las reglas de integridad vigentes.
 
-Los nombres, argumentos y la lista final de comandos deberán corresponder a las capacidades acordadas y a la revisión del estado actual del código. No se añadirán comandos solo por anticipar funciones futuras.
+El conjunto básico de comandos de navegación de este incremento es:
+
+- `ls`: lista únicamente las instancias hijas directas de la ubicación actual.
+- `enter <instance-id>`: entra en una instancia que sea hija directa de la ubicación actual; no permite saltar arbitrariamente a otra rama.
+- `up`: sube al padre; desde la raíz permanece en ella.
+- `root`: vuelve explícitamente a la raíz.
+- `pwd`: muestra la ubicación actual.
+
+`show` sin ID conserva la consulta del árbol completo y `show <resource-id>` consulta una definición. `create` y `add` crean la instancia dentro de la ubicación actual, o como raíz cuando el contexto es la raíz. `create --no-instance` crea únicamente la definición. La ubicación se persiste en `workspaces/navigation.toml`, independiente del JSON del workspace.
+
+No se añadirán comandos solo por anticipar funciones futuras.
 
 La CLI actúa como interfaz del sistema. Las reglas de identidad, contención, validación y consistencia pertenecen al núcleo, no deben existir únicamente en la presentación de terminal.
 
@@ -131,10 +141,10 @@ La meta es disponer de una base operativa estable y extensible, no anticipar tod
 
 ## 9. Criterios de aceptación
 
-- [ ] Las operaciones básicas acordadas de la CLI funcionan de forma coherente.
+- [ ] Las operaciones básicas acordadas de la CLI funcionan de forma coherente: `create`, `show`, `add`, `remove`, `recover`, `ls`, `enter`, `up`, `root` y `pwd`.
 - [ ] Se conserva la separación de identidad entre recurso e instancia.
-- [ ] La navegación permite entrar en ubicaciones válidas y volver a la raíz según las operaciones definidas.
-- [ ] La ubicación actual se guarda en TOML y se recupera al reiniciar la aplicación.
+- [ ] `enter` solo acepta instancias hijas directas; `up` sube al padre y `root` vuelve a la raíz.
+- [ ] La ubicación actual se guarda en `workspaces/navigation.toml` y se recupera al reiniciar la aplicación.
 - [ ] Un destino inexistente o inválido se resuelve de forma segura, regresando a la raíz.
 - [ ] La navegación no modifica accidentalmente los recursos ni la estructura del workspace.
 - [ ] Se preservan las invariantes del árbol recursivo y las reglas de persistencia del contrato 0.3.0.
