@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::workspace::atomic_write;
-use crate::{Workspace, WorkspaceError};
+use crate::persistence::atomic_write;
+use crate::Workspace;
 
 /// Ubicación actual de navegación. La ausencia de una instancia representa la raíz.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -21,7 +21,6 @@ pub enum NavigationError {
     Io(io::Error),
     TomlParse(toml::de::Error),
     TomlSerialize(toml::ser::Error),
-    Workspace(WorkspaceError),
 }
 
 impl std::fmt::Display for NavigationError {
@@ -30,7 +29,6 @@ impl std::fmt::Display for NavigationError {
             Self::Io(error) => write!(f, "error de E/S de navegación: {error}"),
             Self::TomlParse(error) => write!(f, "estado de navegación TOML inválido: {error}"),
             Self::TomlSerialize(error) => write!(f, "no se pudo serializar la navegación: {error}"),
-            Self::Workspace(error) => write!(f, "error de workspace al persistir navegación: {error}"),
         }
     }
 }
@@ -39,10 +37,6 @@ impl std::error::Error for NavigationError {}
 
 impl From<io::Error> for NavigationError {
     fn from(error: io::Error) -> Self { Self::Io(error) }
-}
-
-impl From<WorkspaceError> for NavigationError {
-    fn from(error: WorkspaceError) -> Self { Self::Workspace(error) }
 }
 
 /// Persistencia local del contexto de navegación.
