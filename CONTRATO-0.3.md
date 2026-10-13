@@ -148,7 +148,7 @@ La interfaz podrá presentar esta operación al usuario con expresiones sencilla
 - `semantic.allocation`: lista de IDs de los hijos directos de una instancia, sin copiar sus datos.
 - `content.instances`: lista de esos mismos hijos como instancias completas, anidadas físicamente en el JSON.
 
-La lista de IDs de `semantic.allocation` debe coincidir, en el mismo orden, con los valores `id` de `content.instances`. Una instancia hoja debe representar ambas listas como arreglos vacíos. Los dos campos son obligatorios en el esquema 0.3; no deben omitirse por estar vacíos.
+`semantic.allocation` debe coincidir, en el mismo orden, con los valores `id` de `content.instances`. Si una instancia no tiene hijos, cualquiera de los dos componentes puede omitirse o representarse como un arreglo vacío; para validar la consistencia, un componente omitido equivale a una lista vacía únicamente en ese caso. Si hay hijos, ambas representaciones deben estar presentes y coincidir exactamente en contenido y orden.
 
 La contención solo se aplica a instancias, nunca a las definiciones de recursos originales. El árbol físico no puede contener una instancia más de una vez, repetir IDs, contenerse a sí misma ni formar ciclos. Cada instancia debe tener un único padre físico como máximo; las instancias raíz solo aparecen en `Workspace.content.instances`. Las relaciones y referencias que no sean contención pertenecen a componentes futuros y no alteran estas reglas.
 
@@ -160,7 +160,7 @@ Son componentes conceptuales reservados para relaciones y referencias. No se imp
 
 `content.instances` es el componente físico que almacena instancias completas. En el workspace aparece bajo `content.instances` y contiene las raíces del árbol; en cada instancia aparece bajo `content.instances` y contiene recursivamente sus hijos directos.
 
-Para cada instancia, el sistema debe validar que `semantic.allocation` y `content.instances` describan exactamente los mismos hijos directos y en el mismo orden. No basta con que ambos contengan IDs válidos: una discrepancia es un estado inválido y no debe corregirse silenciosamente eligiendo una de las representaciones.
+Para cada instancia, el sistema debe validar que `semantic.allocation` y `content.instances` describan exactamente los mismos hijos directos y en el mismo orden. Cuando no hay hijos, cualquiera de los componentes puede omitirse o contener un arreglo vacío; la omisión se interpreta como vacío solo si la otra representación también está vacía. Cuando hay hijos, ambas representaciones deben estar presentes. Una discrepancia es un estado inválido y no debe corregirse silenciosamente eligiendo una de las representaciones.
 
 La identidad de instancia debe ser única en todo el workspace, no solo entre hermanos. Una instancia no puede aparecer a la vez como raíz y como descendiente ni tener más de un padre. El árbol físico no puede tener ciclos. Antes de persistir o aceptar un workspace cargado, el núcleo debe validar estas invariantes y referencias a recursos de origen.
 
@@ -179,11 +179,19 @@ La identidad de instancia debe ser única en todo el workspace, no solo entre he
 
 `management.structural` es el registro administrativo de las identidades de instancia asociadas a cada recurso de origen; no contiene la jerarquía de padres e hijos. La jerarquía y la contención se conservan en el estado JSON mediante `content.instances` y `semantic.allocation`. Por tanto, `management.structural` por sí solo no permite reconstruir el árbol completo.
 
-La creación y eliminación deben mantener coordinados el registro del recurso y el workspace. Como `management.structural` se persiste en TOML y el árbol se persiste en JSON, no existe una escritura atómica que abarque ambos archivos. Las operaciones de ciclo de vida deben utilizar un registro duradero de operación pendiente (journal), con al menos la acción, el ID de instancia, el ID del recurso de origen y el ID del padre (`null` para una raíz). El registro debe persistirse antes de modificar cualquiera de los dos archivos y conservarse hasta que ambos cambios hayan sido persistidos y validados.
+Hay que distinguir tres operaciones: **instanciación** (crear una instancia a partir de un recurso), **remoción de instancia** (desinstanciarla del workspace sin destruir la definición del recurso) y **eliminación de recurso** (destruir la definición y limpiar las instancias e identidades asociadas). No son sinónimos y deben tener operaciones del núcleo separadas. En este incremento se implementan la instanciación necesaria para `bitto add` y la remoción de instancias; la eliminación destructiva del recurso queda definida como operación futura y no debe confundirse con la remoción.
 
-Para crear una instancia, el sistema registra la intención, registra el ID en `management.structural`, inserta la instancia en `Workspace.content.instances` o en el `content.instances` del padre y añade su ID al `semantic.allocation` del padre cuando exista; después valida y persiste el workspace y retira el registro de operación pendiente. La inserción física y la actualización semántica deben ocurrir en una misma escritura atómica del JSON. Para eliminar una instancia, se registra la intención, se retira el ID de `management.structural`, se elimina la instancia de su ubicación física y el ID correspondiente de la asignación del padre en una misma escritura atómica, y finalmente se retira el registro pendiente. La operación debe ser idempotente para que la recuperación pueda terminarla después de una interrupción.
+Como `management.structural` se persiste en TOML y el árbol se persiste en JSON, no existe una escritura atómica que abarque ambos archivos. Las operaciones de instanciación y remoción deben utilizar un journal duradero de operación pendiente. El journal debe persistirse de forma duradera antes de modificar el recurso o el workspace y conservarse hasta que ambos cambios hayan sido persistidos y validados. Cada entrada identifica la acción, el ID de instancia, el ID del recurso de origen y el padre (`null` para una raíz); para instanciación también debe contener datos suficientes para reconstruir la nueva instancia y su destino. El formato debe permitir añadir en el futuro una acción de eliminación destructiva de recurso sin mezclarla con la remoción de una instancia.
 
-En este incremento, solo se permite eliminar instancias hoja. Si una instancia contiene hijos, su eliminación debe rechazarse explícitamente; no se eliminarán ni reubicarán descendientes de manera implícita. Si el registro de operación pendiente está ausente pero los archivos discrepan, o si está corrupto o no permite resolver la operación sin ambigüedad, la recuperación debe detenerse sin aplanar el árbol ni convertir instancias desconocidas en raíces. La recuperación valida todos los recursos antes de modificar el workspace, exige `management.structural` en cada recurso y rechaza IDs registrados en más de un recurso.
+El orden de escritura será explícito y común para mantener pequeño el journal: **journal → recurso TOML → workspace JSON → retirar journal**. Primero se persiste la intención; después se modifica y persiste `management.structural`; a continuación se modifica y persiste el workspace; solo después de validar ambos resultados se elimina el journal. Cada archivo se actualiza mediante escritura atómica, y el journal debe quedar durable antes de empezar la operación. Las operaciones deben ser idempotentes para que la recuperación pueda repetir los pasos de forma segura.
+
+Para instanciar, el journal registra la intención de crear la instancia, su ID, el recurso de origen y el padre previsto. El núcleo registra el ID en `management.structural` y luego inserta la instancia en `Workspace.content.instances` o en los hijos del padre. La inserción física y la actualización de `semantic.allocation` del padre, cuando corresponda, se realizan en una sola escritura atómica del JSON. Para `bitto add`, que crea una instancia raíz, el padre es `null`.
+
+Para remover una instancia, el journal registra su ID, el recurso de origen y su padre actual. El núcleo elimina primero el ID de `management.structural`; después elimina la instancia de su ubicación física y su ID de `semantic.allocation` del padre en una sola escritura atómica del JSON. La definición del recurso permanece intacta. La remoción de una raíz solo modifica la lista de raíces del workspace; la remoción de una hija también actualiza la contención directa de su padre.
+
+En esta etapa, la remoción solo se permite para instancias hoja. La operación debe estar diseñada para recibir cualquier ID de instancia y localizarla recursivamente, de modo que en el futuro se pueda habilitar la remoción de subárboles sin cambiar la interfaz de la operación; por ahora, si la instancia contiene hijos, se rechaza sin modificar archivos. No se eliminan ni reubican descendientes de manera implícita.
+
+La recuperación procesa el journal antes de exponer el workspace y completa la operación pendiente de forma idempotente siguiendo el mismo orden: registro del recurso y después workspace. Si el journal falta y los archivos discrepan, o si está corrupto o no permite resolver la operación sin ambigüedad, la recuperación se detiene sin aplanar el árbol ni convertir instancias desconocidas en raíces. La recuperación valida todos los recursos antes de modificar el workspace, exige `management.structural` en cada recurso y rechaza IDs registrados en más de un recurso. Si una operación pendiente no puede completarse de forma segura, debe conservarse el journal y comunicarse un error explícito.
 
 ## 6. Herencia y máscaras
 
@@ -215,7 +223,7 @@ La política provisional permite que las instancias sean accesibles por terceros
 
 Los recursos individuales se persisten en TOML; el espacio de trabajo y el árbol de instancias se persisten en JSON. TOML se mantiene como formato de las definiciones individuales para evitar duplicar en cada instancia toda la definición de origen. JSON representa la estructura física del workspace y también es el formato de exportación estructural previsto.
 
-El objeto raíz del workspace contiene `content.instances`, un arreglo de instancias raíz. Cada instancia contiene `id`, `source.id`, `semantic.allocation` y `content.instances`. Los hijos completos se anidan recursivamente dentro de `content.instances`; `semantic.allocation` conserva solo los IDs de los hijos directos. Ambos componentes deben existir incluso cuando la instancia no tenga hijos, en cuyo caso ambos arreglos estarán vacíos.
+El objeto raíz del workspace contiene `content.instances`, un arreglo de instancias raíz. Cada instancia tiene `id` y `source.id`; `semantic.allocation` y `content.instances` representan sus hijos directos. Los hijos completos se anidan recursivamente dentro de `content.instances`, mientras `semantic.allocation` conserva solo sus IDs. Si una instancia no tiene hijos, cualquiera de esos componentes puede omitirse o aparecer como arreglo vacío. Si tiene hijos, ambos deben estar presentes y coincidir.
 
 Ejemplo ilustrativo de una instancia raíz con una hija:
 
@@ -385,11 +393,15 @@ La línea 0.3 podrá considerarse coherente con este contrato cuando las impleme
 - [ ] `management.structural` se mantiene separado de la contención y registra las identidades de instancia asociadas a la definición.
 - [ ] `semantic.allocation` registra solo los IDs de los hijos directos de una instancia.
 - [ ] `Workspace.content.instances` contiene las instancias raíz y cada `Instance.content.instances` contiene recursivamente sus hijos completos.
-- [ ] `semantic.allocation` y `content.instances` existen incluso en hojas y describen los mismos hijos directos, en el mismo orden.
+- [ ] Cuando hay hijos, `semantic.allocation` y `content.instances` están presentes y describen los mismos hijos directos en el mismo orden; cuando no hay hijos, los componentes pueden omitirse o ser arreglos vacíos.
 - [ ] Los IDs de instancia son únicos en todo el workspace; ninguna instancia aparece más de una vez en el árbol ni tiene más de un padre.
 - [ ] El árbol físico no contiene ciclos y toda instancia anidada tiene una referencia `source.id` válida.
 - [ ] Una discrepancia entre `semantic.allocation` y `content.instances` se rechaza explícitamente, sin corregirla silenciosamente.
 - [ ] La recuperación no aplana instancias ni inventa padres cuando `management.structural` no permite conocer la jerarquía.
+- [ ] La instanciación y la remoción usan un journal durable y siguen el orden journal → recurso → workspace → retirar journal.
+- [ ] La remoción elimina la identidad de `management.structural` y la instancia del workspace, pero conserva la definición del recurso.
+- [ ] La remoción está preparada para localizar instancias a cualquier profundidad, pero en esta etapa rechaza cualquier instancia que tenga hijos.
+- [ ] La eliminación destructiva del recurso es una operación distinta y queda aplazada; no se implementa como alias de la remoción de instancia.
 - [ ] La modificación de datos particulares de una instancia no modifica accidentalmente la definición original.
 - [ ] Las máscaras distinguen las propiedades heredadas de las protegidas o sobrepuestas.
 - [ ] La eliminación de una máscara no destruye silenciosamente datos propios de la instancia.
