@@ -2,27 +2,25 @@
 
 Bittopos es un proyecto en Rust para modelar, organizar y navegar información mediante **recursos**, **instancias** y relaciones estructurales. Su objetivo es ayudar a externalizar ideas y construir modelos que las personas definen y controlan.
 
-> **Estado:** prototipo en desarrollo. La interfaz disponible es la CLI `bitto`, orientada al uso local. El modelo de segmentos, conceptos, componentes y máscaras está en definición; no todas las capacidades descritas en la documentación conceptual están implementadas.
+> **Estado:** prototipo en desarrollo. La interfaz operativa actual es la CLI `bitto`, orientada al uso local. El modelo de segmentos, conceptos, componentes y máscaras está en definición; no todas las capacidades conceptuales están implementadas.
 
 ## Qué existe hoy
 
 - Workspace de Cargo con la biblioteca `bittopos-core` y la CLI `bitto-cli`.
-- Definiciones de recursos almacenadas como TOML.
-- Espacio de trabajo local almacenado como JSON, con instancias de identidad propia y contención recursiva.
-- Navegación persistente de la CLI.
-- Validación del árbol, registro estructural de instancias y recuperación mediante journal para operaciones de ciclo de vida.
+- Definiciones de recursos en TOML.
+- Espacio de trabajo local en JSON, con instancias de identidad propia y contención recursiva.
+- Navegación persistente.
+- Validación estructural y recuperación mediante journal para operaciones del ciclo de vida.
 
-Consulta [Estado y alcance](docs/status.md) para distinguir las capacidades implementadas de las decisiones del modelo y el trabajo pendiente.
+Consulta [Estado del proyecto](docs/status.md) para distinguir las capacidades implementadas de las decisiones conceptuales y del trabajo pendiente.
 
 ## Prototipo web local
 
-Hay una interfaz estática experimental en [`web/`](web/README.md). Permite importar y exportar el workspace y recursos desde el navegador, pero todavía no se conecta al núcleo Rust ni modifica directamente los archivos locales de Bittopos.
+Existe una interfaz estática experimental en [`web/`](web/README.md). Permite importar y exportar un workspace y recursos desde el navegador, pero no está conectada al núcleo Rust ni modifica directamente los archivos locales de Bittopos.
 
 ## Inicio rápido
 
 Requisitos: Rust y Cargo instalados.
-
-Desde la raíz del repositorio:
 
 ```bash
 cargo run -p bitto-cli -- --help
@@ -48,47 +46,42 @@ Mostrar el espacio de trabajo:
 cargo run -p bitto-cli -- show
 ```
 
-Los comandos disponibles pueden cambiar durante el desarrollo. Usa siempre `--help` para consultar la CLI de la revisión que tengas instalada.
+Los comandos pueden cambiar durante el desarrollo. Usa siempre `--help` para consultar la revisión instalada.
 
 ## Desarrollo
 
-Verifica los paquetes del workspace, no solo el paquete raíz:
+Desde la raíz del repositorio:
 
 ```bash
 cargo fmt --all -- --check
 cargo build --workspace --locked
 cargo test --workspace --locked
-```
-
-Antes de abrir una PR, revisa:
-
-```bash
-git status --short
 git diff --check
-git diff
 ```
 
-Consulta [CONTRIBUTING.md](CONTRIBUTING.md) para el flujo de ramas, commits, Pull Requests y criterios de revisión.
+Consulta [CONTRIBUTING.md](CONTRIBUTING.md) para ramas, commits y Pull Requests, y [la guía de ingeniería](docs/DEVELOPMENT-GUIDE.md) para criterios de diseño, pruebas, persistencia y uso de herramientas de IA.
 
-## Documentación
+## Documentación vigente
 
-- [Estado del proyecto y próximos pasos](docs/status.md)
-- [Modelo conceptual vigente](docs/model.md)
-- [Arquitectura: estado actual y dirección](docs/architecture.md)
+- [Visión del producto y arquitectura objetivo](docs/VISION.md)
+- [Estado del proyecto y alcance](docs/status.md)
+- [Modelo conceptual](docs/model.md)
+- [Arquitectura actual y dirección](docs/architecture.md)
 - [Decisiones arquitectónicas (ADR)](docs/decisions/README.md)
-- [Guía de desarrollo y contribución](CONTRIBUTING.md)
+- [Guía de ingeniería](docs/DEVELOPMENT-GUIDE.md)
+- [Desarrollo y contribución](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)
 - [Documentación histórica](docs/archive/README.md)
 
-Los documentos `CONTRATO-*.md` que permanecen en la raíz son referencias históricas de etapas anteriores. **No son la fuente de verdad vigente**: las reglas actuales están en `docs/`, y el estado de implementación se registra por separado.
+Los contratos numerados antiguos están en [`docs/archive/`](docs/archive/README.md); no son la fuente normativa vigente.
 
 ## Principios de trabajo
 
-1. La documentación distingue el modelo acordado del comportamiento que el código implementa hoy.
-2. Las decisiones importantes registran su motivo y sus consecuencias; las decisiones sustituidas no se borran del historial.
-3. Cada cambio de código tiene un alcance pequeño, criterios verificables y pruebas adecuadas.
-4. El changelog resume cambios relevantes para usuarios y desarrolladores; no duplica cada commit.
-5. Las versiones de Cargo, las versiones publicadas y las decisiones/documentos no tienen que compartir números.
+1. La documentación distingue el modelo acordado del comportamiento implementado.
+2. Las decisiones importantes conservan su motivo y sus consecuencias.
+3. Cada cambio tiene un alcance verificable y pruebas adecuadas.
+4. El changelog resume cambios relevantes, no cada commit.
+5. Las versiones de Cargo, las etiquetas Git y las decisiones documentales cumplen funciones distintas.
 
 ## Licencia
 

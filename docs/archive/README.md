@@ -1,14 +1,24 @@
 # Documentación histórica
 
-Los contratos numerados y documentos de incrementos que permanecen en la raíz son registros históricos de cómo evolucionó el proyecto. Pueden contener decisiones que fueron sustituidas o requisitos que no llegaron a implementarse.
+Esta carpeta conserva especificaciones y planes de etapas anteriores para mantener la trazabilidad de las decisiones y del desarrollo.
 
-**No son la fuente de verdad vigente.** Usa estos documentos según su propósito:
+**Los documentos aquí archivados no son la fuente normativa vigente.** Pueden contener reglas reemplazadas o capacidades que nunca se implementaron. Para el estado actual, consulta:
 
+- [Visión del producto](../VISION.md)
 - [Modelo conceptual vigente](../model.md)
 - [Estado y alcance implementado](../status.md)
 - [Arquitectura actual y dirección](../architecture.md)
 - [Decisiones arquitectónicas](../decisions/README.md)
-- [Flujo de desarrollo](../../CONTRIBUTING.md)
+- [Guía de ingeniería](../DEVELOPMENT-GUIDE.md)
+- [Flujo de contribución](../../CONTRIBUTING.md)
 - [Changelog](../../CHANGELOG.md)
 
-Los documentos antiguos se conservan por ahora para no perder contexto ni romper referencias. Su retirada o traslado físico puede hacerse después de comprobar que la información útil está recuperada y que no quedan enlaces activos que dependan de sus rutas.
+## Documentos archivados
+
+- [Arquitectura y plan de refactorización anterior](ARQUITECTURA.md)
+- [Contrato 0.1](CONTRATO-0.1.md)
+- [Contrato 0.2](CONTRATO-0.2.md)
+- [Contrato 0.3](CONTRATO-0.3.md)
+- [Incremento de CLI y navegación](CONTRATO-INCREMENTO-CLI-NAVEGACION.md)
+
+Se conservan los textos originales; el traslado no los actualiza retroactivamente ni implica que sus decisiones sigan vigentes.

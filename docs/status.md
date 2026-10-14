@@ -22,7 +22,8 @@ La lista anterior es un inventario general del repositorio, no una afirmación d
 ## Acordado conceptualmente, pendiente de implementación completa
 
 - Un modelo general de segmentos, conceptos y componentes configurables.
-- Máscaras de segmento en instancias y resolución de herencia.
+- Máscaras dispersas con diferencias locales y herencia dinámica, según [ADR 0003](decisions/0003-sparse-mask-overrides.md).
+- Resolución de máscaras, incluidos reinicio de diferencias y eliminación local de valores heredados.
 - Reglas efectivas de permisos en los espacios de definición e instanciación.
 - Un mecanismo de resolución extensible a otros dominios estructurales, como tareas, responsabilidades y proyectos.
 - Una capa de aplicación reutilizable por futuras interfaces, allí donde un caso de uso real justifique la separación.
@@ -37,12 +38,13 @@ La lista anterior es un inventario general del repositorio, no una afirmación d
 
 ## Próximo orden de trabajo recomendado
 
-1. Acordar las reglas generales de segmentos, conceptos, componentes y máscaras.
-2. Definir el comportamiento del mecanismo de resolución con ejemplos y casos límite.
-3. Convertir esas reglas en pruebas de modelo independientes de persistencia.
-4. Implementar la resolución mínima necesaria y documentar sus límites.
-5. Revisar permisos por separado: una regla descrita no equivale a control de acceso implementado.
-6. Mantener README, especificación y changelog sincronizados con cada PR relevante.
+1. Especificar con ejemplos la identidad de elementos, las modificaciones locales, la eliminación/restablecimiento y la resolución de máscaras.
+2. Convertir esas reglas en pruebas de modelo independientes de persistencia.
+3. Introducir una capa de aplicación mínima cuando el alcance de los casos de uso esté delimitado.
+4. Reforzar CI para formato, compilación y pruebas de todo el workspace.
+5. Refactorizar persistencia en incrementos pequeños, preservando journal y recuperación.
+6. Revisar permisos por separado: una regla descrita no equivale a control de acceso implementado.
+7. Mantener README, especificación y changelog sincronizados con cada PR relevante.
 
 ## Cómo leer el estado
 

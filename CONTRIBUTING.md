@@ -32,7 +32,7 @@ Usa mensajes claros, preferiblemente con Conventional Commits:
 - `refactor(core): separate model validation`
 - `test(core): cover mask fallback`
 
-Conventional Commits es una convención útil para leer el historial y automatizar versiones; no sustituye la revisión ni exige que cada commit sea una versión.
+Conventional Commits ayuda a leer el historial y automatizar versiones; no sustituye la revisión ni exige que cada commit sea una versión.
 
 ## 3. Pull Request
 
@@ -46,7 +46,7 @@ Una PR debe explicar:
 
 Mantén las PR pequeñas cuando eso facilite la revisión. Una PR puede incluir documentación y código si describen el mismo cambio.
 
-No marques como implementado algo que solo está documentado. La integración en `main` se realiza después de revisar el diff y el resultado de CI.
+No marques como implementado algo que solo está documentado. Integra en `main` después de revisar el diff y el resultado de CI.
 
 ## 4. Verificación local
 
@@ -59,23 +59,26 @@ cargo test --workspace --locked
 git diff --check
 ```
 
-Si un comando no se ejecutó, indícalo explícitamente en la PR. Las pruebas del workspace son importantes porque el repositorio contiene más de un paquete Cargo.
+Si un comando no se ejecutó, indícalo explícitamente en la PR. Las pruebas del workspace importan porque el repositorio contiene más de un paquete Cargo.
 
-## 5. Cómo se mantiene cada documento
+## 5. Responsabilidades documentales
 
-- **README:** presentación y puerta de entrada; no debe convertirse en especificación exhaustiva.
-- **`docs/model.md`:** reglas conceptuales vigentes del modelo.
-- **`docs/architecture.md`:** límites actuales, dependencias y dirección técnica.
-- **ADR:** decisión arquitectónica concreta, alternativas, motivo y consecuencias.
+- **README:** presentación y puerta de entrada.
+- **`docs/VISION.md`:** propósito y dirección estratégica.
+- **`docs/model.md`:** reglas conceptuales vigentes.
+- **`docs/architecture.md`:** límites actuales y dirección técnica.
+- **`docs/status.md`:** capacidades implementadas, pendientes y aplazadas.
+- **ADR:** decisiones técnicas importantes, alternativas y consecuencias.
+- **`docs/DEVELOPMENT-GUIDE.md`:** normas de ingeniería y límites de responsabilidad.
 - **Issues:** trabajo pendiente y criterios de aceptación.
 - **PR:** registro revisable de un cambio concreto.
-- **CHANGELOG:** cambios relevantes agrupados por versión de producto.
-- **Histórico:** contratos antiguos y decisiones sustituidas que aún aportan contexto.
+- **CHANGELOG:** cambios relevantes agrupados por versión.
+- **Histórico:** contratos antiguos y decisiones sustituidas.
 
-No abras un ADR para cada decisión trivial ni una Issue para cada línea de código. La formalidad debe ser proporcional al impacto y al coste de revertir una decisión.
+Evita mantener la misma especificación completa en varios documentos. Enlaza la fuente de autoridad en lugar de copiarla.
 
 ## 6. Versiones y changelog
 
 La versión de un paquete Rust se declara en su `Cargo.toml`; Git registra commits y referencias, pero no decide automáticamente qué versión debe tener la aplicación. Las etiquetas Git y GitHub Releases se crean cuando se decide publicar una versión.
 
-Mientras Bittopos sea un prototipo, registra en `CHANGELOG.md` los cambios funcionales y de arquitectura que afecten al uso o al desarrollo. No incrementes la versión del paquete por cada PR. Al preparar una publicación, decide el incremento SemVer según compatibilidad y alcance, actualiza los metadatos pertinentes, valida el workspace y etiqueta el commit publicado.
+Mientras Bittopos sea un prototipo, registra en `CHANGELOG.md` los cambios funcionales y arquitectónicos relevantes. No incrementes la versión del paquete por cada PR. Al preparar una publicación, decide el incremento SemVer según compatibilidad y alcance, actualiza los metadatos pertinentes, valida el workspace y etiqueta el commit publicado.

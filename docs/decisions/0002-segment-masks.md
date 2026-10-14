@@ -1,13 +1,13 @@
 # ADR 0002: máscaras como segmentos locales de instancia
 
-- **Estado:** aceptado como regla conceptual; detalles operativos pendientes
+- **Estado:** sustituido por [ADR 0003](0003-sparse-mask-overrides.md)
 - **Fecha:** 2026-10-13
 
 ## Contexto
 
 Bittopos necesita distinguir la representación heredada de un recurso de una representación que una instancia conserva de forma local. También debe permitir que las instancias trabajen directamente con información definida cuando no se ha creado una máscara.
 
-## Decisión
+## Decisión original
 
 - Una máscara es un segmento que vive en una instancia y contiene al menos un concepto o componente.
 - Si no existe máscara para un segmento, la instancia muestra la representación heredada desde el recurso.
@@ -16,15 +16,14 @@ Bittopos necesita distinguir la representación heredada de un recurso de una re
 - Los permisos no son contenido heredado: los permisos definidos en el recurso afectan a la instancia, aunque no se copien como segmento de contenido.
 - Una máscara de permisos de instancia es local a esa instancia y limita el acceso de terceros sin modificar la política del recurso.
 
-## Alternativas consideradas
+## Alternativas consideradas originalmente
 
-- Copiar automáticamente todos los segmentos al instanciar: se descarta porque haría que toda instancia fuera una copia independiente y ocultaría la diferencia entre herencia y edición compartida.
-- Hacer que todas las ediciones sean locales: se descarta porque contradice la regla de que una instancia sin máscara puede modificar la definición compartida.
-- Tratar permisos como un segmento de contenido ordinario: se descarta porque la política de autorización debe afectar a una instancia sin confundirse con los datos heredados que muestra.
+- Copiar automáticamente todos los segmentos al instanciar: se descartó porque haría que toda instancia fuera una copia independiente y ocultaría la diferencia entre herencia y edición compartida.
+- Hacer que todas las ediciones fueran locales: se descartó porque contradice la regla de que una instancia sin máscara puede modificar la definición compartida.
+- Tratar permisos como un segmento de contenido ordinario: se descartó porque la política de autorización debe afectar a una instancia sin confundirse con los datos heredados que muestra.
 
-## Consecuencias
+## Resultado histórico
 
-- Se necesita un mecanismo de resolución para elegir entre segmento definido y máscara local.
-- La autorización efectiva necesita reglas de precedencia explícitas y no puede depender solo de la presentación de la interfaz.
-- Antes de implementar máscaras se deben concretar la captura, actualización, retirada y validación de una máscara, y cubrirlas con pruebas.
-- Este ADR no afirma que máscaras o permisos efectivos ya estén implementados.
+La regla de congelar una copia completa del segmento fue reemplazada por una máscara dispersa que almacena diferencias locales y conserva la herencia dinámica para los valores no modificados. La decisión vigente está en ADR 0003.
+
+Las reglas originales sobre edición compartida sin máscara y la separación conceptual entre permisos y contenido se mantienen, sujetas a la especificación de autorización pendiente.
