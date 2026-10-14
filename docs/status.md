@@ -14,6 +14,11 @@
 
 La lista anterior es un inventario general del repositorio, no una afirmación de que cada ruta de error o invariante esté exhaustivamente probada. El resultado de CI de la rama que se esté revisando es la fuente para conocer el estado real de las pruebas.
 
+## Prototipo de interfaz
+
+- Existe un prototipo web estático en `web/` para explorar el árbol de instancias, consultar metadatos y editar una copia local mediante importación/exportación.
+- No está conectado a `bittopos-core`, no sustituye a la CLI y no escribe directamente en los archivos del dispositivo. Debe considerarse experimental.
+
 ## Acordado conceptualmente, pendiente de implementación completa
 
 - Un modelo general de segmentos, conceptos y componentes configurables.
@@ -24,7 +29,7 @@ La lista anterior es un inventario general del repositorio, no una afirmación d
 
 ## Aplazado
 
-- Interfaz web, servidor HTTP y daemon.
+- Integración de la interfaz web con el núcleo mediante un servidor HTTP; daemon y servicio de larga duración.
 - Interfaces móvil y de escritorio.
 - Sincronización remota, colaboración y múltiples perfiles/proyectos.
 - Adaptadores de bases de datos o persistencia alternativos.
