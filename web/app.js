@@ -46,7 +46,7 @@
     const kids = i.content && Array.isArray(i.content.instances) ? i.content.instances.map(child => normalizeInstance(child, seen)) : [];
     const allocation = i.semantic && Array.isArray(i.semantic.allocation) ? i.semantic.allocation : [];
     if (kids.length && !i.semantic) throw new Error("Falta semantic.allocation en una instancia que contiene hijos.");
-    if (allocation.length && (allocation.length !== kids.length || allocation.some((id, n) => id !== kids[n].id))) throw new Error("semantic.allocation no coincide con content.instances en " + i.id);
+    if (kids.length && (allocation.length !== kids.length || allocation.some((id, n) => id !== kids[n].id))) throw new Error("semantic.allocation no coincide con content.instances en " + i.id);
     const out = { id:i.id, source:{id:i.source.id} };
     if (kids.length) { out.semantic = {allocation:kids.map(k => k.id)}; out.content = {instances:kids}; }
     return out;
@@ -211,7 +211,7 @@
   }
   $("create-resource").addEventListener("click",openResourceDialog);$("cancel-resource").addEventListener("click",()=>dialog.close());$("resource-form").addEventListener("submit",createResource);
   $("add-instance").addEventListener("click",()=>Object.keys(state.resources).length?pickResource(state.selected):openResourceDialog());
-  $("import-files").addEventListener("click",()=> $("resource-files").click());$("export-workspace").addEventListener("click",exportWorkspace);
+  $("import-files").addEventListener("click",()=> $("resource-files").click());$("import-workspace").addEventListener("click",()=> $("workspace-file").click());$("export-workspace").addEventListener("click",exportWorkspace);$("export-resources").addEventListener("click",exportResources);
   $("resource-files").addEventListener("change",async e=>{if(e.target.files.length)await importTomls(e.target.files);e.target.value="";});
   $("workspace-file").addEventListener("change",async e=>{const f=e.target.files[0];if(f){try{await importWorkspace(f);}catch(err){notify("No se pudo importar el workspace: "+err.message,"error");}}e.target.value="";});
   $("import-files").addEventListener("dblclick",()=>$("workspace-file").click());$("import-files").title="Clic: importar TOML. Doble clic: importar workspace JSON.";
