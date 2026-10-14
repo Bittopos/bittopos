@@ -1,3 +1,11 @@
+> **Documento histórico — no es la fuente de verdad vigente.**
+>
+> Este archivo pertenece a una etapa anterior de Bittopos y puede contener reglas sustituidas, propuestas que nunca se implementaron o criterios de aceptación ya obsoletos. Para el modelo vigente consulta [docs/model.md](docs/model.md); para el estado real de implementación consulta [docs/status.md](docs/status.md); para la arquitectura consulta [docs/architecture.md](docs/architecture.md). Las decisiones arquitectónicas actuales se registran en [docs/decisions/](docs/decisions/README.md).
+>
+> Se conserva temporalmente para mantener el contexto histórico. No debe usarse para definir nuevos cambios ni interpretarse como una garantía de que las características descritas existen en el código.
+
+---
+
 # Bittopos — Contrato del incremento: CLI básica y navegación persistente
 
 **Estado:** contrato del incremento; debe mantenerse alineado con la implementación y sus pruebas.  
