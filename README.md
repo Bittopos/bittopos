@@ -14,6 +14,10 @@ Bittopos es un proyecto en Rust para modelar, organizar y navegar información m
 
 Consulta [Estado y alcance](docs/status.md) para distinguir las capacidades implementadas de las decisiones del modelo y el trabajo pendiente.
 
+## Prototipo web local
+
+Hay una interfaz estática experimental en [`web/`](web/README.md). Permite importar y exportar el workspace y recursos desde el navegador, pero todavía no se conecta al núcleo Rust ni modifica directamente los archivos locales de Bittopos.
+
 ## Inicio rápido
 
 Requisitos: Rust y Cargo instalados.
