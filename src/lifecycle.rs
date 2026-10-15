@@ -523,6 +523,49 @@ mod tests {
     }
 
     #[test]
+    fn reconcile_rejects_instance_registered_by_multiple_resources() {
+        let (_dir, resources, workspaces) = setup();
+        let (first_resource, _) = resources.create("Primero", None).unwrap();
+        let (second_resource, _) = resources.create("Segundo", None).unwrap();
+        let duplicate_id = Uuid::now_v7();
+
+        resources
+            .register_instance(first_resource.id, duplicate_id)
+            .unwrap();
+        resources
+            .register_instance(second_resource.id, duplicate_id)
+            .unwrap();
+
+        assert!(matches!(
+            reconcile_workspace(&resources, &workspaces, "proyecto"),
+            Err(LifecycleError::DuplicateStructuralId(id)) if id == duplicate_id
+        ));
+    }
+
+    #[test]
+    fn reconcile_rejects_structural_source_mismatch() {
+        let (_dir, resources, workspaces) = setup();
+        let (source_resource, _) = resources.create("Origen", None).unwrap();
+        let (registered_resource, _) = resources.create("Registro", None).unwrap();
+        let instance_id = Uuid::now_v7();
+        let workspace = Workspace {
+            content: crate::Content {
+                instances: vec![Instance::new(instance_id, source_resource.id)],
+            },
+        };
+
+        resources
+            .register_instance(registered_resource.id, instance_id)
+            .unwrap();
+        workspaces.save("proyecto", &workspace).unwrap();
+
+        assert!(matches!(
+            reconcile_workspace(&resources, &workspaces, "proyecto"),
+            Err(LifecycleError::JournalConflict(_))
+        ));
+    }
+
+    #[test]
     fn refuses_to_reconcile_corrupt_journal() {
         let (_dir, resources, workspaces) = setup();
         let (_resource, _) = resources.create("Recurso", None).unwrap();
