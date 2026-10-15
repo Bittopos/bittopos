@@ -114,13 +114,8 @@ mod tests {
         let workspaces = WorkspaceStore::new(dir.path().join("workspaces")).unwrap();
         let (root_resource, _) = resources.create("Raíz", None).unwrap();
         let (child_resource, _) = resources.create("Hija", None).unwrap();
-        let root_id = crate::create_instance(
-            &resources,
-            &workspaces,
-            "proyecto",
-            root_resource.id,
-        )
-        .unwrap();
+        let root_id =
+            crate::create_instance(&resources, &workspaces, "proyecto", root_resource.id).unwrap();
         let navigation_state = NavigationState {
             current_instance: Some(root_id),
         };
@@ -135,7 +130,10 @@ mod tests {
         .unwrap();
         let workspace = workspaces.load("proyecto").unwrap();
         assert_eq!(workspace.parent_of(child_id), Some(root_id));
-        assert_eq!(workspace.find_instance(child_id).unwrap().source.id, child_resource.id);
+        assert_eq!(
+            workspace.find_instance(child_id).unwrap().source.id,
+            child_resource.id
+        );
     }
 
     #[test]
@@ -145,13 +143,8 @@ mod tests {
         let workspaces = WorkspaceStore::new(dir.path().join("workspaces")).unwrap();
         let navigation = NavigationStore::new(dir.path().join("workspaces"));
         let (resource, _) = resources.create("Recurso", None).unwrap();
-        let instance_id = crate::create_instance(
-            &resources,
-            &workspaces,
-            "proyecto",
-            resource.id,
-        )
-        .unwrap();
+        let instance_id =
+            crate::create_instance(&resources, &workspaces, "proyecto", resource.id).unwrap();
         let mut navigation_state = NavigationState {
             current_instance: Some(instance_id),
         };
