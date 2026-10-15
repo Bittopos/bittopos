@@ -740,6 +740,55 @@ mod tests {
     }
 
     #[test]
+    fn conflicting_removal_journal_preserves_instance_and_journal() {
+        let (_dir, resources, workspaces) = setup();
+        let (resource, _) = resources.create("Recurso", None).unwrap();
+        let root_id = create_instance(&resources, &workspaces, "proyecto", resource.id).unwrap();
+        let child_id = create_instance_under(
+            &resources,
+            &workspaces,
+            "proyecto",
+            resource.id,
+            Some(root_id),
+        )
+        .unwrap();
+        let child = workspaces
+            .load("proyecto")
+            .unwrap()
+            .find_instance(child_id)
+            .unwrap()
+            .clone();
+
+        // El journal afirma que la instancia es raíz, pero el workspace la contiene bajo root_id.
+        persist_journal(
+            &workspaces,
+            "proyecto",
+            &PendingOperation::Remove {
+                instance: PersistedInstance::from(child),
+                parent_id: None,
+            },
+        )
+        .unwrap();
+        let journal = journal_path(&workspaces, "proyecto").unwrap();
+
+        assert!(matches!(
+            reconcile_workspace(&resources, &workspaces, "proyecto"),
+            Err(LifecycleError::JournalConflict(_))
+        ));
+
+        let workspace = workspaces.load("proyecto").unwrap();
+        assert_eq!(workspace.parent_of(child_id), Some(root_id));
+        assert!(workspace.find_instance(child_id).is_some());
+        assert!(resources
+            .get(resource.id)
+            .unwrap()
+            .management
+            .structural
+            .contains(&child_id));
+        assert!(journal.exists());
+    }
+
+    #[test]
     fn refuses_to_reconcile_corrupt_journal() {
         let (_dir, resources, workspaces) = setup();
         let (_resource, _) = resources.create("Recurso", None).unwrap();

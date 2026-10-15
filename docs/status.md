@@ -50,7 +50,7 @@ Ampliar las pruebas de `lifecycle.rs` y `store.rs` alrededor de los estados inte
 - creación con journal escrito, antes y después del registro estructural;
 - repetición de la recuperación después de haber aplicado los efectos, pero antes de retirar el journal;
 - eliminación en distintos puntos de la operación multiarchivo;
-- rechazo de estados inconsistentes sin inventar padres ni perder datos;
+- rechazo de estados inconsistentes sin inventar padres ni perder datos, incluida la preservación del journal cuando contradice la ubicación real;
 - validación de recursos temporales y archivos corruptos en la recuperación.
 
 Las pruebas deben expresar estados concretos y resultados esperados. No se añadirá infraestructura general de inyección de fallos hasta que los casos reales demuestren que hace falta.
