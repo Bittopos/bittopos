@@ -1,0 +1,35 @@
+name: One-time Rust formatter
+
+on:
+  push:
+    branches:
+      - chore/format-rust-code
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chore/format-rust-code
+      - name: Install Rust formatter
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Apply standard Rust formatting
+        run: cargo fmt --all
+      - name: Commit formatting-only changes
+        shell: bash
+        run: |
+          if git diff --quiet -- '*.rs'; then
+            echo "Rust source already follows rustfmt."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- '*.rs'
+          git commit -m "style: format Rust workspace"
+          git push origin HEAD:chore/format-rust-code
