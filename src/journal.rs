@@ -65,10 +65,7 @@ pub(crate) fn persist(
     Ok(())
 }
 
-pub(crate) fn clear(
-    workspaces: &WorkspaceStore,
-    workspace_name: &str,
-) -> Result<(), JournalError> {
+pub(crate) fn clear(workspaces: &WorkspaceStore, workspace_name: &str) -> Result<(), JournalError> {
     let path = path(workspaces, workspace_name)?;
     match fs::remove_file(&path) {
         Ok(()) => {
