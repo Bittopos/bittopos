@@ -101,11 +101,15 @@ impl From<toml::de::Error> for StoreError {
 pub enum TemporaryInspection {
     Missing,
     /// El temporal existe, pero no puede validarse como una definición completa.
-    Invalid { reason: String },
+    Invalid {
+        reason: String,
+    },
     /// El temporal contiene exactamente los mismos bytes que el recurso confirmado.
     IdenticalToConfirmed,
     /// El temporal es válido, pero no se puede saber automáticamente si debía confirmarse.
-    ValidUnconfirmed { resource: Resource },
+    ValidUnconfirmed {
+        resource: Resource,
+    },
 }
 
 /// Almacén local de recursos. El prototipo presupone un solo proceso escritor.
@@ -168,17 +172,21 @@ impl ResourceStore {
             if path.extension().and_then(|ext| ext.to_str()) != Some("toml") {
                 continue;
             }
-            let stem = path.file_stem().and_then(|s| s.to_str()).ok_or_else(|| {
-                StoreError::InvalidFileName(path.clone())
-            })?;
-            let expected_id = Uuid::parse_str(stem).map_err(|_| {
-                StoreError::InvalidFileName(path.clone())
-            })?;
+            let stem = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .ok_or_else(|| StoreError::InvalidFileName(path.clone()))?;
+            let expected_id =
+                Uuid::parse_str(stem).map_err(|_| StoreError::InvalidFileName(path.clone()))?;
             let content = fs::read_to_string(&path)?;
             let document: toml::Value = toml::from_str(&content)?;
             if document
                 .get("management")
-                .and_then(|management| management.get("structural").or_else(|| management.get("allocation")))
+                .and_then(|management| {
+                    management
+                        .get("structural")
+                        .or_else(|| management.get("allocation"))
+                })
                 .is_none()
             {
                 return Err(StoreError::IncompleteStructural(expected_id));
@@ -287,7 +295,11 @@ impl ResourceStore {
         };
         if document
             .get("management")
-            .and_then(|management| management.get("structural").or_else(|| management.get("allocation")))
+            .and_then(|management| {
+                management
+                    .get("structural")
+                    .or_else(|| management.get("allocation"))
+            })
             .is_none()
         {
             return Ok(TemporaryInspection::Invalid {
@@ -311,7 +323,9 @@ impl ResourceStore {
             self.read_file(&confirmed_path, id)?;
         }
 
-        Ok(TemporaryInspection::ValidUnconfirmed { resource: candidate })
+        Ok(TemporaryInspection::ValidUnconfirmed {
+            resource: candidate,
+        })
     }
 
     /// Promueve explícitamente un temporal válido tras decisión del operador.
@@ -519,9 +533,12 @@ fn promote_temporary(temporary_path: &Path, path: &Path, replace: bool) -> Resul
 
     // Sincroniza también la entrada de directorio: sync_all del archivo temporal por sí
     // solo no garantiza que el cambio de nombre sobreviva a una interrupción del sistema.
-    let parent = path.parent().ok_or_else(|| StoreError::Io(io::Error::new(
-        io::ErrorKind::InvalidInput, "la ruta del recurso no tiene directorio padre"
-    )))?;
+    let parent = path.parent().ok_or_else(|| {
+        StoreError::Io(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "la ruta del recurso no tiene directorio padre",
+        ))
+    })?;
     OpenOptions::new().read(true).open(parent)?.sync_all()?;
     Ok(())
 }
@@ -555,9 +572,7 @@ mod tests {
         let path = store.path_for(id);
         fs::write(
             &path,
-            format!(
-                "id = \"{id}\"\n\n[info]\ntitle = \"Recurso antiguo\"\ntags = []\n"
-            ),
+            format!("id = \"{id}\"\n\n[info]\ntitle = \"Recurso antiguo\"\ntags = []\n"),
         )
         .unwrap();
 
@@ -573,7 +588,8 @@ mod tests {
         fs::write(
             store.path_for(id),
             format!("id = \"{id}\"\n\n[info]\ntitle = \"Antiguo\"\ntags = []\n"),
-        ).unwrap();
+        )
+        .unwrap();
 
         assert!(matches!(
             store.all_strict(),
@@ -622,7 +638,10 @@ mod tests {
         let persisted = fs::read_to_string(path).unwrap();
         assert!(persisted.contains("structural = ["));
         assert!(!persisted.contains("allocation = ["));
-        assert_eq!(store.get(id).unwrap().management.structural, vec![instance_id]);
+        assert_eq!(
+            store.get(id).unwrap().management.structural,
+            vec![instance_id]
+        );
     }
 
     #[test]
@@ -632,10 +651,18 @@ mod tests {
         let instance_id = Uuid::now_v7();
 
         store.register_instance(resource.id, instance_id).unwrap();
-        assert_eq!(store.get(resource.id).unwrap().management.structural, vec![instance_id]);
+        assert_eq!(
+            store.get(resource.id).unwrap().management.structural,
+            vec![instance_id]
+        );
 
         assert!(store.unregister_instance(resource.id, instance_id).unwrap());
-        assert!(store.get(resource.id).unwrap().management.structural.is_empty());
+        assert!(store
+            .get(resource.id)
+            .unwrap()
+            .management
+            .structural
+            .is_empty());
         assert!(!store.unregister_instance(resource.id, instance_id).unwrap());
     }
 
@@ -650,7 +677,10 @@ mod tests {
             store.register_instance(resource.id, instance_id),
             Err(StoreError::StructuralConflict(id)) if id == instance_id
         ));
-        assert_eq!(store.get(resource.id).unwrap().management.structural, vec![instance_id]);
+        assert_eq!(
+            store.get(resource.id).unwrap().management.structural,
+            vec![instance_id]
+        );
     }
 
     #[test]

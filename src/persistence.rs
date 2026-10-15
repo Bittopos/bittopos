@@ -19,7 +19,10 @@ pub(crate) fn atomic_write(
     content: &[u8],
 ) -> io::Result<()> {
     let parent = destination.parent().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidInput, "ruta de destino sin directorio")
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "ruta de destino sin directorio",
+        )
     })?;
 
     let mut file = OpenOptions::new()
@@ -34,7 +37,6 @@ pub(crate) fn atomic_write(
     OpenOptions::new().read(true).open(parent)?.sync_all()?;
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {

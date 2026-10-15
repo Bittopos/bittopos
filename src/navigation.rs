@@ -36,7 +36,9 @@ impl std::fmt::Display for NavigationError {
 impl std::error::Error for NavigationError {}
 
 impl From<io::Error> for NavigationError {
-    fn from(error: io::Error) -> Self { Self::Io(error) }
+    fn from(error: io::Error) -> Self {
+        Self::Io(error)
+    }
 }
 
 /// Persistencia local del contexto de navegación.
@@ -47,7 +49,9 @@ pub struct NavigationStore {
 impl NavigationStore {
     /// Guarda el estado en `navigation.toml` dentro del directorio de workspaces.
     pub fn new(workspaces_root: impl AsRef<Path>) -> Self {
-        Self { path: workspaces_root.as_ref().join("navigation.toml") }
+        Self {
+            path: workspaces_root.as_ref().join("navigation.toml"),
+        }
     }
 
     /// Un archivo ausente representa la raíz. Un archivo malformado produce error.
@@ -61,9 +65,15 @@ impl NavigationStore {
 
     /// Recupera el estado y vuelve a la raíz si su destino ya no existe.
     /// Devuelve true cuando tuvo que corregir y persistir un destino inválido.
-    pub fn load_validated(&self, workspace: &Workspace) -> Result<(NavigationState, bool), NavigationError> {
+    pub fn load_validated(
+        &self,
+        workspace: &Workspace,
+    ) -> Result<(NavigationState, bool), NavigationError> {
         let mut state = self.load()?;
-        if state.current_instance.is_some_and(|id| workspace.find_instance(id).is_none()) {
+        if state
+            .current_instance
+            .is_some_and(|id| workspace.find_instance(id).is_none())
+        {
             state.current_instance = None;
             self.save(&state)?;
             return Ok((state, true));
@@ -75,7 +85,10 @@ impl NavigationStore {
     pub fn save(&self, state: &NavigationState) -> Result<(), NavigationError> {
         let content = toml::to_string_pretty(state).map_err(NavigationError::TomlSerialize)?;
         let parent = self.path.parent().ok_or_else(|| {
-            NavigationError::Io(io::Error::new(io::ErrorKind::InvalidInput, "ruta de navegación sin directorio"))
+            NavigationError::Io(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "ruta de navegación sin directorio",
+            ))
         })?;
         let temporary = parent.join(format!(".navigation.{}.tmp", Uuid::now_v7()));
         atomic_write(&temporary, &self.path, content.as_bytes())?;
@@ -94,15 +107,21 @@ mod tests {
         let store = NavigationStore::new(dir.path());
         let id = Uuid::now_v7();
         let workspace = Workspace {
-            content: Content { instances: vec![Instance {
-                id,
-                source: crate::Source { id: Uuid::now_v7() },
-                semantic: None,
-                content: None,
-            }] },
+            content: Content {
+                instances: vec![Instance {
+                    id,
+                    source: crate::Source { id: Uuid::now_v7() },
+                    semantic: None,
+                    content: None,
+                }],
+            },
         };
 
-        store.save(&NavigationState { current_instance: Some(id) }).unwrap();
+        store
+            .save(&NavigationState {
+                current_instance: Some(id),
+            })
+            .unwrap();
         let (loaded, corrected) = store.load_validated(&workspace).unwrap();
         assert_eq!(loaded.current_instance, Some(id));
         assert!(!corrected);
@@ -112,7 +131,11 @@ mod tests {
     fn invalid_destination_is_reset_to_root() {
         let dir = tempfile::tempdir().unwrap();
         let store = NavigationStore::new(dir.path());
-        store.save(&NavigationState { current_instance: Some(Uuid::now_v7()) }).unwrap();
+        store
+            .save(&NavigationState {
+                current_instance: Some(Uuid::now_v7()),
+            })
+            .unwrap();
 
         let (loaded, corrected) = store.load_validated(&Workspace::new()).unwrap();
         assert_eq!(loaded.current_instance, None);
@@ -127,6 +150,9 @@ mod tests {
         fs::write(dir.path().join("navigation.toml"), "current_instance = [").unwrap();
 
         assert!(store.load().is_err());
-        assert_eq!(fs::read_to_string(dir.path().join("navigation.toml")).unwrap(), "current_instance = [");
+        assert_eq!(
+            fs::read_to_string(dir.path().join("navigation.toml")).unwrap(),
+            "current_instance = ["
+        );
     }
 }
