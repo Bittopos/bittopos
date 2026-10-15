@@ -53,7 +53,10 @@ mod tests {
         };
 
         assert_eq!(children_of(&workspace, None).unwrap()[0].id, root_id);
-        assert_eq!(children_of(&workspace, Some(root_id)).unwrap()[0].id, child_id);
+        assert_eq!(
+            children_of(&workspace, Some(root_id)).unwrap()[0].id,
+            child_id
+        );
         assert_eq!(
             children_of(&workspace, Some(child_id)).unwrap()[0].id,
             grandchild_id
