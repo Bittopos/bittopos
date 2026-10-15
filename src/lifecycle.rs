@@ -190,7 +190,9 @@ pub fn reconcile_workspace(
     workspace_name: &str,
 ) -> Result<(Workspace, RecoveryReport), LifecycleError> {
     let mut report = RecoveryReport::default();
-    if let Some(operation) = journal::read(workspaces, workspace_name).map_err(LifecycleError::from)? {
+    if let Some(operation) =
+        journal::read(workspaces, workspace_name).map_err(LifecycleError::from)?
+    {
         match &operation {
             PendingOperation::Create { .. } => report.restored += 1,
             PendingOperation::Remove { .. } => report.removed += 1,
