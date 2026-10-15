@@ -13,11 +13,11 @@ mod store;
 mod workspace;
 mod workspace_model;
 
-pub use model_operations::children_of;
 pub use lifecycle::{
     create_instance, create_instance_under, reconcile_workspace, remove_instance, LifecycleError,
     RecoveryReport,
 };
+pub use model_operations::children_of;
 pub use navigation::{NavigationError, NavigationState, NavigationStore};
 pub use resource::{Info, Resource, ResourcePatch, ResourceWarning};
 pub use store::{ResourceStore, StoreError, TemporaryInspection};
