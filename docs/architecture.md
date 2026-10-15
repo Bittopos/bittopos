@@ -38,7 +38,7 @@ La implementación actual contiene, entre otros:
 - `navigation.rs`: persistencia del estado de navegación.
 - `cli/src/main.rs`: parsing, presentación y parte de la coordinación de la interfaz de terminal.
 
-Existe una primera frontera de aplicación reutilizable: `prepare_workspace` prepara un contexto consistente antes de ejecutar un comando, coordinando recuperación y navegación. Es un primer caso de uso, no una capa de aplicación completa; las operaciones de creación/eliminación y otros flujos todavía no están expuestos por una fachada común. El modelo general Segment/Concept/Component tampoco está implementado de forma genérica.
+Existe una frontera de aplicación reutilizable con tres casos de uso: `prepare_workspace` coordina recuperación y validación de navegación; `create_instance_at_current_location` crea una instancia bajo la ubicación seleccionada; y `remove_instance_and_update_navigation` elimina una instancia hoja y restablece la navegación si apuntaba a ella. La creación combinada de recursos, etiquetas e instancia aún permanece en la CLI porque sus garantías ante fallos necesitan definirse. El modelo general Segment/Concept/Component tampoco está implementado de forma genérica.
 
 ## Persistencia y recuperación
 
