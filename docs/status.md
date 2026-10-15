@@ -29,7 +29,7 @@ La lista anterior es un inventario general del repositorio, no una afirmación d
 - Resolución de máscaras, incluidos reinicio de diferencias y eliminación local de valores heredados.
 - Reglas efectivas de permisos en los espacios de definición e instanciación.
 - Un mecanismo de resolución extensible a otros dominios estructurales, como tareas, responsabilidades y proyectos.
-- Una capa de aplicación completa y común para futuras interfaces; existe únicamente el primer caso de uso `prepare_workspace`, que coordina reconciliación y validación de navegación.
+- Una capa de aplicación completa y común para futuras interfaces; ya existen `prepare_workspace`, `create_instance_at_current_location` y `remove_instance_and_update_navigation`. La creación combinada de recursos, etiquetas e instancia sigue en la CLI y requiere definir sus garantías ante fallos antes de extraerla.
 
 ## Aplazado
 
@@ -59,7 +59,9 @@ Las pruebas deben expresar estados concretos y resultados esperados. No se añad
 
 Primer incremento: `prepare_workspace` coordina la reconciliación del workspace y la validación del estado de navegación antes de que la CLI ejecute un comando. La CLI conserva el análisis de argumentos, los mensajes y la presentación.
 
-Siguientes incrementos: exponer creación de instancias y eliminación de una instancia hoja como casos de uso de aplicación, reutilizando las operaciones de ciclo de vida existentes. No duplicar reglas ni envolver cada función mecánicamente sin aportar coordinación o una interfaz útil.
+Segundo incremento: `create_instance_at_current_location` reutiliza el estado de navegación para crear bajo la ubicación actual; `remove_instance_and_update_navigation` coordina la eliminación y el restablecimiento de navegación cuando se elimina la ubicación activa. Ambos reutilizan las operaciones de ciclo de vida existentes.
+
+Pendiente: delimitar la creación combinada de recurso, etiquetas e instancia. No convertirla en una única operación de aplicación hasta especificar y probar qué permanece persistido si falla un paso intermedio.
 
 No trasladar toda la CLI de una sola vez. El caso de creación de recurso con etiquetas e instancia opcional debe delimitar explícitamente qué queda persistido si falla un paso intermedio antes de tratarlo como una única operación de aplicación.
 
