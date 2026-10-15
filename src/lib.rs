@@ -5,6 +5,7 @@
 //! de la identidad del recurso de origen.
 
 mod lifecycle;
+mod model_operations;
 mod navigation;
 mod persistence;
 mod resource;
@@ -12,6 +13,7 @@ mod store;
 mod workspace;
 mod workspace_model;
 
+pub use model_operations::children_of;
 pub use lifecycle::{
     create_instance, create_instance_under, reconcile_workspace, remove_instance, LifecycleError,
     RecoveryReport,
