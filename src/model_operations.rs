@@ -32,6 +32,35 @@ mod tests {
     }
 
     #[test]
+    fn children_of_returns_only_immediate_children_at_each_depth() {
+        let resource_id = Uuid::now_v7();
+        let root_id = Uuid::now_v7();
+        let child_id = Uuid::now_v7();
+        let grandchild_id = Uuid::now_v7();
+
+        let mut child = Instance::new(child_id, resource_id);
+        child.content = Some(crate::Content {
+            instances: vec![Instance::new(grandchild_id, resource_id)],
+        });
+        let mut root = Instance::new(root_id, resource_id);
+        root.content = Some(crate::Content {
+            instances: vec![child],
+        });
+        let workspace = Workspace {
+            content: crate::Content {
+                instances: vec![root],
+            },
+        };
+
+        assert_eq!(children_of(&workspace, None).unwrap()[0].id, root_id);
+        assert_eq!(children_of(&workspace, Some(root_id)).unwrap()[0].id, child_id);
+        assert_eq!(
+            children_of(&workspace, Some(child_id)).unwrap()[0].id,
+            grandchild_id
+        );
+    }
+
+    #[test]
     fn children_of_missing_parent_returns_domain_error() {
         let workspace = Workspace::new();
         let missing_id = Uuid::now_v7();
