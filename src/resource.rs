@@ -74,7 +74,6 @@ pub(crate) fn normalize_description(description: Option<String>) -> Option<Strin
     description.filter(|value| !value.is_empty())
 }
 
-
 /// Error produced by resource-domain validation, independent of persistence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ResourceError {
@@ -84,13 +83,15 @@ pub(crate) enum ResourceError {
 impl std::fmt::Display for ResourceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InvalidName => write!(f, "el nombre no puede estar vacío ni contener solo espacios"),
+            Self::InvalidName => write!(
+                f,
+                "el nombre no puede estar vacío ni contener solo espacios"
+            ),
         }
     }
 }
 
 impl std::error::Error for ResourceError {}
-
 
 #[cfg(test)]
 mod tests {
@@ -98,8 +99,14 @@ mod tests {
 
     #[test]
     fn name_validation_reports_domain_error_without_storage_types() {
-        assert_eq!(normalize_name("   ").unwrap_err(), ResourceError::InvalidName);
-        assert_eq!(validate_stored_name("   ").unwrap_err(), ResourceError::InvalidName);
+        assert_eq!(
+            normalize_name("   ").unwrap_err(),
+            ResourceError::InvalidName
+        );
+        assert_eq!(
+            validate_stored_name("   ").unwrap_err(),
+            ResourceError::InvalidName
+        );
         assert!(normalize_name("valid name").is_ok());
     }
 }

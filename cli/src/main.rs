@@ -62,7 +62,10 @@ impl Paths {
             None => {
                 let home =
                     env::var_os("HOME").ok_or("no se pudo determinar el directorio del usuario")?;
-                PathBuf::from(home).join(".local").join("share").join("bittopos")
+                PathBuf::from(home)
+                    .join(".local")
+                    .join("share")
+                    .join("bittopos")
             }
         };
         Ok(Self {
@@ -88,8 +91,7 @@ fn run() -> Result<(), String> {
 
     let paths = Paths::discover()?;
     let resources = ResourceStore::new(&paths.resources).map_err(|error| error.to_string())?;
-    let workspaces =
-        WorkspaceStore::new(&paths.workspaces).map_err(|error| error.to_string())?;
+    let workspaces = WorkspaceStore::new(&paths.workspaces).map_err(|error| error.to_string())?;
     let navigation = NavigationStore::new(&paths.workspaces);
 
     // Toda invocación reconcilia primero la persistencia del workspace.
@@ -119,7 +121,10 @@ fn run() -> Result<(), String> {
             if !tags.is_empty() {
                 match resources.update(
                     resource.id,
-                    ResourcePatch { tags: Some(tags), ..Default::default() },
+                    ResourcePatch {
+                        tags: Some(tags),
+                        ..Default::default()
+                    },
                 ) {
                     Ok((updated, _)) => resource = updated,
                     Err(error) => {
@@ -134,15 +139,18 @@ fn run() -> Result<(), String> {
             let instance_id = if no_instance {
                 None
             } else {
-                Some(create_instance_under(
-                    &resources,
-                    &workspaces,
-                    WORKSPACE_FILE,
-                    resource.id,
-                    nav_state.current_instance,
-                ).map_err(|error| format!(
-                    "el recurso se creó, pero no se pudo crear su instancia: {error}"
-                ))?)
+                Some(
+                    create_instance_under(
+                        &resources,
+                        &workspaces,
+                        WORKSPACE_FILE,
+                        resource.id,
+                        nav_state.current_instance,
+                    )
+                    .map_err(|error| {
+                        format!("el recurso se creó, pero no se pudo crear su instancia: {error}")
+                    })?,
+                )
             };
 
             println!("Recurso creado: {} ({})", resource.info.title, resource.id);
@@ -192,18 +200,25 @@ fn run() -> Result<(), String> {
                 ));
             }
             nav_state.current_instance = Some(id);
-            navigation.save(&nav_state).map_err(|error| error.to_string())?;
+            navigation
+                .save(&nav_state)
+                .map_err(|error| error.to_string())?;
             print_location(&nav_state, &startup_workspace, &resources)?;
         }
         Command::Up => {
-            nav_state.current_instance = nav_state.current_instance
+            nav_state.current_instance = nav_state
+                .current_instance
                 .and_then(|id| startup_workspace.parent_of(id));
-            navigation.save(&nav_state).map_err(|error| error.to_string())?;
+            navigation
+                .save(&nav_state)
+                .map_err(|error| error.to_string())?;
             print_location(&nav_state, &startup_workspace, &resources)?;
         }
         Command::Root => {
             nav_state = NavigationState::default();
-            navigation.save(&nav_state).map_err(|error| error.to_string())?;
+            navigation
+                .save(&nav_state)
+                .map_err(|error| error.to_string())?;
             println!("Ubicación actual: raíz del espacio de trabajo.");
         }
         Command::Pwd => {
@@ -217,7 +232,8 @@ fn run() -> Result<(), String> {
                 WORKSPACE_FILE,
                 id,
                 nav_state.current_instance,
-            ).map_err(|error| error.to_string())?;
+            )
+            .map_err(|error| error.to_string())?;
             println!(
                 "Instancia añadida: {} — recurso {} (instancia {})",
                 resource.info.title, resource.id, instance_id
@@ -228,8 +244,12 @@ fn run() -> Result<(), String> {
                 .map_err(|error| error.to_string())?;
             if nav_state.current_instance == Some(id) {
                 nav_state = NavigationState::default();
-                navigation.save(&nav_state).map_err(|error| error.to_string())?;
-                println!("La ubicación eliminada era la actual; navegación restablecida a la raíz.");
+                navigation
+                    .save(&nav_state)
+                    .map_err(|error| error.to_string())?;
+                println!(
+                    "La ubicación eliminada era la actual; navegación restablecida a la raíz."
+                );
             }
             println!("Instancia removida: {id}");
         }
@@ -260,19 +280,22 @@ fn print_location(
     match state.current_instance {
         None => println!("Ubicación actual: raíz del espacio de trabajo."),
         Some(id) => {
-            let instance = workspace.find_instance(id)
+            let instance = workspace
+                .find_instance(id)
                 .ok_or_else(|| format!("no existe la ubicación actual: {id}"))?;
-            let resource = resources.get(instance.source.id).map_err(|error| error.to_string())?;
-            println!("Ubicación actual: {} [{}]", resource.info.title, instance.id);
+            let resource = resources
+                .get(instance.source.id)
+                .map_err(|error| error.to_string())?;
+            println!(
+                "Ubicación actual: {} [{}]",
+                resource.info.title, instance.id
+            );
         }
     }
     Ok(())
 }
 
-fn print_workspace(
-    workspace: &Workspace,
-    resources: &ResourceStore,
-) -> Result<(), String> {
+fn print_workspace(workspace: &Workspace, resources: &ResourceStore) -> Result<(), String> {
     if workspace.all_instances().is_empty() {
         println!("El workspace está vacío.");
         return Ok(());
@@ -286,10 +309,15 @@ fn print_instances(
     depth: usize,
 ) -> Result<(), String> {
     for instance in instances {
-        let resource = resources.get(instance.source.id).map_err(|error| error.to_string())?;
+        let resource = resources
+            .get(instance.source.id)
+            .map_err(|error| error.to_string())?;
         println!(
             "{}- {} [{}] — recurso {}",
-            "  ".repeat(depth), resource.info.title, instance.id, instance.source.id
+            "  ".repeat(depth),
+            resource.info.title,
+            instance.id,
+            instance.source.id
         );
         print_instances(instance.children(), resources, depth + 1)?;
     }

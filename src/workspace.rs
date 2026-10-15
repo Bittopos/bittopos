@@ -54,11 +54,18 @@ impl From<&Instance> for PersistedInstance {
             source: PersistedSource {
                 id: instance.source.id,
             },
-            semantic: instance.semantic.as_ref().map(|semantic| PersistedSemantic {
-                allocation: semantic.allocation.clone(),
-            }),
+            semantic: instance
+                .semantic
+                .as_ref()
+                .map(|semantic| PersistedSemantic {
+                    allocation: semantic.allocation.clone(),
+                }),
             content: instance.content.as_ref().map(|content| PersistedContent {
-                instances: content.instances.iter().map(PersistedInstance::from).collect(),
+                instances: content
+                    .instances
+                    .iter()
+                    .map(PersistedInstance::from)
+                    .collect(),
             }),
         }
     }
@@ -235,9 +242,7 @@ impl WorkspaceStore {
         workspace.validate().map_err(WorkspaceError::from)?;
 
         let path = self.path_for(name)?;
-        let temporary_path = self
-            .root
-            .join(format!(".{name}.{}.tmp", Uuid::now_v7()));
+        let temporary_path = self.root.join(format!(".{name}.{}.tmp", Uuid::now_v7()));
         let content = serde_json::to_vec_pretty(&PersistedWorkspace::from(workspace))?;
 
         atomic_write(&temporary_path, &path, &content)?;
@@ -254,7 +259,9 @@ impl WorkspaceStore {
                 .and_then(|name| name.to_str())
                 .is_some_and(|name| name.starts_with('.'));
 
-            if is_hidden || path.extension().and_then(|extension| extension.to_str()) != Some("json") {
+            if is_hidden
+                || path.extension().and_then(|extension| extension.to_str()) != Some("json")
+            {
                 continue;
             }
 
@@ -319,10 +326,9 @@ mod tests {
         workspaces.save("proyecto", &workspace).unwrap();
         assert_eq!(workspaces.load("proyecto").unwrap(), workspace);
 
-        let json: serde_json::Value = serde_json::from_slice(
-            &fs::read(workspaces.root().join("proyecto.json")).unwrap(),
-        )
-        .unwrap();
+        let json: serde_json::Value =
+            serde_json::from_slice(&fs::read(workspaces.root().join("proyecto.json")).unwrap())
+                .unwrap();
 
         assert_eq!(
             json["content"]["instances"][0]["semantic"]["allocation"][0],
@@ -349,10 +355,9 @@ mod tests {
         let (_directory, _resources, workspaces) = setup();
         workspaces.save("proyecto", &Workspace::new()).unwrap();
 
-        let json: serde_json::Value = serde_json::from_slice(
-            &fs::read(workspaces.root().join("proyecto.json")).unwrap(),
-        )
-        .unwrap();
+        let json: serde_json::Value =
+            serde_json::from_slice(&fs::read(workspaces.root().join("proyecto.json")).unwrap())
+                .unwrap();
 
         assert_eq!(json["content"]["instances"], serde_json::json!([]));
     }

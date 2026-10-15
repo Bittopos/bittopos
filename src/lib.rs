@@ -12,7 +12,10 @@ mod store;
 mod workspace;
 mod workspace_model;
 
-pub use lifecycle::{create_instance, create_instance_under, reconcile_workspace, remove_instance, LifecycleError, RecoveryReport};
+pub use lifecycle::{
+    create_instance, create_instance_under, reconcile_workspace, remove_instance, LifecycleError,
+    RecoveryReport,
+};
 pub use navigation::{NavigationError, NavigationState, NavigationStore};
 pub use resource::{Info, Resource, ResourcePatch, ResourceWarning};
 pub use store::{ResourceStore, StoreError, TemporaryInspection};
