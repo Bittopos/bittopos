@@ -11,6 +11,9 @@
 - Persistencia de navegación local.
 - Operaciones de ciclo de vida coordinadas con journal y recuperación.
 - Separación del modelo de workspace respecto a sus DTOs de persistencia.
+- Operación compartida `children_of` para consultar los hijos directos de una ubicación, utilizada por la CLI en `ls` y `enter`.
+- CI que exige formato Rust, compilación del workspace y pruebas con dependencias bloqueadas.
+- Pruebas de integridad para IDs estructurales duplicados y discrepancias entre el recurso de origen de una instancia y su registro.
 
 La lista anterior es un inventario general del repositorio, no una afirmación de que cada ruta de error o invariante esté exhaustivamente probada. El resultado de CI de la rama que se esté revisando es la fuente para conocer el estado real de las pruebas.
 
@@ -36,15 +39,58 @@ La lista anterior es un inventario general del repositorio, no una afirmación d
 - Adaptadores de bases de datos o persistencia alternativos.
 - Modelo avanzado de relaciones y referencias.
 
-## Próximo orden de trabajo recomendado
+## Trayectoria de ingeniería revisada
 
-1. Especificar con ejemplos la identidad de elementos, las modificaciones locales, la eliminación/restablecimiento y la resolución de máscaras.
-2. Convertir esas reglas en pruebas de modelo independientes de persistencia.
-3. Introducir una capa de aplicación mínima cuando el alcance de los casos de uso esté delimitado.
-4. Reforzar CI para formato, compilación y pruebas de todo el workspace.
-5. Refactorizar persistencia en incrementos pequeños, preservando journal y recuperación.
-6. Revisar permisos por separado: una regla descrita no equivale a control de acceso implementado.
-7. Mantener README, especificación y changelog sincronizados con cada PR relevante.
+La secuencia evita combinar cambios de comportamiento con refactorizaciones de estructura. El orden siguiente es deliberado y puede ajustarse si las pruebas descubren un riesgo nuevo.
+
+### 1. Completar la línea base de regresión — en curso
+
+Ampliar las pruebas de `lifecycle.rs` y `store.rs` alrededor de los estados intermedios persistidos, especialmente:
+
+- creación con journal escrito, antes y después del registro estructural;
+- repetición de la recuperación después de haber aplicado los efectos, pero antes de retirar el journal;
+- eliminación en distintos puntos de la operación multiarchivo;
+- rechazo de estados inconsistentes sin inventar padres ni perder datos;
+- validación de recursos temporales y archivos corruptos en la recuperación.
+
+Las pruebas deben expresar estados concretos y resultados esperados. No se añadirá infraestructura general de inyección de fallos hasta que los casos reales demuestren que hace falta.
+
+### 2. Establecer una frontera de aplicación mínima
+
+Extraer primero casos de uso que ya tienen semántica y límites claros, como reconciliar el workspace, crear una instancia y quitar una instancia hoja. La CLI conservará el análisis de argumentos, los mensajes y la presentación.
+
+No trasladar toda la CLI de una sola vez. El caso de creación de recurso con etiquetas e instancia opcional debe delimitar explícitamente qué queda persistido si falla un paso intermedio antes de tratarlo como una única operación de aplicación.
+
+### 3. Refactorizar persistencia por responsabilidades
+
+Solo después de reforzar las pruebas, separar `store.rs` y `lifecycle.rs` en incrementos que conserven las interfaces y formatos existentes. Cada cambio debe indicar qué responsabilidad mueve y qué garantía protege.
+
+- No cambiar TOML ni JSON en una refactorización interna.
+- No simplificar el journal, las escrituras atómicas ni la recuperación sin pruebas equivalentes.
+- Mantener la reconciliación como una decisión explícita ante dos vistas persistidas; no corregir silenciosamente datos dudosos.
+- Evitar abstraer cada operación de archivo antes de que exista un límite útil para reutilización o pruebas.
+
+### 4. Cerrar el contrato del modelo semántico — en paralelo, sin adelantar código
+
+Resolver mediante ejemplos y decisiones documentadas las cuestiones pendientes de máscaras: identidad estable de conceptos/componentes, modificaciones iguales al valor de origen, eliminación local, restablecimiento, cambios estructurales de la definición y precedencia de permisos.
+
+Estas decisiones no bloquean las pruebas ni la refactorización interna. Sí bloquean la implementación de máscaras y del motor de resolución hasta que exista una semántica completa y verificable.
+
+### 5. Implementar el modelo semántico de forma incremental
+
+Cuando el contrato esté cerrado, comenzar con pruebas de resolución independientes de TOML/JSON. Implementar solo los conceptos necesarios para los casos acordados; no construir un motor universal hipotético.
+
+La primera cobertura debe distinguir claramente definición compartida, valores heredados, diferencias locales y errores de resolución. Los permisos efectivos se diseñarán y probarán como una preocupación separada.
+
+### 6. Revisar la API pública y habilitar futuras interfaces
+
+Una vez establecida la capa de aplicación y estabilizadas las reglas del modelo, revisar qué tipos y operaciones deben exponerse desde `lib.rs`. Mantener detalles de almacenamiento internos si no forman parte del contrato público deseado.
+
+La interfaz web seguirá siendo experimental hasta que pueda consumir operaciones comunes sin duplicar reglas. No iniciar un daemon, servidor HTTP, sincronización remota o adaptadores de bases de datos dentro de esta trayectoria.
+
+### Criterio transversal de aceptación
+
+Cada PR debe tener un propósito acotado, conservar compatibilidad de datos salvo que una migración explícita esté aprobada, pasar formato/compilación/pruebas de CI y distinguir con honestidad las capacidades implementadas de las únicamente documentadas. Las operaciones que toquen varios archivos requieren pruebas sobre sus estados intermedios y su recuperación.
 
 ## Cómo leer el estado
 
