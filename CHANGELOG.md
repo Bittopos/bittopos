@@ -6,6 +6,11 @@ Mientras no existan versiones publicadas, `Unreleased` reúne los cambios que se
 
 ## [Unreleased]
 
+### Engineering
+- Se adopta una secuencia de refactorización basada en pruebas de regresión, capa de aplicación mínima y cambios de persistencia por responsabilidades.
+- Las decisiones no cerradas de máscaras se mantienen como bloqueo de implementación semántica, no de mejoras internas independientes.
+
+
 ### Documentation
 - Se separa la visión estratégica, el modelo conceptual, la arquitectura actual, el estado, las decisiones y la guía interna de ingeniería.
 - Se archivan los contratos anteriores sin eliminar su contenido histórico.
