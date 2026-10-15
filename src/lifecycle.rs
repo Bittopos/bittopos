@@ -566,6 +566,180 @@ mod tests {
     }
 
     #[test]
+    fn journal_recovers_creation_before_either_persistent_effect() {
+        let (_dir, resources, workspaces) = setup();
+        let (resource, _) = resources.create("Recurso", None).unwrap();
+        let instance = Instance::new(Uuid::now_v7(), resource.id);
+
+        persist_journal(
+            &workspaces,
+            "proyecto",
+            &PendingOperation::Create {
+                instance: PersistedInstance::from(instance.clone()),
+                parent_id: None,
+            },
+        )
+        .unwrap();
+
+        let (workspace, report) = reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
+
+        assert_eq!(report.restored, 1);
+        assert_eq!(workspace.all_instances().len(), 1);
+        assert!(workspace.find_instance(instance.id).is_some());
+        assert!(resources
+            .get(resource.id)
+            .unwrap()
+            .management
+            .structural
+            .contains(&instance.id));
+        assert!(!journal_path(&workspaces, "proyecto").unwrap().exists());
+    }
+
+    #[test]
+    fn journal_recovers_creation_idempotently_after_both_effects() {
+        let (_dir, resources, workspaces) = setup();
+        let (resource, _) = resources.create("Recurso", None).unwrap();
+        let instance = Instance::new(Uuid::now_v7(), resource.id);
+
+        persist_journal(
+            &workspaces,
+            "proyecto",
+            &PendingOperation::Create {
+                instance: PersistedInstance::from(instance.clone()),
+                parent_id: None,
+            },
+        )
+        .unwrap();
+        resources
+            .register_instance(resource.id, instance.id)
+            .unwrap();
+        workspaces
+            .save(
+                "proyecto",
+                &Workspace {
+                    content: crate::Content {
+                        instances: vec![instance.clone()],
+                    },
+                },
+            )
+            .unwrap();
+
+        let (workspace, report) = reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
+
+        assert_eq!(report.restored, 1);
+        assert_eq!(workspace.all_instances().len(), 1);
+        assert!(workspace.find_instance(instance.id).is_some());
+        assert!(!journal_path(&workspaces, "proyecto").unwrap().exists());
+
+        let (again, second_report) =
+            reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
+        assert_eq!(second_report, RecoveryReport::default());
+        assert_eq!(again.all_instances().len(), 1);
+    }
+
+    #[test]
+    fn journal_recovers_removal_before_either_persistent_effect() {
+        let (_dir, resources, workspaces) = setup();
+        let (resource, _) = resources.create("Recurso", None).unwrap();
+        let root_id = create_instance(&resources, &workspaces, "proyecto", resource.id).unwrap();
+        let child_id = create_instance_under(
+            &resources,
+            &workspaces,
+            "proyecto",
+            resource.id,
+            Some(root_id),
+        )
+        .unwrap();
+        let child = workspaces
+            .load("proyecto")
+            .unwrap()
+            .find_instance(child_id)
+            .unwrap()
+            .clone();
+
+        persist_journal(
+            &workspaces,
+            "proyecto",
+            &PendingOperation::Remove {
+                instance: PersistedInstance::from(child),
+                parent_id: Some(root_id),
+            },
+        )
+        .unwrap();
+
+        let (workspace, report) = reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
+
+        assert_eq!(report.removed, 1);
+        assert!(workspace.find_instance(child_id).is_none());
+        assert!(workspace
+            .find_instance(root_id)
+            .unwrap()
+            .children()
+            .is_empty());
+        assert!(!resources
+            .get(resource.id)
+            .unwrap()
+            .management
+            .structural
+            .contains(&child_id));
+        assert!(!journal_path(&workspaces, "proyecto").unwrap().exists());
+    }
+
+    #[test]
+    fn journal_finishes_removal_idempotently_after_both_effects() {
+        let (_dir, resources, workspaces) = setup();
+        let (resource, _) = resources.create("Recurso", None).unwrap();
+        let root_id = create_instance(&resources, &workspaces, "proyecto", resource.id).unwrap();
+        let child_id = create_instance_under(
+            &resources,
+            &workspaces,
+            "proyecto",
+            resource.id,
+            Some(root_id),
+        )
+        .unwrap();
+        let child = workspaces
+            .load("proyecto")
+            .unwrap()
+            .find_instance(child_id)
+            .unwrap()
+            .clone();
+
+        persist_journal(
+            &workspaces,
+            "proyecto",
+            &PendingOperation::Remove {
+                instance: PersistedInstance::from(child),
+                parent_id: Some(root_id),
+            },
+        )
+        .unwrap();
+        resources
+            .unregister_instance(resource.id, child_id)
+            .unwrap();
+        let mut workspace = workspaces.load("proyecto").unwrap();
+        workspace.remove_leaf(child_id).unwrap();
+        workspaces.save("proyecto", &workspace).unwrap();
+
+        let (recovered, report) = reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
+
+        assert_eq!(report.removed, 1);
+        assert!(recovered.find_instance(child_id).is_none());
+        assert!(recovered
+            .find_instance(root_id)
+            .unwrap()
+            .children()
+            .is_empty());
+        assert!(!journal_path(&workspaces, "proyecto").unwrap().exists());
+
+        let (again, second_report) =
+            reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
+        assert_eq!(second_report, RecoveryReport::default());
+        assert!(again.find_instance(child_id).is_none());
+        assert_eq!(again.all_instances().len(), 1);
+    }
+
+    #[test]
     fn refuses_to_reconcile_corrupt_journal() {
         let (_dir, resources, workspaces) = setup();
         let (_resource, _) = resources.create("Recurso", None).unwrap();
