@@ -81,8 +81,7 @@ mod tests {
             })
             .unwrap();
 
-        let prepared =
-            prepare_workspace(&resources, &workspaces, &navigation, "proyecto").unwrap();
+        let prepared = prepare_workspace(&resources, &workspaces, &navigation, "proyecto").unwrap();
 
         assert!(prepared.workspace.all_instances().is_empty());
         assert_eq!(prepared.navigation_state.current_instance, None);
