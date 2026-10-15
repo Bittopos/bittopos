@@ -3,8 +3,9 @@ use std::path::PathBuf;
 use std::process;
 
 use bittopos_core::{
-    create_instance_under, reconcile_workspace, remove_instance, Instance, NavigationState,
-    NavigationStore, ResourcePatch, ResourceStore, Workspace, WorkspaceStore,
+    children_of, create_instance_under, reconcile_workspace, remove_instance, Instance,
+    NavigationState, NavigationStore, ResourcePatch, ResourceStore, Workspace, WorkspaceModelError,
+    WorkspaceStore,
 };
 use clap::{Parser, Subcommand};
 use uuid::Uuid;
@@ -173,13 +174,14 @@ fn run() -> Result<(), String> {
             print_workspace(&startup_workspace, &resources)?;
         }
         Command::Ls => {
-            let children = match nav_state.current_instance {
-                None => startup_workspace.instances(),
-                Some(id) => startup_workspace
-                    .find_instance(id)
-                    .ok_or_else(|| format!("la ubicación actual ya no existe: {id}"))?
-                    .children(),
-            };
+            let children = children_of(&startup_workspace, nav_state.current_instance).map_err(
+                |error| match error {
+                    WorkspaceModelError::ParentNotFound(id) => {
+                        format!("la ubicación actual ya no existe: {id}")
+                    }
+                    other => other.to_string(),
+                },
+            )?;
             if children.is_empty() {
                 println!("No hay instancias en esta ubicación.");
             } else {
@@ -187,13 +189,14 @@ fn run() -> Result<(), String> {
             }
         }
         Command::Enter { id } => {
-            let children = match nav_state.current_instance {
-                None => startup_workspace.instances(),
-                Some(parent_id) => startup_workspace
-                    .find_instance(parent_id)
-                    .ok_or_else(|| format!("no existe la ubicación actual: {parent_id}"))?
-                    .children(),
-            };
+            let children = children_of(&startup_workspace, nav_state.current_instance).map_err(
+                |error| match error {
+                    WorkspaceModelError::ParentNotFound(id) => {
+                        format!("no existe la ubicación actual: {id}")
+                    }
+                    other => other.to_string(),
+                },
+            )?;
             if !children.iter().any(|child| child.id == id) {
                 return Err(format!(
                     "la instancia {id} no es hija directa de la ubicación actual; usa 'bitto ls' para consultar las opciones"
