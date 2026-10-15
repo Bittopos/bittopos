@@ -581,8 +581,7 @@ mod tests {
         )
         .unwrap();
 
-        let (workspace, report) =
-            reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
+        let (workspace, report) = reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
 
         assert_eq!(report.restored, 1);
         assert_eq!(workspace.all_instances().len(), 1);
@@ -625,8 +624,7 @@ mod tests {
             )
             .unwrap();
 
-        let (workspace, report) =
-            reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
+        let (workspace, report) = reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
 
         assert_eq!(report.restored, 1);
         assert_eq!(workspace.all_instances().len(), 1);
@@ -669,12 +667,15 @@ mod tests {
         )
         .unwrap();
 
-        let (workspace, report) =
-            reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
+        let (workspace, report) = reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
 
         assert_eq!(report.removed, 1);
         assert!(workspace.find_instance(child_id).is_none());
-        assert!(workspace.find_instance(root_id).unwrap().children().is_empty());
+        assert!(workspace
+            .find_instance(root_id)
+            .unwrap()
+            .children()
+            .is_empty());
         assert!(!resources
             .get(resource.id)
             .unwrap()
@@ -720,12 +721,15 @@ mod tests {
         workspace.remove_leaf(child_id).unwrap();
         workspaces.save("proyecto", &workspace).unwrap();
 
-        let (recovered, report) =
-            reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
+        let (recovered, report) = reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
 
         assert_eq!(report.removed, 1);
         assert!(recovered.find_instance(child_id).is_none());
-        assert!(recovered.find_instance(root_id).unwrap().children().is_empty());
+        assert!(recovered
+            .find_instance(root_id)
+            .unwrap()
+            .children()
+            .is_empty());
         assert!(!journal_path(&workspaces, "proyecto").unwrap().exists());
 
         let (again, second_report) =
