@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use std::process;
 
 use bittopos_core::{
-    children_of, create_instance_under, prepare_workspace, remove_instance, Instance,
+    children_of, create_instance_at_current_location, create_instance_under, prepare_workspace,
+    remove_instance_and_update_navigation, Instance,
     NavigationState, NavigationStore, ResourcePatch, ResourceStore, Workspace, WorkspaceModelError,
     WorkspaceStore,
 };
@@ -229,12 +230,12 @@ fn run() -> Result<(), String> {
         }
         Command::Add { id } => {
             let resource = resources.get(id).map_err(|error| error.to_string())?;
-            let instance_id = create_instance_under(
+            let instance_id = create_instance_at_current_location(
                 &resources,
                 &workspaces,
                 WORKSPACE_FILE,
                 id,
-                nav_state.current_instance,
+                &nav_state,
             )
             .map_err(|error| error.to_string())?;
             println!(
@@ -243,13 +244,16 @@ fn run() -> Result<(), String> {
             );
         }
         Command::Remove { id } => {
-            remove_instance(&resources, &workspaces, WORKSPACE_FILE, id)
-                .map_err(|error| error.to_string())?;
-            if nav_state.current_instance == Some(id) {
-                nav_state = NavigationState::default();
-                navigation
-                    .save(&nav_state)
-                    .map_err(|error| error.to_string())?;
+            let navigation_reset = remove_instance_and_update_navigation(
+                &resources,
+                &workspaces,
+                &navigation,
+                WORKSPACE_FILE,
+                id,
+                &mut nav_state,
+            )
+            .map_err(|error| error.to_string())?;
+            if navigation_reset {
                 println!(
                     "La ubicación eliminada era la actual; navegación restablecida a la raíz."
                 );
