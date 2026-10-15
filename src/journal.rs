@@ -105,9 +105,19 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let workspaces = WorkspaceStore::new(dir.path()).unwrap();
 
-        for name in ["", "  ", ".", "..", "../outside", "nested/name", "nested\\name"] {
-            assert!(matches!(path(&workspaces, name), Err(JournalError::InvalidName)));
+        for name in [
+            "",
+            "  ",
+            ".",
+            "..",
+            "../outside",
+            "nested/name",
+            "nested\\name",
+        ] {
+            assert!(matches!(
+                path(&workspaces, name),
+                Err(JournalError::InvalidName)
+            ));
         }
     }
-
 }
