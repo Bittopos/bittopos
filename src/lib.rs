@@ -4,6 +4,7 @@
 //! se guardan en JSON y contienen instancias con identidad propia, separada
 //! de la identidad del recurso de origen.
 
+mod application;
 mod lifecycle;
 mod model_operations;
 mod navigation;
@@ -13,6 +14,7 @@ mod store;
 mod workspace;
 mod workspace_model;
 
+pub use application::{prepare_workspace, ApplicationError, PreparedWorkspace};
 pub use lifecycle::{
     create_instance, create_instance_under, reconcile_workspace, remove_instance, LifecycleError,
     RecoveryReport,
