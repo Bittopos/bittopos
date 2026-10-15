@@ -4,9 +4,8 @@ use std::process;
 
 use bittopos_core::{
     children_of, create_instance_at_current_location, create_instance_under, prepare_workspace,
-    remove_instance_and_update_navigation, Instance,
-    NavigationState, NavigationStore, ResourcePatch, ResourceStore, Workspace, WorkspaceModelError,
-    WorkspaceStore,
+    remove_instance_and_update_navigation, Instance, NavigationState, NavigationStore,
+    ResourcePatch, ResourceStore, Workspace, WorkspaceModelError, WorkspaceStore,
 };
 use clap::{Parser, Subcommand};
 use uuid::Uuid;
