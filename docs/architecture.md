@@ -38,7 +38,7 @@ La implementación actual contiene, entre otros:
 - `navigation.rs`: persistencia del estado de navegación.
 - `cli/src/main.rs`: parsing, presentación y parte de la coordinación de la interfaz de terminal.
 
-Esto ya separa ciertas responsabilidades, pero **no significa que exista una capa de aplicación completa y común para todas las interfaces** ni que el modelo general Segment/Concept/Component esté implementado de forma genérica.
+Existe una primera frontera de aplicación reutilizable: `prepare_workspace` prepara un contexto consistente antes de ejecutar un comando, coordinando recuperación y navegación. Es un primer caso de uso, no una capa de aplicación completa; las operaciones de creación/eliminación y otros flujos todavía no están expuestos por una fachada común. El modelo general Segment/Concept/Component tampoco está implementado de forma genérica.
 
 ## Persistencia y recuperación
 
