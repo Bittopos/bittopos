@@ -29,4 +29,5 @@ No se reescriben los ADR aceptados para ocultar la historia. Si una decisión ca
 ## Índice
 
 - [ADR 0001: núcleo adaptable y adaptadores explícitos](0001-core-and-adapters.md)
-- [ADR 0002: máscaras como segmentos locales de instancia](0002-segment-masks.md)
+- [ADR 0002: máscaras como segmentos locales de instancia (sustituido)](0002-segment-masks.md)
+- [ADR 0003: máscaras dispersas y herencia dinámica](0003-sparse-mask-overrides.md)

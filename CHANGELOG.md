@@ -7,12 +7,13 @@ Mientras no existan versiones publicadas, `Unreleased` reúne los cambios que se
 ## [Unreleased]
 
 ### Documentation
-- Se establece una documentación de trabajo separada en modelo, arquitectura, estado del proyecto y decisiones arquitectónicas.
-- Se define el flujo de desarrollo mediante Issues, ramas, Conventional Commits, Pull Requests y pruebas del workspace.
-- Se aclara que los contratos numerados anteriores son documentos históricos, no la fuente de verdad vigente.
+- Se separa la visión estratégica, el modelo conceptual, la arquitectura actual, el estado, las decisiones y la guía interna de ingeniería.
+- Se archivan los contratos anteriores sin eliminar su contenido histórico.
+- Se refuerzan los enlaces del README y se aclara qué documentación es normativa y cuál es histórica.
 
 ### Model
-- Se documenta como regla conceptual provisional la máscara de segmento en instancias, la herencia por defecto y el propósito de congelar una copia de un segmento definido.
+- Se sustituye el modelo de máscara como instantánea congelada por una máscara dispersa de diferencias locales con herencia dinámica.
+- Se mantiene la distinción entre edición compartida sin máscara y modificación local mediante máscara.
 - Se distingue la gestión de permisos en el espacio de definición de la máscara de permisos local a una instancia.
 
 ### Notes
