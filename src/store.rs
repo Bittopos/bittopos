@@ -873,6 +873,39 @@ mod tests {
     }
 
     #[test]
+    fn inspecting_invalid_temporary_preserves_both_files() {
+        let (_dir, store) = store();
+        let (confirmed, _) = store.create("Confirmado", None).unwrap();
+        let confirmed_path = store.path_for(confirmed.id);
+        let confirmed_before = fs::read(&confirmed_path).unwrap();
+        let temporary_path = store.temporary_path_for(confirmed.id);
+        fs::write(&temporary_path, "temporal incompleto").unwrap();
+
+        let inspection = store.inspect_temporary(confirmed.id).unwrap();
+
+        assert!(matches!(inspection, TemporaryInspection::Invalid { .. }));
+        assert_eq!(fs::read(&confirmed_path).unwrap(), confirmed_before);
+        assert_eq!(
+            fs::read_to_string(&temporary_path).unwrap(),
+            "temporal incompleto"
+        );
+    }
+
+    #[test]
+    fn inspecting_missing_temporary_reports_missing_without_mutation() {
+        let (_dir, store) = store();
+        let (confirmed, _) = store.create("Confirmado", None).unwrap();
+        let confirmed_path = store.path_for(confirmed.id);
+        let confirmed_before = fs::read(&confirmed_path).unwrap();
+
+        assert_eq!(
+            store.inspect_temporary(confirmed.id).unwrap(),
+            TemporaryInspection::Missing
+        );
+        assert_eq!(fs::read(confirmed_path).unwrap(), confirmed_before);
+    }
+
+    #[test]
     fn explicit_temporary_promotion_validates_and_replaces_confirmed_file() {
         let (_dir, store) = store();
         let (confirmed, _) = store.create("Confirmado", None).unwrap();
