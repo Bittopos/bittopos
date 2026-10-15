@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::process;
 
 use bittopos_core::{
-    children_of, create_instance_under, reconcile_workspace, remove_instance, Instance,
+    children_of, create_instance_under, prepare_workspace, remove_instance, Instance,
     NavigationState, NavigationStore, ResourcePatch, ResourceStore, Workspace, WorkspaceModelError,
     WorkspaceStore,
 };
@@ -95,15 +95,13 @@ fn run() -> Result<(), String> {
     let workspaces = WorkspaceStore::new(&paths.workspaces).map_err(|error| error.to_string())?;
     let navigation = NavigationStore::new(&paths.workspaces);
 
-    // Toda invocación reconcilia primero la persistencia del workspace.
-    let (startup_workspace, startup_report) =
-        reconcile_workspace(&resources, &workspaces, WORKSPACE_FILE)
-            .map_err(|error| error.to_string())?;
-    report_recovery(startup_report.restored, startup_report.removed);
-
-    let (mut nav_state, navigation_reset) = navigation
-        .load_validated(&startup_workspace)
+    // La capa de aplicación prepara el contexto consistente para la interfaz.
+    let prepared = prepare_workspace(&resources, &workspaces, &navigation, WORKSPACE_FILE)
         .map_err(|error| error.to_string())?;
+    report_recovery(prepared.recovery.restored, prepared.recovery.removed);
+    let startup_workspace = prepared.workspace;
+    let mut nav_state = prepared.navigation_state;
+    let navigation_reset = prepared.navigation_reset;
     if navigation_reset {
         eprintln!("La ubicación guardada ya no existe; navegación restablecida a la raíz.");
     }
