@@ -29,7 +29,7 @@ La lista anterior es un inventario general del repositorio, no una afirmación d
 - Resolución de máscaras, incluidos reinicio de diferencias y eliminación local de valores heredados.
 - Reglas efectivas de permisos en los espacios de definición e instanciación.
 - Un mecanismo de resolución extensible a otros dominios estructurales, como tareas, responsabilidades y proyectos.
-- Una capa de aplicación reutilizable por futuras interfaces, allí donde un caso de uso real justifique la separación.
+- Una capa de aplicación completa y común para futuras interfaces; existe únicamente el primer caso de uso `prepare_workspace`, que coordina reconciliación y validación de navegación.
 
 ## Aplazado
 
@@ -55,9 +55,11 @@ Ampliar las pruebas de `lifecycle.rs` y `store.rs` alrededor de los estados inte
 
 Las pruebas deben expresar estados concretos y resultados esperados. No se añadirá infraestructura general de inyección de fallos hasta que los casos reales demuestren que hace falta.
 
-### 2. Establecer una frontera de aplicación mínima
+### 2. Establecer una frontera de aplicación mínima — en curso
 
-Extraer primero casos de uso que ya tienen semántica y límites claros, como reconciliar el workspace, crear una instancia y quitar una instancia hoja. La CLI conservará el análisis de argumentos, los mensajes y la presentación.
+Primer incremento: `prepare_workspace` coordina la reconciliación del workspace y la validación del estado de navegación antes de que la CLI ejecute un comando. La CLI conserva el análisis de argumentos, los mensajes y la presentación.
+
+Siguientes incrementos: exponer creación de instancias y eliminación de una instancia hoja como casos de uso de aplicación, reutilizando las operaciones de ciclo de vida existentes. No duplicar reglas ni envolver cada función mecánicamente sin aportar coordinación o una interfaz útil.
 
 No trasladar toda la CLI de una sola vez. El caso de creación de recurso con etiquetas e instancia opcional debe delimitar explícitamente qué queda persistido si falla un paso intermedio antes de tratarlo como una única operación de aplicación.
 
