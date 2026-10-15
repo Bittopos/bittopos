@@ -174,14 +174,15 @@ fn run() -> Result<(), String> {
             print_workspace(&startup_workspace, &resources)?;
         }
         Command::Ls => {
-            let children = children_of(&startup_workspace, nav_state.current_instance).map_err(
-                |error| match error {
-                    WorkspaceModelError::ParentNotFound(id) => {
-                        format!("la ubicación actual ya no existe: {id}")
+            let children =
+                children_of(&startup_workspace, nav_state.current_instance).map_err(|error| {
+                    match error {
+                        WorkspaceModelError::ParentNotFound(id) => {
+                            format!("la ubicación actual ya no existe: {id}")
+                        }
+                        other => other.to_string(),
                     }
-                    other => other.to_string(),
-                },
-            )?;
+                })?;
             if children.is_empty() {
                 println!("No hay instancias en esta ubicación.");
             } else {
@@ -189,14 +190,15 @@ fn run() -> Result<(), String> {
             }
         }
         Command::Enter { id } => {
-            let children = children_of(&startup_workspace, nav_state.current_instance).map_err(
-                |error| match error {
-                    WorkspaceModelError::ParentNotFound(id) => {
-                        format!("no existe la ubicación actual: {id}")
+            let children =
+                children_of(&startup_workspace, nav_state.current_instance).map_err(|error| {
+                    match error {
+                        WorkspaceModelError::ParentNotFound(id) => {
+                            format!("no existe la ubicación actual: {id}")
+                        }
+                        other => other.to_string(),
                     }
-                    other => other.to_string(),
-                },
-            )?;
+                })?;
             if !children.iter().any(|child| child.id == id) {
                 return Err(format!(
                     "la instancia {id} no es hija directa de la ubicación actual; usa 'bitto ls' para consultar las opciones"
