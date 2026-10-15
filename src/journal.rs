@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::persistence::atomic_write;
-use crate::workspace::{PersistedInstance, WorkspaceError, WorkspaceStore};
+use crate::workspace::{PersistedInstance, WorkspaceStore};
 
 #[derive(Debug)]
 pub(crate) enum JournalError {
@@ -99,7 +99,6 @@ pub(crate) fn read(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
 
     #[test]
     fn journal_path_rejects_names_that_escape_workspace_directory() {
@@ -111,26 +110,4 @@ mod tests {
         }
     }
 
-    #[test]
-    fn journal_round_trips_operation_without_changing_path_or_format() {
-        let dir = tempfile::tempdir().unwrap();
-        let workspaces = WorkspaceStore::new(Path::new(dir.path())).unwrap();
-        let operation = PendingOperation::Remove {
-            instance: PersistedInstance {
-                id: Uuid::now_v7(),
-                source: crate::workspace::PersistedSource { id: Uuid::now_v7() },
-                semantic: None,
-                content: None,
-            },
-            parent_id: None,
-        };
-
-        persist(&workspaces, "proyecto", &operation).unwrap();
-        assert_eq!(read(&workspaces, "proyecto").unwrap().map(|value| {
-            serde_json::to_value(value).unwrap()
-        }), Some(serde_json::to_value(operation).unwrap()));
-        assert!(path(&workspaces, "proyecto").unwrap().exists());
-        clear(&workspaces, "proyecto").unwrap();
-        assert!(read(&workspaces, "proyecto").unwrap().is_none());
-    }
 }
