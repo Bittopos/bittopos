@@ -15,8 +15,8 @@ mod workspace;
 mod workspace_model;
 
 pub use application::{
-    create_instance_at_current_location, prepare_workspace,
-    remove_instance_and_update_navigation, ApplicationError, PreparedWorkspace,
+    create_instance_at_current_location, prepare_workspace, remove_instance_and_update_navigation,
+    ApplicationError, PreparedWorkspace,
 };
 pub use lifecycle::{
     create_instance, create_instance_under, reconcile_workspace, remove_instance, LifecycleError,
