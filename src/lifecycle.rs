@@ -303,7 +303,7 @@ pub fn remove_instance(
         instance: PersistedInstance::from(instance),
         parent_id,
     };
-    persist_journal(workspaces, workspace_name, &operation)?;
+    journal::persist(workspaces, workspace_name, &operation)?;
     apply_pending(resources, workspaces, workspace_name, operation)
 }
 
@@ -422,7 +422,7 @@ mod tests {
             instance: PersistedInstance::from(child),
             parent_id: Some(root_id),
         };
-        persist_journal(&workspaces, "proyecto", &operation).unwrap();
+        journal::persist(&workspaces, "proyecto", &operation).unwrap();
         resources
             .unregister_instance(resource.id, child_id)
             .unwrap();
@@ -440,7 +440,7 @@ mod tests {
             .management
             .structural
             .contains(&child_id));
-        assert!(!journal_path(&workspaces, "proyecto").unwrap().exists());
+        assert!(!journal::path(&workspaces, "proyecto").unwrap().exists());
     }
 
     #[test]
@@ -504,7 +504,7 @@ mod tests {
         let (resource, _) = resources.create("Recurso", None).unwrap();
         let instance = Instance::new(Uuid::now_v7(), resource.id);
 
-        persist_journal(
+        journal::persist(
             &workspaces,
             "proyecto",
             &PendingOperation::Create {
@@ -525,7 +525,7 @@ mod tests {
             .management
             .structural
             .contains(&instance.id));
-        assert!(!journal_path(&workspaces, "proyecto").unwrap().exists());
+        assert!(!journal::path(&workspaces, "proyecto").unwrap().exists());
     }
 
     #[test]
@@ -534,7 +534,7 @@ mod tests {
         let (resource, _) = resources.create("Recurso", None).unwrap();
         let instance = Instance::new(Uuid::now_v7(), resource.id);
 
-        persist_journal(
+        journal::persist(
             &workspaces,
             "proyecto",
             &PendingOperation::Create {
@@ -562,7 +562,7 @@ mod tests {
         assert_eq!(report.restored, 1);
         assert_eq!(workspace.all_instances().len(), 1);
         assert!(workspace.find_instance(instance.id).is_some());
-        assert!(!journal_path(&workspaces, "proyecto").unwrap().exists());
+        assert!(!journal::path(&workspaces, "proyecto").unwrap().exists());
 
         let (again, second_report) =
             reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
@@ -590,7 +590,7 @@ mod tests {
             .unwrap()
             .clone();
 
-        persist_journal(
+        journal::persist(
             &workspaces,
             "proyecto",
             &PendingOperation::Remove {
@@ -615,7 +615,7 @@ mod tests {
             .management
             .structural
             .contains(&child_id));
-        assert!(!journal_path(&workspaces, "proyecto").unwrap().exists());
+        assert!(!journal::path(&workspaces, "proyecto").unwrap().exists());
     }
 
     #[test]
@@ -638,7 +638,7 @@ mod tests {
             .unwrap()
             .clone();
 
-        persist_journal(
+        journal::persist(
             &workspaces,
             "proyecto",
             &PendingOperation::Remove {
@@ -663,7 +663,7 @@ mod tests {
             .unwrap()
             .children()
             .is_empty());
-        assert!(!journal_path(&workspaces, "proyecto").unwrap().exists());
+        assert!(!journal::path(&workspaces, "proyecto").unwrap().exists());
 
         let (again, second_report) =
             reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
@@ -693,7 +693,7 @@ mod tests {
             .clone();
 
         // El journal afirma que la instancia es raíz, pero el workspace la contiene bajo root_id.
-        persist_journal(
+        journal::persist(
             &workspaces,
             "proyecto",
             &PendingOperation::Remove {
@@ -702,7 +702,7 @@ mod tests {
             },
         )
         .unwrap();
-        let journal = journal_path(&workspaces, "proyecto").unwrap();
+        let journal = journal::path(&workspaces, "proyecto").unwrap();
 
         assert!(matches!(
             reconcile_workspace(&resources, &workspaces, "proyecto"),
