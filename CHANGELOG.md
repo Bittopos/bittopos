@@ -20,7 +20,7 @@ Mientras no existan versiones publicadas, Unreleased reúne los cambios que se p
 
 ### Model
 - Se documenta la resolución desde la instancia hacia el recurso de origen mediante topología y direcciones semánticas.
-- Se distinguen las máscaras puntuales de diferencias locales de las máscaras Snapshot, que congelan explícitamente las partes incluidas en su alcance.
+- Se distinguen las máscaras puntuales de diferencias locales de las máscaras Snapshot, que congelan las partes maskables comprendidas en la Snapshot; las redefiniciones ordinarias no eliminan máscaras locales.
 - Se aclara que los componentes pueden tener reglas específicas de combinación, que las referencias se expanden y que los permisos se resuelven separadamente del contenido.
 
 ### Notes
