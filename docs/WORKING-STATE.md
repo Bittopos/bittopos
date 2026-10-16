@@ -1,7 +1,7 @@
 # Estado de trabajo y continuidad de Bittopos
 
-**Última reconciliación documental:** 2026-10-15  
-**Base de código examinada:** rama `main` posterior al PR #28, según los archivos consultados durante esta revisión.  
+**Última reconciliación documental:** 2026-10-16  
+**Base de código examinada:** `main` en `296a76a84b28d181c904a6ab34e2db4a269f1acb` (PR #31 integrado).  
 **Tipo de cambio de esta actualización:** documentación; no modifica el código de ejecución.
 
 Esta página existe para que una conversación nueva pueda continuar el trabajo sin reconstruirlo por memoria, repetir pruebas existentes ni reabrir decisiones ya revisadas.
@@ -76,6 +76,7 @@ PRs integrados relevantes en la secuencia actual:
 - **#27 — regresiones de estados inconsistentes:** protege instancias y journal cuando la información persistida contradice la operación pendiente.
 - **#28 — separación física del journal:** mueve lectura/escritura/formato/limpieza a `journal.rs`, manteniendo en `lifecycle.rs` la coordinación semántica.
 - **#29 — reconciliación documental:** alinea visión, modelo, ADR, arquitectura, estado y changelog; añade este documento de continuidad y registra que las máscaras están revisadas conceptualmente, mientras su motor sigue pendiente. Se integró mediante squash merge en el commit `c0c02605eebce36173d396381ea085c6ecfe2c92`; CI pasó en la rama del PR.
+- **#31 — límites del contrato de máscaras:** añade ADR 0005 para separar las reglas centrales acordadas de los casos estructurales que todavía necesitan decisiones explícitas. El estado actual de `main` se verificó en el commit `296a76a84b28d181c904a6ab34e2db4a269f1acb`.
 
 La secuencia se debe leer como una progresión de garantías y límites de responsabilidad, no como una invitación a repetir las pruebas o rehacer la separación del journal.
 
@@ -98,36 +99,19 @@ Los nombres confirmados incluyen `journal_recovers_creation_after_resource_write
 
 No proponer otra prueba con la misma precondición y el mismo resultado esperado. La línea base solo se puede marcar como cerrada después de revisar también las pruebas relevantes de temporales inválidos/ausentes en `store.rs` y comprobar el CI de la revisión actual. No se ha confirmado ese cierre aquí.
 
-## 7. Siguiente tarea concreta
+## 7. Siguiente trabajo concreto
 
-**Auditar el flujo de `bitto create` antes de extraerlo a la capa de aplicación.** El código de la CLI hace estos pasos por separado:
+La prioridad inmediata es preparar el núcleo para una reestructuración arquitectónica amplia. No continuar por ahora el flujo combinado de `bitto create` ni iniciar refactors de persistencia que no sean necesarios para preparar ese cambio.
 
-1. crear el recurso;
-2. si se solicitaron etiquetas, actualizar el recurso para guardarlas;
-3. salvo `--no-instance`, crear una instancia bajo la ubicación de navegación actual.
+El plan de preparación y sus criterios están en [Preparación para la reestructuración del núcleo](CORE-REWRITE-READINESS.md). Este documento ordena el alcance y el proceso; no autoriza por sí solo la implementación posterior.
 
-La CLI ya informa explícitamente cuando el recurso se creó pero falla el guardado de etiquetas o la creación de la instancia. La siguiente conversación debe examinar el código, los errores y las pruebas actuales para precisar las garantías deseadas ante fallos parciales.
+Antes de iniciar código nuevo, consultar el PR de preparación, verificar el estado de `main` y CI, y acordar el alcance del siguiente incremento. Las reglas centrales de máscaras no se reabren por defecto; los casos no resueltos permanecen delimitados en el ADR 0005.
 
-Secuencia de trabajo:
+## 8. Prioridad y límites
 
-1. Enumerar cada efecto persistente y su orden.
-2. Describir los estados alcanzables si falla cada paso.
-3. Decidir qué se considera éxito parcial, qué debe permanecer y qué debe recuperarse; no asumir una transacción ni borrar automáticamente el recurso.
-4. Comparar los criterios con las pruebas existentes.
-5. Añadir solo las pruebas que cubran una garantía realmente ausente.
-6. Cuando las garantías estén definidas y probadas, decidir si el flujo combinado merece convertirse en un caso de uso de `application.rs`.
-7. Mantener el cambio pequeño y revisar el diff y CI antes de integrarlo.
+La dirección estratégica de producto y la cola inmediata de ingeniería son escalas diferentes. La prioridad inmediata deja de ser la auditoría de `bitto create`: el usuario ha decidido pausar ese trabajo para preparar una reestructuración del núcleo centrada en el modelo semántico y las máscaras.
 
-Después, continuar la revisión de `store.rs` y `workspace.rs` solo para identificar límites reales de persistencia. El almacenamiento de recursos tiene una secuencia especializada de preparación, validación y promoción de temporales; no sustituirla a ciegas por la escritura atómica genérica del workspace.
-
-## 8. Hoja de ruta y niveles de prioridad
-
-Hay dos escalas que no deben confundirse:
-
-- **Dirección de producto a largo plazo:** modelo general, instanciación, estructura/navegación, resolución semántica, capacidades superiores y futuras interfaces. La visión no significa que esas capacidades estén implementadas.
-- **Cola de ingeniería inmediata posterior al PR #28:** cerrar con evidencia la línea base de regresión; auditar la creación combinada; definir y extraer la frontera de aplicación cuando corresponda; continuar la separación de persistencia sin cambiar garantías; después implementar el motor semántico según el contrato y revisar la API pública.
-
-La conversación previa también manejó una hoja de ruta general de diez etapas, pero la trayectoria técnica registrada en el PR #23 es una priorización de seis frentes cercanos, no una sustitución de esa hoja de ruta. No inventar una equivalencia entre ambas ni renumerar los frentes como etapas del producto. Si se necesita restaurar el detalle literal de las diez etapas, recuperar la fuente histórica exacta antes de transcribirla.
+No se debe interpretar esta preparación como autorización para implementar todo el motor en un solo cambio. La reestructuración debe proponerse en incrementos revisables, conservar las garantías de persistencia salvo decisión explícita y no introducir migraciones silenciosas. No borrar ramas antiguas ni cambiar configuración de GitHub como parte de un PR documental.
 
 ## 9. Documentación y fuentes de verdad
 
