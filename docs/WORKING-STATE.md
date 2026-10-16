@@ -32,13 +32,13 @@ Según los archivos de código consultados en `main`:
 - Workspace local JSON con instancias que tienen identidad propia y referencia `source.id` al recurso de origen.
 - Contención recursiva de instancias; la ubicación padre-hijo directa se representa en `semantic.allocation`.
 - Registro de instancias asociadas a una definición mediante `management.structural`, distinto de la jerarquía padre-hijo.
-- Navegación local persistida en `navigation.toml).
+- Navegación local persistida en `navigation.toml`.
 - CLI con `create`, `show`, `ls`, `enter`, `up`, `root`, `pwd`, `add`, `remove` y `recover`.
 - Modelo del árbol de workspace separado de DTOs JSON y rutas.
 - Journal durable para coordinar creación/eliminación de instancias y reconciliación al preparar el workspace.
 - Reglas que impiden borrar instancias con descendientes y recuperación que falla explícitamente ante discrepancias que no puede resolver con seguridad.
 - `journal.rs` separado de la coordinación de ciclo de vida.
-- `application.rs` con tres casos de uso: `prepare_workspace`, `create_instance_at_current_location` y `remove_instance_and_update_navigation).
+- `application.rs` con tres casos de uso: `prepare_workspace`, `create_instance_at_current_location` y `remove_instance_and_update_navigation`.
 - Prototipo web estático con árbol/mapa e importación/exportación local; mantiene una copia local del estado y no usa el núcleo Rust.
 
 **Implementado no significa exhaustivamente verificado.** La suite contiene pruebas de recuperación para estados intermedios; la verificación de una revisión concreta requiere consultar el resultado de CI correspondiente. Esta actualización no ejecutó `cargo fmt`, `cargo build` ni `cargo test`.
@@ -94,7 +94,7 @@ En `src/lifecycle.rs` existen, entre otras, pruebas para:
 
 Los nombres confirmados incluyen `journal_recovers_creation_after_resource_write`, `journal_recovers_creation_before_either_persistent_effect`, `journal_recovers_creation_idempotently_after_both_effects`, `journal_recovers_removal_before_either_persistent_effect` y `conflicting_removal_journal_preserves_instance_and_journal`.
 
-No proponer otra prueba con la misma precondición y el mismo resultado esperado. La línea base solo se puede marcar como cerrada después de revisar también las pruebas relevantes de temporales inválidos/ausentes en `store.rs) y comprobar el CI de la revisión actual. No se ha confirmado ese cierre aquí.
+No proponer otra prueba con la misma precondición y el mismo resultado esperado. La línea base solo se puede marcar como cerrada después de revisar también las pruebas relevantes de temporales inválidos/ausentes en `store.rs` y comprobar el CI de la revisión actual. No se ha confirmado ese cierre aquí.
 
 ## 7. Siguiente tarea concreta
 
@@ -143,7 +143,7 @@ Cuando dos documentos parezcan discrepar, determinar cuál es la fuente normativ
 
 ## 10. Lista de comprobación para una conversación nueva
 
-- [ ] Leer este documento, `docs/status.md), `docs/model.md) y el ADR relevante.
+- [ ] Leer este documento, `docs/status.md`, `docs/model.md` y el ADR relevante.
 - [ ] Consultar `main`, últimos commits, PR abiertos y estado de CI actual.
 - [ ] Revisar el código y las pruebas actuales del flujo que se vaya a tocar.
 - [ ] Distinguir: acordado, implementado, verificado, pendiente y aplazado.
