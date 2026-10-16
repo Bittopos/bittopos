@@ -1,63 +1,54 @@
 # Bittopos
 
-Bittopos es un proyecto en Rust para modelar, organizar y navegar información mediante **recursos**, **instancias** y relaciones estructurales. Su objetivo es ayudar a externalizar ideas y construir modelos que las personas definen y controlan.
+Bittopos es un sistema de estructuración semántica y control de ejecución. El proyecto permite modelar, organizar y navegar información mediante recursos, instancias y relaciones estructurales, con un modelo que las personas conservan bajo su control.
 
-> **Estado:** prototipo en desarrollo. La interfaz operativa actual es la CLI `bitto`, orientada al uso local. El modelo de segmentos, conceptos, componentes y máscaras está en definición; no todas las capacidades conceptuales están implementadas.
+> **Estado:** prototipo local en desarrollo. La CLI bitto es la interfaz operativa actual. El contrato conceptual de máscaras está revisado, pero el motor general Segment/Concept/Component, la resolución semántica y los permisos efectivos todavía no están implementados.
 
 ## Qué existe hoy
 
-- Workspace de Cargo con la biblioteca `bittopos-core` y la CLI `bitto-cli`.
-- Definiciones de recursos en TOML.
-- Espacio de trabajo local en JSON, con instancias de identidad propia y contención recursiva.
-- Navegación persistente.
-- Validación estructural y recuperación mediante journal para operaciones del ciclo de vida.
+- Workspace Rust con la biblioteca bittopos-core y la CLI bitto-cli.
+- Definiciones de recursos en TOML con metadatos actuales: título, descripción, etiquetas y registro de instancias.
+- Workspace local JSON con instancias de identidad propia, referencias a recursos de origen y contención recursiva.
+- Registro estructural por recurso y asignación de contención directa en el workspace.
+- Navegación persistente local.
+- Operaciones de ciclo de vida coordinadas mediante journal durable y recuperación.
+- Frontera de aplicación para preparar el workspace, crear instancias en la ubicación actual y eliminar instancias actualizando la navegación.
+- Pruebas de integridad y recuperación para distintos estados intermedios e inconsistentes.
 
-Consulta [Estado del proyecto](docs/status.md) para distinguir las capacidades implementadas de las decisiones conceptuales y del trabajo pendiente.
+Consulta [Estado del proyecto](docs/status.md) para el inventario completo y [Estado de trabajo y continuidad](docs/WORKING-STATE.md) para el punto exacto de continuación.
 
 ## Prototipo web local
 
-Existe una interfaz estática experimental en [`web/`](web/README.md). Permite importar y exportar un workspace y recursos desde el navegador, pero no está conectada al núcleo Rust ni modifica directamente los archivos locales de Bittopos.
+Existe una interfaz estática experimental en [web/](web/README.md). Permite importar y exportar un workspace y recursos desde el navegador, pero no está conectada al núcleo Rust ni modifica directamente los archivos locales de Bittopos.
 
 ## Inicio rápido
 
 Requisitos: Rust y Cargo instalados.
 
-```bash
-cargo run -p bitto-cli -- --help
-```
+    cargo run -p bitto-cli -- --help
 
 Crear un recurso (por defecto también crea una instancia en la ubicación actual):
 
-```bash
-cargo run -p bitto-cli -- create "Aprender Rust" \
-  --description "Notas sobre el lenguaje" \
-  --tag software --tag aprendizaje
-```
+    cargo run -p bitto-cli -- create "Aprender Rust" --description "Notas sobre el lenguaje" --tag software --tag aprendizaje
 
 Crear solo la definición, sin instancia:
 
-```bash
-cargo run -p bitto-cli -- create "Idea pendiente" --no-instance
-```
+    cargo run -p bitto-cli -- create "Idea pendiente" --no-instance
 
 Mostrar el espacio de trabajo:
 
-```bash
-cargo run -p bitto-cli -- show
-```
+    cargo run -p bitto-cli -- show
 
-Los comandos pueden cambiar durante el desarrollo. Usa siempre `--help` para consultar la revisión instalada.
+Los comandos pueden cambiar durante el desarrollo. Usa siempre --help para consultar la revisión instalada.
 
 ## Desarrollo
 
 Desde la raíz del repositorio:
 
-```bash
-cargo fmt --all -- --check
-cargo build --workspace --locked
-cargo test --workspace --locked
-git diff --check
-```
+    cargo fmt --all -- --check
+    cargo build --workspace --locked
+    cargo test --workspace --locked
+    git diff --check
 
 Consulta [CONTRIBUTING.md](CONTRIBUTING.md) para ramas, commits y Pull Requests, y [la guía de ingeniería](docs/DEVELOPMENT-GUIDE.md) para criterios de diseño, pruebas, persistencia y uso de herramientas de IA.
 
@@ -65,6 +56,7 @@ Consulta [CONTRIBUTING.md](CONTRIBUTING.md) para ramas, commits y Pull Requests,
 
 - [Visión del producto y arquitectura objetivo](docs/VISION.md)
 - [Estado del proyecto y alcance](docs/status.md)
+- [Estado de trabajo y continuidad](docs/WORKING-STATE.md)
 - [Modelo conceptual](docs/model.md)
 - [Arquitectura actual y dirección](docs/architecture.md)
 - [Decisiones arquitectónicas (ADR)](docs/decisions/README.md)
@@ -73,7 +65,7 @@ Consulta [CONTRIBUTING.md](CONTRIBUTING.md) para ramas, commits y Pull Requests,
 - [Changelog](CHANGELOG.md)
 - [Documentación histórica](docs/archive/README.md)
 
-Los contratos numerados antiguos están en [`docs/archive/`](docs/archive/README.md); no son la fuente normativa vigente.
+Los contratos numerados antiguos están en docs/archive/; se conservan por trazabilidad y no son la fuente normativa vigente.
 
 ## Principios de trabajo
 
@@ -85,4 +77,4 @@ Los contratos numerados antiguos están en [`docs/archive/`](docs/archive/README
 
 ## Licencia
 
-Consulta [LICENSE](LICENSE).
+Consulta LICENSE.
