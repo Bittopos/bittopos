@@ -11,19 +11,18 @@ El objetivo es mantener la coherencia entre el modelo, los contratos, la arquite
 Cada fuente tiene una función distinta:
 
 - **Visión:** propósito, principios y dirección estratégica.
-- **Contrato vigente:** conceptos, estructuras, invariantes y semántica obligatoria.
-- **ADR:** decisiones técnicas relevantes, alternativas y consecuencias.
+- **Contrato vigente y ADR aceptados:** conceptos, estructuras, invariantes y semántica acordada.
 - **Pruebas:** verifican comportamientos concretos que la implementación afirma soportar.
 - **Código:** determina lo que está implementado hoy; no convierte por sí solo una desviación en una regla correcta.
 - **README y guías:** explican el estado, el uso y las rutas de entrada.
+- **Estado de trabajo:** indica el punto actual de continuación y las tareas inmediatas.
 - **Histórico:** conserva decisiones y requisitos de etapas anteriores; no es fuente normativa vigente.
 
-Una prueba que contradice el contrato señala un problema que debe resolverse; no modifica automáticamente el contrato. Una visión tampoco demuestra que una capacidad esté implementada. Ante una contradicción, documenta el impacto y resuélvela explícitamente antes de ampliar la funcionalidad afectada.
+Una prueba que contradice el contrato señala un problema que debe resolverse; no modifica automáticamente el contrato. Una visión tampoco demuestra que una capacidad esté implementada. Ante una contradicción, documenta el impacto y resuélvela explícitamente antes de ampliar la funcionalidad.
 
 ## 2. Desarrollo orientado por contratos
 
 Antes de implementar cambios que afecten al modelo o a la persistencia, determina:
-
 1. qué conceptos y operaciones están involucrados;
 2. qué invariantes deben mantenerse;
 3. qué datos se crean, cambian, eliminan o resuelven;
@@ -53,7 +52,6 @@ Antes de añadir una abstracción, justifica el problema que resuelve, las invar
 ## 4. Persistencia, consistencia y recuperación
 
 Para cualquier operación que modifique varias representaciones persistidas, especifica, según corresponda:
-
 - orden de escrituras y punto de confirmación;
 - estados intermedios posibles;
 - recuperación después de una interrupción;
@@ -67,7 +65,6 @@ Los datos persistidos deben validarse al cargarse. Ante una discrepancia que no 
 ## 5. Cambios incrementales y Git
 
 Flujo recomendado:
-
 1. identifica el problema y el comportamiento esperado;
 2. revisa contrato, implementación y pruebas pertinentes;
 3. delimita el cambio mínimo correcto;
@@ -84,7 +81,6 @@ La guía de ramas, commits y Pull Requests para colaboradores está en [CONTRIBU
 ## 6. Estrategia de pruebas
 
 Prioriza pruebas acordes al riesgo:
-
 - **Dominio:** invariantes, validaciones y resolución.
 - **Persistencia:** serialización, lectura, escritura y errores de E/S.
 - **Aplicación:** coordinación y errores de casos de uso.
@@ -98,12 +94,10 @@ Las pruebas deben ser reproducibles y evitar servicios externos cuando la lógic
 
 Compilar no basta para considerar terminado un cambio. Como base, ejecuta desde la raíz:
 
-```bash
-cargo fmt --all -- --check
-cargo build --workspace --locked
-cargo test --workspace --locked
-git diff --check
-```
+    cargo fmt --all -- --check
+    cargo build --workspace --locked
+    cargo test --workspace --locked
+    git diff --check
 
 Comprueba además que no se debilitaron invariantes, que los errores mantienen contexto útil, que las garantías de persistencia sobreviven y que la documentación refleja el resultado real. Si una comprobación no se ejecutó, indícalo; nunca declares que pasó por inferencia.
 
@@ -112,22 +106,29 @@ Comprueba además que no se debilitaron invariantes, que los errores mantienen c
 Cargo declara versiones de paquetes; Git registra commits y referencias, pero no elige automáticamente la versión del producto. Usa SemVer al preparar una publicación, no por cada PR. El changelog registra cambios relevantes, no cada commit.
 
 Mantén las responsabilidades documentales separadas:
-
-- `README.md`: puerta de entrada y estado resumido.
-- `docs/VISION.md`: dirección estratégica.
-- `docs/model.md`: semántica conceptual vigente.
-- `docs/architecture.md`: arquitectura actual y dirección técnica.
-- `docs/status.md`: capacidades implementadas, pendientes y aplazadas.
-- `docs/decisions/`: decisiones arquitectónicas.
-- `docs/archive/`: documentación histórica.
-- `CONTRIBUTING.md`: flujo práctico de contribución.
+- README.md: puerta de entrada y estado resumido.
+- docs/VISION.md: dirección estratégica.
+- docs/model.md: semántica conceptual vigente.
+- docs/architecture.md: arquitectura actual y dirección técnica.
+- docs/status.md: capacidades implementadas, pendientes y aplazadas.
+- docs/WORKING-STATE.md: punto de continuación y siguiente trabajo concreto.
+- docs/decisions/: decisiones arquitectónicas.
+- docs/archive/: documentación histórica.
+- CONTRIBUTING.md: flujo práctico de contribución.
 - Esta guía: normas de ingeniería.
 
 Evita mantener la misma especificación completa en varios documentos. En caso de duda, enlaza la fuente de autoridad en lugar de copiarla.
 
-## 9. Uso de herramientas de IA
+## 9. Uso de herramientas de IA y continuidad
 
 Toda herramienta de IA que contribuya al repositorio debe consultar las fuentes vigentes, distinguir requisitos de inferencias, no inventar APIs ni resultados de pruebas, respetar el alcance autorizado y declarar verificaciones y limitaciones. Debe señalar contradicciones entre contrato y código en lugar de resolverlas silenciosamente.
+
+Antes de retomar trabajo en una conversación nueva:
+1. leer docs/WORKING-STATE.md y docs/status.md;
+2. comprobar la rama main, los PR abiertos y los últimos commits;
+3. consultar el contrato o ADR relevante y verificar el código/pruebas actuales;
+4. distinguir tareas pendientes de capacidades ya implementadas y decisiones ya acordadas;
+5. no volver a proponer pruebas existentes ni reabrir decisiones cerradas sin una contradicción concreta demostrada.
 
 La continuidad del proyecto debe apoyarse en documentación persistente, decisiones y estado verificable del repositorio, no solo en el historial conversacional.
 
