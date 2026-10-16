@@ -1,44 +1,16 @@
-# ADR 0003: máscaras dispersas y herencia dinámica
+# ADR 0003: máscaras dispersas y herencia dinámica (marco parcial sustituido)
 
-- **Estado:** aceptado conceptualmente; detalles operativos pendientes
+- **Estado:** sustituido por [ADR 0004](0004-semantic-mask-resolution.md)
 - **Fecha:** 2026-10-14
-- **Sustituye:** [ADR 0002](0002-segment-masks.md)
 
-## Contexto
+## Contexto histórico
 
-La primera formulación de las máscaras trataba la máscara como una copia del estado de un segmento en el momento de su creación. Esa interpretación congela valores que no han sido modificados localmente y hace que una instancia deje de reflejar cambios posteriores en la definición incluso cuando no existe una razón local para hacerlo.
+Este ADR registró la decisión de que las modificaciones locales no congelaran por accidente los valores heredados: una máscara puntual conserva diferencias locales y los elementos no modificados siguen resolviéndose desde la definición vigente. También mantuvo la regla de que editar sin máscara local puede modificar el recurso compartido.
 
-La regla acordada más reciente es mantener la definición compartida como origen vigente y registrar en la instancia únicamente las diferencias locales.
+Esas reglas continúan formando parte del contrato, pero describir toda la semántica de máscaras únicamente como «sobrescrituras dispersas» resultó insuficiente. Bittopos también necesita lectura desde la instancia del workspace hacia la definición de origen mediante topología y direcciones semánticas, modos de máscara distintos, comportamiento de componentes, expansión de referencias y resolución separada de permisos.
 
-## Decisión
+## Resultado
 
-- Una máscara representa diferencias locales de un segmento definido; no es una instantánea completa.
-- La creación de una máscara no copia todos los valores heredados como estado local. Solo se registran las diferencias locales.
-- Un valor sin modificación local se resuelve desde la definición actual del recurso.
-- Los cambios posteriores en la definición se reflejan automáticamente en los valores no modificados localmente.
-- Editar un valor heredado sin máscara puede modificar directamente la definición compartida y afectar a otras instancias.
-- Editar un valor mediante una máscara crea o modifica una diferencia local de esa instancia y no muta la definición compartida.
-- Las máscaras se aplican por segmento y no convierten toda la instancia en una copia privada.
-- Los permisos se mantienen conceptualmente separados del contenido heredado. Este ADR no define la autorización efectiva ni su precedencia.
+La formulación vigente está en [ADR 0004](0004-semantic-mask-resolution.md) y en el [modelo conceptual](../model.md). Este ADR se conserva para explicar la evolución del diseño, no como especificación completa independiente.
 
-## Consecuencias
-
-- La resolución debe combinar la definición vigente con las diferencias locales de la instancia.
-- El modelo debe distinguir de manera estable los elementos de la definición y sus posibles modificaciones locales.
-- Los cambios de definición deben preservar las modificaciones locales, sin congelar por accidente los valores heredados.
-- La semántica de máscaras debe implementarse en un único lugar compartido por las interfaces.
-- La implementación necesita pruebas para herencia dinámica, edición compartida, edición local y cambios de definición.
-- La persistencia no debe decidir la semántica por el mero hecho de copiar o no copiar campos.
-
-## Cuestiones que siguen abiertas
-
-Antes de implementar el mecanismo se deben resolver con ejemplos y pruebas:
-
-- identidad y correspondencia de conceptos/componentes entre definición y máscara;
-- tratamiento de una modificación local que coincide con el valor definido;
-- representación de la eliminación local de un elemento heredado;
-- operación de restablecimiento y pérdida de datos locales;
-- validación cuando cambia la estructura del segmento de origen;
-- precedencia y aplicación efectiva de permisos.
-
-Este ADR establece la dirección conceptual, pero no afirma que las máscaras estén implementadas.
+No se debe reabrir la decisión de herencia dinámica de las máscaras puntuales como si estuviera pendiente. La implementación de la semántica acordada sigue pendiente.
