@@ -14,7 +14,7 @@ No se necesita un ADR para cada tarea, refactor menor ni corrección localizada.
 
 ## Formato
 
-Usa números secuenciales y títulos descriptivos, por ejemplo `0001-core-and-adapters.md`.
+Usa números secuenciales y títulos descriptivos, por ejemplo 0001-core-and-adapters.md.
 
 Cada ADR incluye:
 - **Estado:** propuesto, aceptado, sustituido o rechazado.
@@ -30,4 +30,5 @@ No se reescriben los ADR aceptados para ocultar la historia. Si una decisión ca
 
 - [ADR 0001: núcleo adaptable y adaptadores explícitos](0001-core-and-adapters.md)
 - [ADR 0002: máscaras como segmentos locales de instancia (sustituido)](0002-segment-masks.md)
-- [ADR 0003: máscaras dispersas y herencia dinámica](0003-sparse-mask-overrides.md)
+- [ADR 0003: máscaras dispersas y herencia dinámica (marco parcial sustituido)](0003-sparse-mask-overrides.md)
+- [ADR 0004: resolución semántica y modos de máscara](0004-semantic-mask-resolution.md)
