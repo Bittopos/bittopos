@@ -1,108 +1,96 @@
 # Estado del proyecto
 
-**Estado general:** prototipo local en desarrollo. La CLI `bitto` es la interfaz operativa actual. Esta página resume lo que existe y evita confundir objetivos del modelo con capacidades implementadas.
+**Estado general:** prototipo local en desarrollo. La CLI bitto es la interfaz operativa actual. Esta página distingue capacidades implementadas, decisiones conceptuales acordadas y trabajo pendiente.
+
+Para el punto de continuación tras el PR #28, consulta [Estado de trabajo y continuidad](WORKING-STATE.md). Esta secuencia de ingeniería inmediata no sustituye la hoja de ruta general original de diez etapas ni debe renumerarse como si lo hiciera.
 
 ## Implementado en el repositorio
 
-- Workspace Rust con `bittopos-core` y `bitto-cli`.
-- Definiciones de recursos en TOML.
-- Workspace en JSON con instancias que tienen identidad propia, referencia de origen y contención recursiva.
-- Registro de IDs de instancias en `management.structural`, distinto de la contención directa `semantic.allocation`.
-- Persistencia de navegación local.
-- Operaciones de ciclo de vida coordinadas con journal y recuperación.
-- Separación del modelo de workspace respecto a sus DTOs de persistencia.
-- Operación compartida `children_of` para consultar los hijos directos de una ubicación, utilizada por la CLI en `ls` y `enter`.
-- CI que exige formato Rust, compilación del workspace y pruebas con dependencias bloqueadas.
-- Pruebas de integridad para IDs estructurales duplicados y discrepancias entre el recurso de origen de una instancia y su registro.
+- Workspace Rust con bittopos-core y bitto-cli.
+- Definiciones de recursos en TOML, con ID, metadatos info (título, descripción y etiquetas) y registro management.structural.
+- Workspace en JSON con instancias de identidad propia, referencia source.id al recurso de origen y contención recursiva.
+- Registro de instancias en management.structural separado de la contención padre-hijo directa en semantic.allocation.
+- Persistencia local de navegación mediante navigation.toml.
+- Comandos CLI: create, show, ls, enter, up, root, pwd, add, remove y recover.
+- Operaciones de ciclo de vida de creación/eliminación coordinadas mediante journal durable y recuperación idempotente.
+- Modelo del árbol de workspace separado de DTOs JSON y detalles de rutas.
+- Consulta compartida children_of para obtener los hijos directos de una ubicación.
+- Capa de aplicación con prepare_workspace, create_instance_at_current_location y remove_instance_and_update_navigation.
+- Validación estructural y pruebas de recuperación frente a varios estados intermedios e inconsistentes.
+- CI para formato, compilación y pruebas del workspace; el resultado de una revisión concreta debe verificarse en sus ejecuciones.
+- Prototipo web estático experimental en web/, con árbol/mapa e importación/exportación local, no conectado al núcleo Rust.
 
-La lista anterior es un inventario general del repositorio, no una afirmación de que cada ruta de error o invariante esté exhaustivamente probada. El resultado de CI de la rama que se esté revisando es la fuente para conocer el estado real de las pruebas.
+La lista es un inventario del código; no implica que toda ruta de error esté exhaustivamente probada ni que la CI haya pasado en una revisión que no se haya consultado.
 
-## Prototipo de interfaz
+## Acordado conceptualmente, pendiente de implementación
 
-- Existe un prototipo web estático en `web/` para explorar el árbol de instancias, consultar metadatos y editar una copia local mediante importación/exportación.
-- No está conectado a `bittopos-core`, no sustituye a la CLI y no escribe directamente en los archivos del dispositivo. Debe considerarse experimental.
+- Modelo semántico general de Segment, Concept y Component.
+- Resolución desde la instancia hacia la definición mediante topología y direcciones semánticas.
+- Máscaras puntuales de diferencias locales y máscaras Snapshot, según [ADR 0004](decisions/0004-semantic-mask-resolution.md).
+- Combinación específica por tipo de componente y expansión de referencias.
+- Resolución efectiva de permisos, separada de la lectura de contenido.
+- Motor reutilizable de resolución para futuros dominios como tareas, responsabilidades y proyectos.
 
-## Acordado conceptualmente, pendiente de implementación completa
-
-- Un modelo general de segmentos, conceptos y componentes configurables.
-- Máscaras dispersas con diferencias locales y herencia dinámica, según [ADR 0003](decisions/0003-sparse-mask-overrides.md).
-- Resolución de máscaras, incluidos reinicio de diferencias y eliminación local de valores heredados.
-- Reglas efectivas de permisos en los espacios de definición e instanciación.
-- Un mecanismo de resolución extensible a otros dominios estructurales, como tareas, responsabilidades y proyectos.
-- Una capa de aplicación completa y común para futuras interfaces; ya existen `prepare_workspace`, `create_instance_at_current_location` y `remove_instance_and_update_navigation`. La creación combinada de recursos, etiquetas e instancia sigue en la CLI y requiere definir sus garantías ante fallos antes de extraerla.
+**El contrato conceptual de máscaras ya fue revisado.** No es un pendiente de diseño ni debe volver a abrirse por defecto. Lo pendiente es implementar el contrato y probarlo. Las fuentes normativas actuales son [model.md](model.md) y [ADR 0004](decisions/0004-semantic-mask-resolution.md).
 
 ## Aplazado
 
-- Integración de la interfaz web con el núcleo mediante un servidor HTTP; daemon y servicio de larga duración.
+- Integración de la web con el núcleo Rust mediante servidor HTTP o daemon.
 - Interfaces móvil y de escritorio.
 - Sincronización remota, colaboración y múltiples perfiles/proyectos.
-- Adaptadores de bases de datos o persistencia alternativos.
-- Modelo avanzado de relaciones y referencias.
+- Adaptadores de bases de datos o persistencia alternativa.
+- Capacidades avanzadas de relaciones y referencias más allá de la resolución definida conceptualmente.
+- Publicación y distribución de versiones estables.
 
-## Trayectoria de ingeniería revisada
+## Trayectoria de ingeniería inmediata
 
-La secuencia evita combinar cambios de comportamiento con refactorizaciones de estructura. El orden siguiente es deliberado y puede ajustarse si las pruebas descubren un riesgo nuevo.
+Esta cola ordena el trabajo técnico cercano al estado posterior al PR #28. No reemplaza las diez etapas de la hoja de ruta general del producto.
 
-### 1. Completar la línea base de regresión — en curso
+### 1. Verificar y cerrar la línea base de regresión
 
-Ampliar las pruebas de `lifecycle.rs` y `store.rs` alrededor de los estados intermedios persistidos, especialmente:
+La suite de lifecycle.rs ya contiene pruebas para creación y eliminación interrumpidas, recuperación idempotente, journal corrupto y conflictos entre el journal y el estado persistido. Entre otras, existen journal_recovers_creation_after_resource_write, journal_recovers_creation_before_either_persistent_effect, journal_recovers_creation_idempotently_after_both_effects, journal_recovers_removal_before_either_persistent_effect y conflicting_removal_journal_preserves_instance_and_journal.
 
-- creación con journal escrito, antes y después del registro estructural;
-- repetición de la recuperación después de haber aplicado los efectos, pero antes de retirar el journal;
-- eliminación en distintos puntos de la operación multiarchivo;
-- rechazo de estados inconsistentes sin inventar padres ni perder datos, incluida la preservación del journal cuando contradice la ubicación real;
-- validación de recursos temporales y archivos corruptos en la recuperación.
+No añadas otra prueba de esos mismos casos sin demostrar primero una condición distinta que esté sin cubrir. El cierre de esta línea requiere revisar los casos de temporales inválidos/ausentes en store.rs y el resultado de CI actual; no debe declararse completa solo porque existan algunas pruebas.
 
-Las pruebas deben expresar estados concretos y resultados esperados. No se añadirá infraestructura general de inyección de fallos hasta que los casos reales demuestren que hace falta.
+### 2. Auditar el flujo combinado de bitto create
 
-### 2. Establecer una frontera de aplicación mínima — en curso
+Este es el siguiente trabajo concreto. Hoy la CLI:
+1. crea el recurso;
+2. si se solicitaron etiquetas, actualiza el recurso por separado;
+3. salvo --no-instance, crea una instancia mediante la operación de ciclo de vida.
 
-Primer incremento: `prepare_workspace` coordina la reconciliación del workspace y la validación del estado de navegación antes de que la CLI ejecute un comando. La CLI conserva el análisis de argumentos, los mensajes y la presentación.
+La CLI ya informa de forma explícita si el recurso quedó creado pero falló el guardado de etiquetas o la creación de la instancia. Antes de extraer el flujo a application.rs, documentar qué estados parciales pueden quedar, cuál es el comportamiento deseado y qué garantías de recuperación son necesarias. Después, comparar esos criterios con las pruebas existentes y añadir solo la cobertura que falte.
 
-Segundo incremento: `create_instance_at_current_location` reutiliza el estado de navegación para crear bajo la ubicación actual; `remove_instance_and_update_navigation` coordina la eliminación y el restablecimiento de navegación cuando se elimina la ubicación activa. Ambos reutilizan las operaciones de ciclo de vida existentes.
+No convertirlo automáticamente en una transacción ni borrar un recurso al fallar un paso sin definir antes el contrato de consistencia y recuperación.
 
-Pendiente: delimitar la creación combinada de recurso, etiquetas e instancia. No convertirla en una única operación de aplicación hasta especificar y probar qué permanece persistido si falla un paso intermedio.
+### 3. Continuar la separación de persistencia solo donde exista un límite real
 
-No trasladar toda la CLI de una sola vez. El caso de creación de recurso con etiquetas e instancia opcional debe delimitar explícitamente qué queda persistido si falla un paso intermedio antes de tratarlo como una única operación de aplicación.
+journal.rs ya separa la persistencia física del journal de la coordinación semántica en lifecycle.rs. Revisar store.rs y workspace.rs para identificar una frontera útil, no para reducir el tamaño de los archivos por sí mismo.
 
-### 3. Refactorizar persistencia por responsabilidades — en curso
+El almacenamiento de recursos tiene una ruta especializada de preparar, validar y promover temporales. No reemplazarla sin más por la escritura atómica genérica del workspace: sus garantías y su tratamiento de errores son distintos. No cambiar formatos TOML/JSON ni simplificar la recuperación sin pruebas equivalentes.
 
-Primer incremento: el módulo privado `journal.rs` concentra la ruta, serialización, lectura, escritura atómica y limpieza del journal. `lifecycle.rs` conserva la validación y aplicación semántica de las operaciones pendientes. Se mantienen la estructura JSON y las garantías existentes; el CI del PR debe verificarlas.
+### 4. Completar la frontera de aplicación y la API después de la auditoría
 
-Siguientes incrementos: revisar `store.rs` y `workspace.rs` para encontrar fronteras de persistencia que reduzcan acoplamiento real. Cada cambio debe indicar qué responsabilidad mueve y qué garantía protege.
+Una vez especificadas y probadas las garantías de bitto create, decidir si ese flujo debe convertirse en un caso de uso de aplicación. No trasladar toda la CLI de golpe. Revisar la API pública cuando las operaciones compartidas y el modelo de dominio estén más estables.
 
-- No cambiar TOML ni JSON en una refactorización interna.
-- No simplificar el journal, las escrituras atómicas ni la recuperación sin pruebas equivalentes.
-- Mantener la reconciliación como una decisión explícita ante dos vistas persistidas; no corregir silenciosamente datos dudosos.
-- Evitar abstraer cada operación de archivo antes de que exista un límite útil para reutilización o pruebas.
+### 5. Implementar el motor semántico conforme al contrato acordado
 
-### 4. Cerrar el contrato del modelo semántico — en paralelo, sin adelantar código
+No reabrir el diseño de máscaras como primer paso. Implementar el contrato de [ADR 0004](decisions/0004-semantic-mask-resolution.md) de forma incremental: pruebas puras de resolución, topología/direcciones, máscaras puntuales y Snapshot, comportamiento de componentes, referencias y permisos. Mantener la persistencia como adaptador y no duplicar la semántica en la CLI o en la web.
 
-Resolver mediante ejemplos y decisiones documentadas las cuestiones pendientes de máscaras: identidad estable de conceptos/componentes, modificaciones iguales al valor de origen, eliminación local, restablecimiento, cambios estructurales de la definición y precedencia de permisos.
+### 6. Integrar futuras interfaces cuando exista una operación compartida
 
-Estas decisiones no bloquean las pruebas ni la refactorización interna. Sí bloquean la implementación de máscaras y del motor de resolución hasta que exista una semántica completa y verificable.
+La web seguirá siendo experimental hasta consumir operaciones comunes del núcleo. No iniciar servidor, sincronización remota o adaptadores de bases de datos dentro de la tarea inmediata.
 
-### 5. Implementar el modelo semántico de forma incremental
+## Criterio transversal de aceptación
 
-Cuando el contrato esté cerrado, comenzar con pruebas de resolución independientes de TOML/JSON. Implementar solo los conceptos necesarios para los casos acordados; no construir un motor universal hipotético.
-
-La primera cobertura debe distinguir claramente definición compartida, valores heredados, diferencias locales y errores de resolución. Los permisos efectivos se diseñarán y probarán como una preocupación separada.
-
-### 6. Revisar la API pública y habilitar futuras interfaces
-
-Una vez establecida la capa de aplicación y estabilizadas las reglas del modelo, revisar qué tipos y operaciones deben exponerse desde `lib.rs`. Mantener detalles de almacenamiento internos si no forman parte del contrato público deseado.
-
-La interfaz web seguirá siendo experimental hasta que pueda consumir operaciones comunes sin duplicar reglas. No iniciar un daemon, servidor HTTP, sincronización remota o adaptadores de bases de datos dentro de esta trayectoria.
-
-### Criterio transversal de aceptación
-
-Cada PR debe tener un propósito acotado, conservar compatibilidad de datos salvo que una migración explícita esté aprobada, pasar formato/compilación/pruebas de CI y distinguir con honestidad las capacidades implementadas de las únicamente documentadas. Las operaciones que toquen varios archivos requieren pruebas sobre sus estados intermedios y su recuperación.
+Cada cambio debe tener un objetivo acotado, preservar los datos persistidos salvo migración aprobada, pasar las comprobaciones aplicables y actualizar la documentación afectada. Las operaciones multiarchivo requieren pruebas de estados intermedios y recuperación. Los resultados de CI deben comprobarse en GitHub; no se infieren.
 
 ## Cómo leer el estado
 
-- **Acordado:** decisión conceptual aprobada; puede seguir sin código.
+- **Acordado:** decisión conceptual revisada; no equivale a implementación.
 - **Implementado:** el código contiene la capacidad.
-- **Verificado:** pruebas o CI han confirmado el comportamiento en una revisión concreta.
-- **Pendiente:** falta diseño, implementación o verificación.
+- **Verificado:** pruebas o CI confirmaron el comportamiento en una revisión concreta.
+- **Pendiente:** falta implementación, integración o una verificación específica.
+- **Aplazado:** no pertenece al alcance actual.
 
-No se asigna un porcentaje global de avance: mezclar conceptos, código y pruebas en un único número daría una impresión de precisión que no existe.
+No se asigna un porcentaje global de avance: mezclar modelo, código, integración y pruebas en una cifra daría una precisión engañosa.
