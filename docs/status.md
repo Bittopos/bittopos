@@ -65,9 +65,11 @@ Pendiente: delimitar la creación combinada de recurso, etiquetas e instancia. N
 
 No trasladar toda la CLI de una sola vez. El caso de creación de recurso con etiquetas e instancia opcional debe delimitar explícitamente qué queda persistido si falla un paso intermedio antes de tratarlo como una única operación de aplicación.
 
-### 3. Refactorizar persistencia por responsabilidades
+### 3. Refactorizar persistencia por responsabilidades — en curso
 
-Solo después de reforzar las pruebas, separar `store.rs` y `lifecycle.rs` en incrementos que conserven las interfaces y formatos existentes. Cada cambio debe indicar qué responsabilidad mueve y qué garantía protege.
+Primer incremento: el módulo privado `journal.rs` concentra la ruta, serialización, lectura, escritura atómica y limpieza del journal. `lifecycle.rs` conserva la validación y aplicación semántica de las operaciones pendientes. Se mantienen la estructura JSON y las garantías existentes; el CI del PR debe verificarlas.
+
+Siguientes incrementos: revisar `store.rs` y `workspace.rs` para encontrar fronteras de persistencia que reduzcan acoplamiento real. Cada cambio debe indicar qué responsabilidad mueve y qué garantía protege.
 
 - No cambiar TOML ni JSON en una refactorización interna.
 - No simplificar el journal, las escrituras atómicas ni la recuperación sin pruebas equivalentes.

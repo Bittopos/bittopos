@@ -34,7 +34,8 @@ La implementación actual contiene, entre otros:
 - `workspace_model.rs`: tipos e invariantes del modelo del árbol de instancias, separados de Serde y las rutas.
 - `workspace.rs`: DTOs JSON, conversiones y persistencia del workspace.
 - `resource.rs` y `store.rs`: definición y almacenamiento de recursos TOML, con validación.
-- `lifecycle.rs`: coordinación de operaciones de ciclo de vida, journal y reconciliación.
+- `journal.rs`: formato, rutas, lectura, escritura y limpieza del registro durable de operaciones pendientes.
+- `lifecycle.rs`: coordinación de operaciones de ciclo de vida, aplicación del journal y reconciliación.
 - `navigation.rs`: persistencia del estado de navegación.
 - `cli/src/main.rs`: parsing, presentación y parte de la coordinación de la interfaz de terminal.
 

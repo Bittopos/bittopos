@@ -5,6 +5,7 @@
 //! de la identidad del recurso de origen.
 
 mod application;
+mod journal;
 mod lifecycle;
 mod model_operations;
 mod navigation;

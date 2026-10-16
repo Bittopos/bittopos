@@ -1,12 +1,8 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::fs;
-use std::path::PathBuf;
-
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::persistence::atomic_write;
+use crate::journal::{self, JournalError, PendingOperation};
 use crate::workspace::PersistedInstance;
 use crate::{
     Instance, ResourceStore, StoreError, Workspace, WorkspaceError, WorkspaceModelError,
@@ -55,6 +51,16 @@ impl fmt::Display for LifecycleError {
     }
 }
 impl std::error::Error for LifecycleError {}
+
+impl From<JournalError> for LifecycleError {
+    fn from(error: JournalError) -> Self {
+        match error {
+            JournalError::Io(error) => Self::JournalIo(error),
+            JournalError::Json(error) => Self::JournalJson(error),
+            JournalError::InvalidName => Self::Workspace(WorkspaceError::InvalidName),
+        }
+    }
+}
 impl From<StoreError> for LifecycleError {
     fn from(error: StoreError) -> Self {
         Self::Resource(error)
@@ -79,79 +85,6 @@ pub struct RecoveryReport {
 impl RecoveryReport {
     pub fn changed(self) -> bool {
         self.restored > 0 || self.removed > 0
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
-enum PendingOperation {
-    Create {
-        instance: PersistedInstance,
-        parent_id: Option<Uuid>,
-    },
-    Remove {
-        instance: PersistedInstance,
-        parent_id: Option<Uuid>,
-    },
-}
-
-fn journal_path(
-    workspaces: &WorkspaceStore,
-    workspace_name: &str,
-) -> Result<PathBuf, WorkspaceError> {
-    if workspace_name.trim().is_empty()
-        || workspace_name == "."
-        || workspace_name == ".."
-        || workspace_name.contains('/')
-        || workspace_name.contains('\\')
-        || workspace_name.contains('\0')
-    {
-        return Err(WorkspaceError::InvalidName);
-    }
-    Ok(workspaces
-        .root()
-        .join(format!(".{workspace_name}.journal.json")))
-}
-
-fn persist_journal(
-    workspaces: &WorkspaceStore,
-    workspace_name: &str,
-    operation: &PendingOperation,
-) -> Result<(), LifecycleError> {
-    let path = journal_path(workspaces, workspace_name)?;
-    let temp = workspaces
-        .root()
-        .join(format!(".journal.{}.tmp", Uuid::now_v7()));
-    let bytes = serde_json::to_vec_pretty(operation).map_err(LifecycleError::JournalJson)?;
-    atomic_write(&temp, &path, &bytes).map_err(LifecycleError::JournalIo)?;
-    Ok(())
-}
-
-fn clear_journal(workspaces: &WorkspaceStore, workspace_name: &str) -> Result<(), LifecycleError> {
-    let path = journal_path(workspaces, workspace_name)?;
-    match fs::remove_file(&path) {
-        Ok(()) => {
-            fs::File::open(workspaces.root())
-                .and_then(|directory| directory.sync_all())
-                .map_err(LifecycleError::JournalIo)?;
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-        Err(error) => return Err(LifecycleError::JournalIo(error)),
-    }
-    Ok(())
-}
-
-fn read_journal(
-    workspaces: &WorkspaceStore,
-    workspace_name: &str,
-) -> Result<Option<PendingOperation>, LifecycleError> {
-    let path = journal_path(workspaces, workspace_name)?;
-    match fs::read_to_string(path) {
-        Ok(content) => serde_json::from_str(&content)
-            .map(Some)
-            .map_err(LifecycleError::JournalJson),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(LifecycleError::JournalIo(error)),
     }
 }
 
@@ -234,7 +167,7 @@ fn apply_pending(
             }
         }
     }
-    clear_journal(workspaces, workspace_name)?;
+    journal::clear(workspaces, workspace_name).map_err(LifecycleError::from)?;
     Ok(())
 }
 
@@ -257,7 +190,9 @@ pub fn reconcile_workspace(
     workspace_name: &str,
 ) -> Result<(Workspace, RecoveryReport), LifecycleError> {
     let mut report = RecoveryReport::default();
-    if let Some(operation) = read_journal(workspaces, workspace_name)? {
+    if let Some(operation) =
+        journal::read(workspaces, workspace_name).map_err(LifecycleError::from)?
+    {
         match &operation {
             PendingOperation::Create { .. } => report.restored += 1,
             PendingOperation::Remove { .. } => report.removed += 1,
@@ -336,7 +271,7 @@ pub fn create_instance_under(
         instance: PersistedInstance::from(instance.clone()),
         parent_id,
     };
-    persist_journal(workspaces, workspace_name, &operation)?;
+    journal::persist(workspaces, workspace_name, &operation).map_err(LifecycleError::from)?;
     apply_pending(resources, workspaces, workspace_name, operation)?;
     Ok(instance.id)
 }
@@ -370,7 +305,7 @@ pub fn remove_instance(
         instance: PersistedInstance::from(instance),
         parent_id,
     };
-    persist_journal(workspaces, workspace_name, &operation)?;
+    journal::persist(workspaces, workspace_name, &operation)?;
     apply_pending(resources, workspaces, workspace_name, operation)
 }
 
@@ -452,7 +387,7 @@ mod tests {
         let (_dir, resources, workspaces) = setup();
         let (resource, _) = resources.create("Recurso", None).unwrap();
         let instance = Instance::new(Uuid::now_v7(), resource.id);
-        persist_journal(
+        journal::persist(
             &workspaces,
             "proyecto",
             &PendingOperation::Create {
@@ -467,7 +402,7 @@ mod tests {
         let (workspace, report) = reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
         assert!(workspace.find_instance(instance.id).is_some());
         assert_eq!(report.restored, 1);
-        assert!(!journal_path(&workspaces, "proyecto").unwrap().exists());
+        assert!(!journal::path(&workspaces, "proyecto").unwrap().exists());
     }
 
     #[test]
@@ -489,7 +424,7 @@ mod tests {
             instance: PersistedInstance::from(child),
             parent_id: Some(root_id),
         };
-        persist_journal(&workspaces, "proyecto", &operation).unwrap();
+        journal::persist(&workspaces, "proyecto", &operation).unwrap();
         resources
             .unregister_instance(resource.id, child_id)
             .unwrap();
@@ -507,7 +442,7 @@ mod tests {
             .management
             .structural
             .contains(&child_id));
-        assert!(!journal_path(&workspaces, "proyecto").unwrap().exists());
+        assert!(!journal::path(&workspaces, "proyecto").unwrap().exists());
     }
 
     #[test]
@@ -571,7 +506,7 @@ mod tests {
         let (resource, _) = resources.create("Recurso", None).unwrap();
         let instance = Instance::new(Uuid::now_v7(), resource.id);
 
-        persist_journal(
+        journal::persist(
             &workspaces,
             "proyecto",
             &PendingOperation::Create {
@@ -592,7 +527,7 @@ mod tests {
             .management
             .structural
             .contains(&instance.id));
-        assert!(!journal_path(&workspaces, "proyecto").unwrap().exists());
+        assert!(!journal::path(&workspaces, "proyecto").unwrap().exists());
     }
 
     #[test]
@@ -601,7 +536,7 @@ mod tests {
         let (resource, _) = resources.create("Recurso", None).unwrap();
         let instance = Instance::new(Uuid::now_v7(), resource.id);
 
-        persist_journal(
+        journal::persist(
             &workspaces,
             "proyecto",
             &PendingOperation::Create {
@@ -629,7 +564,7 @@ mod tests {
         assert_eq!(report.restored, 1);
         assert_eq!(workspace.all_instances().len(), 1);
         assert!(workspace.find_instance(instance.id).is_some());
-        assert!(!journal_path(&workspaces, "proyecto").unwrap().exists());
+        assert!(!journal::path(&workspaces, "proyecto").unwrap().exists());
 
         let (again, second_report) =
             reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
@@ -657,7 +592,7 @@ mod tests {
             .unwrap()
             .clone();
 
-        persist_journal(
+        journal::persist(
             &workspaces,
             "proyecto",
             &PendingOperation::Remove {
@@ -682,7 +617,7 @@ mod tests {
             .management
             .structural
             .contains(&child_id));
-        assert!(!journal_path(&workspaces, "proyecto").unwrap().exists());
+        assert!(!journal::path(&workspaces, "proyecto").unwrap().exists());
     }
 
     #[test]
@@ -705,7 +640,7 @@ mod tests {
             .unwrap()
             .clone();
 
-        persist_journal(
+        journal::persist(
             &workspaces,
             "proyecto",
             &PendingOperation::Remove {
@@ -730,7 +665,7 @@ mod tests {
             .unwrap()
             .children()
             .is_empty());
-        assert!(!journal_path(&workspaces, "proyecto").unwrap().exists());
+        assert!(!journal::path(&workspaces, "proyecto").unwrap().exists());
 
         let (again, second_report) =
             reconcile_workspace(&resources, &workspaces, "proyecto").unwrap();
@@ -760,7 +695,7 @@ mod tests {
             .clone();
 
         // El journal afirma que la instancia es raíz, pero el workspace la contiene bajo root_id.
-        persist_journal(
+        journal::persist(
             &workspaces,
             "proyecto",
             &PendingOperation::Remove {
@@ -769,7 +704,7 @@ mod tests {
             },
         )
         .unwrap();
-        let journal = journal_path(&workspaces, "proyecto").unwrap();
+        let journal = journal::path(&workspaces, "proyecto").unwrap();
 
         assert!(matches!(
             reconcile_workspace(&resources, &workspaces, "proyecto"),
