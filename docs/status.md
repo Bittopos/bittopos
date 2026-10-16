@@ -42,44 +42,25 @@ La lista es un inventario del código; no implica que toda ruta de error esté e
 - Capacidades avanzadas de relaciones y referencias más allá de la resolución definida conceptualmente.
 - Publicación y distribución de versiones estables.
 
-## Trayectoria de ingeniería inmediata
+## Próxima fase de ingeniería: preparar el cambio del núcleo
 
-Esta cola ordena el trabajo técnico cercano al estado posterior al PR #28. No reemplaza las diez etapas de la hoja de ruta general del producto.
+El trabajo de `bitto create` queda pausado por decisión de producto. La siguiente prioridad es preparar una reestructuración del núcleo para implementar de forma coherente el modelo semántico y las máscaras, sin modificar aún el comportamiento ejecutable.
 
-### 1. Verificar y cerrar la línea base de regresión
+La guía de alcance y aceptación está en [Preparación para la reestructuración del núcleo](CORE-REWRITE-READINESS.md).
 
-La suite de lifecycle.rs ya contiene pruebas para creación y eliminación interrumpidas, recuperación idempotente, journal corrupto y conflictos entre el journal y el estado persistido. Entre otras, existen journal_recovers_creation_after_resource_write, journal_recovers_creation_before_either_persistent_effect, journal_recovers_creation_idempotently_after_both_effects, journal_recovers_removal_before_either_persistent_effect y conflicting_removal_journal_preserves_instance_and_journal.
+### Límites de la fase actual
 
-No añadas otra prueba de esos mismos casos sin demostrar primero una condición distinta que esté sin cubrir. El cierre de esta línea requiere revisar los casos de temporales inválidos/ausentes en store.rs y el resultado de CI actual; no debe declararse completa solo porque existan algunas pruebas.
+- Es documental y preparatoria: no implementa máscaras ni el motor de resolución.
+- No continúa la auditoría/extracción del flujo de `bitto create`.
+- No modifica formatos TOML/JSON ni realiza migraciones.
+- No borra ramas ni cambia la configuración de protección de GitHub.
+- Conserva las reglas centrales de los ADR 0004 y 0005; los casos pendientes del ADR 0005 no se resuelven por inferencia.
 
-### 2. Auditar el flujo combinado de bitto create
+### Criterios para iniciar una implementación posterior
 
-Este es el siguiente trabajo concreto. Hoy la CLI:
-1. crea el recurso;
-2. si se solicitaron etiquetas, actualiza el recurso por separado;
-3. salvo --no-instance, crea una instancia mediante la operación de ciclo de vida.
+Antes de abrir el primer PR de código para la reestructuración, debe existir un alcance concreto que indique tipos y límites afectados, invariantes que se conservan o cambian, compatibilidad/migración de datos, pruebas necesarias y comprobaciones reales de CI. La línea base debe establecerse sobre el `main` vigente; no se considera verificada por el mero hecho de que existan pruebas.
 
-La CLI ya informa de forma explícita si el recurso quedó creado pero falló el guardado de etiquetas o la creación de la instancia. Antes de extraer el flujo a application.rs, documentar qué estados parciales pueden quedar, cuál es el comportamiento deseado y qué garantías de recuperación son necesarias. Después, comparar esos criterios con las pruebas existentes y añadir solo la cobertura que falte.
-
-No convertirlo automáticamente en una transacción ni borrar un recurso al fallar un paso sin definir antes el contrato de consistencia y recuperación.
-
-### 3. Continuar la separación de persistencia solo donde exista un límite real
-
-journal.rs ya separa la persistencia física del journal de la coordinación semántica en lifecycle.rs. Revisar store.rs y workspace.rs para identificar una frontera útil, no para reducir el tamaño de los archivos por sí mismo.
-
-El almacenamiento de recursos tiene una ruta especializada de preparar, validar y promover temporales. No reemplazarla sin más por la escritura atómica genérica del workspace: sus garantías y su tratamiento de errores son distintos. No cambiar formatos TOML/JSON ni simplificar la recuperación sin pruebas equivalentes.
-
-### 4. Completar la frontera de aplicación y la API después de la auditoría
-
-Una vez especificadas y probadas las garantías de bitto create, decidir si ese flujo debe convertirse en un caso de uso de aplicación. No trasladar toda la CLI de golpe. Revisar la API pública cuando las operaciones compartidas y el modelo de dominio estén más estables.
-
-### 5. Implementar el motor semántico conforme al contrato acordado
-
-No reabrir el diseño de máscaras como primer paso. Implementar las reglas acordadas de [ADR 0004](decisions/0004-semantic-mask-resolution.md) de forma incremental y cerrar los casos de borde de [ADR 0005](decisions/0005-mask-contract-boundaries.md) antes de implementar las operaciones que dependan de ellos: pruebas puras de resolución, topología/direcciones, máscaras puntuales y Snapshot, comportamiento de componentes, referencias y permisos. Mantener la persistencia como adaptador y no duplicar la semántica en la CLI o en la web.
-
-### 6. Integrar futuras interfaces cuando exista una operación compartida
-
-La web seguirá siendo experimental hasta consumir operaciones comunes del núcleo. No iniciar servidor, sincronización remota o adaptadores de bases de datos dentro de la tarea inmediata.
+La secuencia sugerida es modelo puro y sus invariantes, topología/direcciones semánticas, resolución incremental, máscaras puntuales y Snapshot, componentes/referencias/autorización según sus dependencias, y después integración de adaptadores e interfaces. Esta secuencia no autoriza automáticamente cada fase; el alcance posterior se decidirá tras revisar el PR de preparación.
 
 ## Criterio transversal de aceptación
 
