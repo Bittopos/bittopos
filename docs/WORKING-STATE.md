@@ -76,6 +76,7 @@ PRs integrados relevantes en la secuencia actual:
 - **#27 — regresiones de estados inconsistentes:** protege instancias y journal cuando la información persistida contradice la operación pendiente.
 - **#28 — separación física del journal:** mueve lectura/escritura/formato/limpieza a `journal.rs`, manteniendo en `lifecycle.rs` la coordinación semántica.
 - **#29 — reconciliación documental:** alinea visión, modelo, ADR, arquitectura, estado y changelog; añade este documento de continuidad y registra que las máscaras están revisadas conceptualmente, mientras su motor sigue pendiente. Se integró mediante squash merge en el commit `c0c02605eebce36173d396381ea085c6ecfe2c92`; CI pasó en la rama del PR.
+- **#30 — cierre del registro de continuidad:** actualiza la continuidad después de la integración del PR #29.
 - **#31 — límites del contrato de máscaras:** añade ADR 0005 para separar las reglas centrales acordadas de los casos estructurales que todavía necesitan decisiones explícitas. El estado actual de `main` se verificó en el commit `296a76a84b28d181c904a6ab34e2db4a269f1acb`.
 
 La secuencia se debe leer como una progresión de garantías y límites de responsabilidad, no como una invitación a repetir las pruebas o rehacer la separación del journal.
