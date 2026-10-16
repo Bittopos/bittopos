@@ -23,16 +23,18 @@ El contrato de máscaras fue revisado conceptualmente. Este ADR registra la dire
 
 ### 2. Máscaras puntuales
 
+- Una máscara es un Segment local de una instancia y contiene al menos un Concept o Component.
 - Una máscara puntual puede dirigirse a un Concept o Component.
 - Registra diferencias locales sin copiar indiscriminadamente todos los valores heredados.
 - Los elementos no modificados se resuelven desde la definición vigente y reflejan cambios posteriores de esa definición.
 - Editar un elemento heredado sin máscara local puede modificar el recurso compartido y afectar a otras instancias.
 - Editar un elemento con máscara crea o cambia la diferencia local.
 - Retirar la máscara local devuelve el elemento al comportamiento de herencia correspondiente.
+- Una redefinición ordinaria del recurso de origen no elimina las máscaras locales ya existentes. Si cambia una política que prohíbe operaciones de máscara, puede cambiar su efectividad; esto es distinto de una redefinición ordinaria del contenido.
 
 ### 3. Máscaras Snapshot
 
-- Una máscara Snapshot congela la definición de origen vigente para las partes incluidas en su alcance.
+- Una máscara Snapshot congela la definición de origen vigente para las partes maskables comprendidas en la Snapshot.
 - Los cambios posteriores de la definición no se propagan a las partes congeladas.
 - Una Snapshot es un modo distinto de una máscara puntual; no debe aplicarse de forma implícita a toda la instancia ni confundirse con el comportamiento de herencia dinámica.
 
