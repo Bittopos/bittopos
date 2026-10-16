@@ -19,15 +19,18 @@ Mientras no existan versiones publicadas, Unreleased reúne los cambios que se p
 - Se aclara que la secuencia de ingeniería inmediata es una cola de trabajo posterior al PR #28 y no reemplaza la hoja de ruta general original de diez etapas.
 
 ### Engineering
-- Se fija como siguiente tarea la auditoría del flujo combinado de bitto create (recurso, etiquetas e instancia opcional) y sus garantías ante fallos parciales, antes de extraerlo a la capa de aplicación.
+- Se pausa la auditoría del flujo combinado de bitto create para priorizar el motor semántico de máscaras.
+- Se añade en el PR #33 un motor de dominio para máscaras puntuales y Snapshot, operaciones persistidas de edición local/compartida y resolución de instancias.
 - Se documenta que las pruebas de recuperación de creación/eliminación ya existen en lifecycle.rs; no deben añadirse duplicados sin identificar primero un hueco concreto.
 - Se conserva el criterio de refactorización incremental: no cambiar formatos TOML/JSON ni simplificar journal, temporales o recuperación sin pruebas equivalentes.
 
 ### Model
+- Se implementa una primera capa ejecutable Segment/Concept/Component con direcciones semánticas, máscaras puntuales y Snapshot de alcance explícito.
+- Las máscaras se persisten en el workspace JSON y los segmentos semánticos adicionales en recursos TOML, con valores por defecto para leer datos históricos.
 - Se documenta la resolución desde la instancia hacia el recurso de origen mediante topología y direcciones semánticas.
 - Se distinguen las máscaras puntuales de diferencias locales de las máscaras Snapshot, que congelan las partes maskables comprendidas en la Snapshot; las redefiniciones ordinarias no eliminan máscaras locales.
 - Se aclara que los componentes pueden tener reglas específicas de combinación, que las referencias se expanden y que los permisos se resuelven separadamente del contenido.
 - Se documentan como pendientes explícitos la evolución estructural del origen, eliminación local/ocultación de elementos heredados, identidad ante reubicación, eliminación de recursos referenciados, precedencia exacta de permisos y evolución de elementos congelados por Snapshot.
 
 ### Notes
-- Estos cambios son documentales. No implementan el motor semántico, las máscaras, la autorización efectiva, un servidor HTTP ni una integración de la interfaz web con el núcleo Rust.
+- El motor de máscaras está en revisión en el PR #33. No incluye aún autorización efectiva, expansión de referencias, comandos CLI ni integración de la interfaz web.

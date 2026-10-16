@@ -1,3 +1,8 @@
+use crate::semantic_masks::{
+    resolve, ComponentMerge, ElementAddress, InstanceSemantics, Mask, MaskError, MaskMode,
+    ResourceDefinition,
+};
+use crate::Resource;
 use std::collections::HashSet;
 use uuid::Uuid;
 
@@ -27,6 +32,8 @@ pub struct Instance {
     pub source: Source,
     pub semantic: Option<Semantic>,
     pub content: Option<Content>,
+    /// Máscaras semánticas locales persistidas junto a la instancia.
+    pub masks: Vec<Mask>,
 }
 
 impl Instance {
@@ -36,6 +43,7 @@ impl Instance {
             source: Source { id: source_id },
             semantic: None,
             content: None,
+            masks: Vec::new(),
         }
     }
 
@@ -49,6 +57,94 @@ impl Instance {
         self.semantic
             .as_ref()
             .map_or(&[], |semantic| semantic.allocation.as_slice())
+    }
+
+    /// Vista semántica de las máscaras locales sin duplicar su estado persistido.
+    pub fn mask_semantics(&self) -> InstanceSemantics {
+        InstanceSemantics {
+            id: self.id,
+            source_id: self.source.id,
+            masks: self.masks.clone(),
+        }
+    }
+
+    /// Valida y aplica un estado semántico de máscaras a esta instancia.
+    pub fn set_mask_semantics(&mut self, semantics: InstanceSemantics) -> Result<(), MaskError> {
+        if semantics.id != self.id {
+            return Err(MaskError::InstanceMismatch {
+                expected: self.id,
+                found: semantics.id,
+            });
+        }
+        if semantics.source_id != self.source.id {
+            return Err(MaskError::SourceMismatch {
+                expected: self.source.id,
+                found: semantics.source_id,
+            });
+        }
+        semantics.validate()?;
+        self.masks = semantics.masks;
+        Ok(())
+    }
+
+    pub fn edit_local_concept(
+        &mut self,
+        resource: &Resource,
+        segment: &str,
+        concept: &str,
+        value: impl Into<String>,
+    ) -> Result<(), MaskError> {
+        let source = Self::source_definition(resource)?;
+        let mut semantics = self.mask_semantics();
+        semantics.edit_local_concept(&source, segment, concept, value)?;
+        self.set_mask_semantics(semantics)
+    }
+
+    pub fn edit_local_component(
+        &mut self,
+        resource: &Resource,
+        segment: &str,
+        component: &str,
+        value: serde_json::Value,
+    ) -> Result<(), MaskError> {
+        let source = Self::source_definition(resource)?;
+        let mut semantics = self.mask_semantics();
+        semantics.edit_local_component(&source, segment, component, value)?;
+        self.set_mask_semantics(semantics)
+    }
+
+    pub fn create_mask_snapshot(
+        &mut self,
+        resource: &Resource,
+        segment: &str,
+        scope: &[ElementAddress],
+    ) -> Result<(), MaskError> {
+        let source = Self::source_definition(resource)?;
+        let mut semantics = self.mask_semantics();
+        semantics.create_snapshot(&source, segment, scope)?;
+        self.set_mask_semantics(semantics)
+    }
+
+    pub fn remove_semantic_mask(&mut self, segment: &str, mode: MaskMode) -> Result<(), MaskError> {
+        let mut semantics = self.mask_semantics();
+        semantics.remove_mask(segment, mode)?;
+        self.set_mask_semantics(semantics)
+    }
+
+    pub fn resolved_semantics(
+        &self,
+        resource: &Resource,
+        merge: &impl ComponentMerge,
+    ) -> Result<ResourceDefinition, MaskError> {
+        let source = Self::source_definition(resource)?;
+        resolve(&source, &self.mask_semantics(), merge)
+    }
+
+    /// Construye la definición semántica almacenada en el recurso.
+    pub fn source_definition(resource: &Resource) -> Result<ResourceDefinition, MaskError> {
+        let definition = resource.semantic_definition();
+        definition.validate()?;
+        Ok(definition)
     }
 
     fn normalize_empty_children(&mut self) {
@@ -81,6 +177,7 @@ pub enum WorkspaceModelError {
     InstanceNotFound(Uuid),
     InstanceHasChildren(Uuid),
     ParentNotFound(Uuid),
+    InvalidMask(String),
 }
 
 impl std::fmt::Display for WorkspaceModelError {
@@ -96,6 +193,7 @@ impl std::fmt::Display for WorkspaceModelError {
                 "no se puede remover la instancia {id}: todavía contiene instancias hijas"
             ),
             Self::ParentNotFound(id) => write!(f, "no existe la instancia padre {id}"),
+            Self::InvalidMask(reason) => write!(f, "máscara semántica inválida: {reason}"),
         }
     }
 }
@@ -113,6 +211,10 @@ impl Workspace {
 
     pub fn find_instance(&self, id: Uuid) -> Option<&Instance> {
         find_in(&self.content.instances, id)
+    }
+
+    pub fn find_instance_mut(&mut self, id: Uuid) -> Option<&mut Instance> {
+        find_mut_in(&mut self.content.instances, id)
     }
 
     pub fn parent_of(&self, id: Uuid) -> Option<Uuid> {
@@ -251,6 +353,10 @@ fn validate_instances(
     seen: &mut HashSet<Uuid>,
 ) -> Result<(), WorkspaceModelError> {
     for instance in instances {
+        instance
+            .mask_semantics()
+            .validate()
+            .map_err(|error| WorkspaceModelError::InvalidMask(error.to_string()))?;
         if !seen.insert(instance.id) {
             return Err(WorkspaceModelError::DuplicateInstanceId(instance.id));
         }

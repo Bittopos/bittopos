@@ -113,6 +113,7 @@ mod tests {
                     source: crate::Source { id: Uuid::now_v7() },
                     semantic: None,
                     content: None,
+                    masks: Vec::new(),
                 }],
             },
         };

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::persistence::atomic_write;
+use crate::semantic_masks::Mask;
 use crate::workspace_model::{Content, Instance, Semantic, Source, Workspace, WorkspaceModelError};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -38,6 +39,8 @@ pub(crate) struct PersistedInstance {
     semantic: Option<PersistedSemantic>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     content: Option<PersistedContent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    masks: Vec<Mask>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -67,6 +70,7 @@ impl From<&Instance> for PersistedInstance {
                     .map(PersistedInstance::from)
                     .collect(),
             }),
+            masks: instance.masks.clone(),
         }
     }
 }
@@ -101,6 +105,7 @@ impl TryFrom<PersistedInstance> for Instance {
                 allocation: semantic.allocation,
             }),
             content,
+            masks: persisted.masks,
         };
 
         Workspace {
@@ -160,6 +165,7 @@ pub enum WorkspaceError {
     InstanceNotFound(Uuid),
     InstanceHasChildren(Uuid),
     ParentNotFound(Uuid),
+    InvalidMask(String),
 }
 
 impl std::fmt::Display for WorkspaceError {
@@ -179,6 +185,7 @@ impl std::fmt::Display for WorkspaceError {
                 "no se puede remover la instancia {id}: todavía contiene instancias hijas"
             ),
             Self::ParentNotFound(id) => write!(f, "no existe la instancia padre {id}"),
+            Self::InvalidMask(reason) => write!(f, "máscara semántica inválida: {reason}"),
         }
     }
 }
@@ -193,6 +200,7 @@ impl From<WorkspaceModelError> for WorkspaceError {
             WorkspaceModelError::InstanceNotFound(id) => Self::InstanceNotFound(id),
             WorkspaceModelError::InstanceHasChildren(id) => Self::InstanceHasChildren(id),
             WorkspaceModelError::ParentNotFound(id) => Self::ParentNotFound(id),
+            WorkspaceModelError::InvalidMask(reason) => Self::InvalidMask(reason),
         }
     }
 }
@@ -292,7 +300,7 @@ impl WorkspaceStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ResourceStore;
+    use crate::{Concept, ReplaceComponent, ResourceStore, SegmentRole, SemanticSegment};
     use std::fs;
 
     fn setup() -> (tempfile::TempDir, ResourceStore, WorkspaceStore) {
@@ -360,6 +368,62 @@ mod tests {
                 .unwrap();
 
         assert_eq!(json["content"]["instances"], serde_json::json!([]));
+    }
+
+    #[test]
+    fn semantic_masks_round_trip_in_workspace_json_and_resolve_from_toml_segments() {
+        let (_directory, resources, workspaces) = setup();
+        let (created, _) = resources.create("Definición", None).unwrap();
+        let resource = resources
+            .update_segments(
+                created.id,
+                vec![SemanticSegment {
+                    role: SegmentRole::Semantic,
+                    key: "details".to_owned(),
+                    concepts: vec![Concept {
+                        key: "title".to_owned(),
+                        value: "Original".to_owned(),
+                    }],
+                    components: Vec::new(),
+                }],
+            )
+            .unwrap();
+
+        let instance_id = Uuid::now_v7();
+        let mut instance = Instance::new(instance_id, resource.id);
+        instance
+            .edit_local_concept(&resource, "details", "title", "Local")
+            .unwrap();
+        let workspace = Workspace {
+            content: Content {
+                instances: vec![instance],
+            },
+        };
+        workspaces.save("masked", &workspace).unwrap();
+
+        let loaded = workspaces.load("masked").unwrap();
+        assert_eq!(loaded, workspace);
+        let stored_resource = resources.get(resource.id).unwrap();
+        let resolved = loaded
+            .find_instance(instance_id)
+            .unwrap()
+            .resolved_semantics(&stored_resource, &ReplaceComponent)
+            .unwrap();
+        assert_eq!(
+            resolved.segment("details").unwrap().concepts[0].value,
+            "Local"
+        );
+
+        let json: serde_json::Value =
+            serde_json::from_slice(&fs::read(workspaces.root().join("masked.json")).unwrap())
+                .unwrap();
+        assert_eq!(
+            json["content"]["instances"][0]["masks"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
     }
 
     #[test]

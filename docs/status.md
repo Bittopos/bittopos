@@ -42,25 +42,28 @@ La lista es un inventario del código; no implica que toda ruta de error esté e
 - Capacidades avanzadas de relaciones y referencias más allá de la resolución definida conceptualmente.
 - Publicación y distribución de versiones estables.
 
-## Próxima fase de ingeniería: preparar el cambio del núcleo
+## Estado de la implementación de máscaras
 
-El trabajo de `bitto create` queda pausado por decisión de producto. La siguiente prioridad es preparar una reestructuración del núcleo para implementar de forma coherente el modelo semántico y las máscaras, sin modificar aún el comportamiento ejecutable.
+El PR #33 implementa en el núcleo un motor semántico inicial para máscaras puntuales y Snapshot, persistencia de máscaras en instancias y segmentos semánticos en recursos, además de casos de uso para editar y resolver. La implementación se encuentra en revisión; consulta el estado de CI del PR antes de considerarla verificada.
 
-La guía de alcance y aceptación está en [Preparación para la reestructuración del núcleo](CORE-REWRITE-READINESS.md).
+### Implementado en esta propuesta
 
-### Límites de la fase actual
+- Modelo puro Segment/Concept/Component y direcciones semánticas.
+- Herencia dinámica desde la definición vigente y diferencias locales escasas.
+- Edición compartida y local de conceptos/componentes.
+- Snapshot de alcance explícito y retirada de máscaras.
+- Persistencia TOML/JSON con campos opcionales para conservar compatibilidad de lectura de datos históricos.
+- Validación de máscaras y errores explícitos ante elementos de origen eliminados, sin inventar reglas de tombstone o reubicación.
 
-- Es documental y preparatoria: no implementa máscaras ni el motor de resolución.
-- No continúa la auditoría/extracción del flujo de `bitto create`.
-- No modifica formatos TOML/JSON ni realiza migraciones.
-- No borra ramas ni cambia la configuración de protección de GitHub.
-- Conserva las reglas centrales de los ADR 0004 y 0005; los casos pendientes del ADR 0005 no se resuelven por inferencia.
+### Pendiente o deliberadamente excluido
 
-### Criterios para iniciar una implementación posterior
+- Comandos de CLI para gestionar máscaras.
+- Expansión semántica de referencias.
+- Autorización efectiva y reglas completas de máscaras de permisos.
+- Decisiones estructurales aún pendientes del ADR 0005.
+- Verificación final de CI y revisión del PR #33.
 
-Antes de abrir el primer PR de código para la reestructuración, debe existir un alcance concreto que indique tipos y límites afectados, invariantes que se conservan o cambian, compatibilidad/migración de datos, pruebas necesarias y comprobaciones reales de CI. La línea base debe establecerse sobre el `main` vigente; no se considera verificada por el mero hecho de que existan pruebas.
-
-La secuencia sugerida es modelo puro y sus invariantes, topología/direcciones semánticas, resolución incremental, máscaras puntuales y Snapshot, componentes/referencias/autorización según sus dependencias, y después integración de adaptadores e interfaces. Esta secuencia no autoriza automáticamente cada fase; el alcance posterior se decidirá tras revisar el PR de preparación.
+El trabajo de bitto create sigue pausado. No iniciar otro refactor ni cambiar los contratos pendientes por inferencia; el siguiente alcance se decidirá después de la revisión y fusión de este PR.
 
 ## Criterio transversal de aceptación
 

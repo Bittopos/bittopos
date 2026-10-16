@@ -1,3 +1,4 @@
+use crate::semantic_masks::{Segment, SegmentRole};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -11,6 +12,47 @@ pub struct Resource {
     #[serde(default)]
     pub(crate) management: Management,
     pub info: Info,
+    /// Segmentos semánticos adicionales; ausente en recursos históricos equivale a vacío.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub segments: Vec<Segment>,
+}
+
+impl Resource {
+    /// Proyecta la metadata histórica al segmento semántico reservado info.
+    /// El segmento no se duplica en el archivo TOML: se deriva de los campos existentes.
+    pub fn semantic_definition(&self) -> crate::semantic_masks::ResourceDefinition {
+        let mut segments = vec![Segment {
+            role: SegmentRole::Semantic,
+            key: "info".to_owned(),
+            concepts: vec![
+                crate::semantic_masks::Concept {
+                    key: "title".to_owned(),
+                    value: self.info.title.clone(),
+                },
+                crate::semantic_masks::Concept {
+                    key: "description".to_owned(),
+                    value: self.info.description.clone().unwrap_or_default(),
+                },
+            ],
+            components: vec![crate::semantic_masks::Component {
+                key: "tags".to_owned(),
+                kind: "string-list".to_owned(),
+                value: serde_json::Value::Array(
+                    self.info
+                        .tags
+                        .iter()
+                        .cloned()
+                        .map(serde_json::Value::String)
+                        .collect(),
+                ),
+            }],
+        }];
+        segments.extend(self.segments.clone());
+        crate::semantic_masks::ResourceDefinition {
+            id: self.id,
+            segments,
+        }
+    }
 }
 
 /// Estado administrativo del recurso. Su contenido no forma parte de la API pública.
