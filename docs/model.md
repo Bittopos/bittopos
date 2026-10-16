@@ -1,108 +1,105 @@
 # Modelo conceptual de Bittopos
 
-**Estado:** modelo en definición. Esta página registra las reglas conceptuales acordadas; no afirma que todas estén implementadas.
+**Estado:** contrato conceptual acordado en sus reglas centrales; el motor semántico todavía no está implementado. Este documento describe el modelo previsto, no afirma que el código ya lo soporte.
 
 ## 1. Espacios de definición e instanciación
 
 - **Espacio de definición:** contiene recursos y sus segmentos definidos. Un recurso puede ser usado por múltiples instancias.
 - **Espacio de instanciación:** contiene instancias concretas de esos recursos. Una instancia tiene identidad propia y referencia su definición de origen.
-- `Resource.id` identifica la definición.
-- `Instance.id` identifica la instancia.
-- `Instance.source.id` identifica el recurso de origen; no es la identidad de la instancia.
+- **Resource.id** identifica la definición.
+- **Instance.id** identifica la instancia.
+- **Instance.source.id** identifica el recurso de origen; no es la identidad de la instancia.
 
-Una instancia sin máscara puede operar sobre información heredada de su recurso. En ese caso, modificar esa información desde la instancia puede modificar la definición compartida y afectar a otras instancias. La instancia no es automáticamente una copia privada por el mero hecho de existir.
+Una instancia no es automáticamente una copia privada por el mero hecho de existir. La información puede resolverse desde la definición, modificarse de forma compartida o quedar gobernada por una máscara local, según las reglas del modelo.
 
 ## 2. Segmentos, conceptos y componentes
 
 ### Segment
 
-Un segmento es una unidad con configuración propia que agrupa conceptos y componentes relacionados. Distintos segmentos pueden contener conceptos o componentes del mismo tipo; su pertenencia al segmento es parte de la organización del modelo, no una garantía de que el tipo sea globalmente único.
+Un segmento es una unidad con configuración propia que agrupa conceptos y componentes relacionados. Distintos segmentos pueden contener elementos del mismo tipo; su pertenencia al segmento forma parte de la organización semántica.
 
-Por ahora, los conceptos y componentes se organizan dentro de segmentos. No se establece un catálogo universal de tipos ni se exige que cada tipo aparezca una sola vez en todo el recurso.
+Algunos segmentos tienen función de control o estructural. Pueden gobernar la organización, la instanciación o la resolución sin convertirse por ello en contenido semántico que deba mostrarse como un segmento ordinario.
 
 ### Concept
 
-Un concepto representa una unidad de información con una clave y un valor. **Para la etapa actual, los valores de concepto se restringen provisionalmente a texto.** No se diseñará todavía soporte general para binarios, tipos de base de datos ni un sistema dinámico de tipos.
+Un concepto representa una unidad de información con clave y valor. Para la etapa inicial, los valores de concepto se restringen provisionalmente a texto. El modelo no exige un catálogo universal de tipos ni que cada tipo aparezca una sola vez en todo el recurso.
 
 ### Component
 
-Un componente representa una unidad estructurada o especializada dentro de un segmento. Los conceptos y componentes son unidades distintas; sus esquemas y reglas generales deben diseñarse como partes del mismo modelo, no como abstracciones aisladas.
+Un componente representa una unidad estructurada o especializada dentro de un segmento. No todos los componentes admiten la misma operación de combinación: su comportamiento de resolución depende del tipo de componente. En particular, una referencia se expande siguiendo la referencia; no se trata como un valor escalar que simplemente reemplaza al contenido de destino.
 
-La forma de representar componentes complejos, referencias tipadas y listas de casos se especificará cuando el modelo general y sus casos de uso estén suficientemente definidos.
+## 3. Máscaras y resolución semántica
 
-## 3. Máscaras de segmento
+**La semántica de las máscaras ya fue revisada y acordada conceptualmente.** No es una tarea pendiente volver a decidir si las máscaras son diferencias locales o si la herencia debe ser dinámica. Lo pendiente es implementar el modelo y verificarlo mediante pruebas.
 
-Una **máscara es una representación local y dispersa de las diferencias de un segmento dentro de una instancia**. Corresponde a un segmento definido del recurso, pero no es una copia completa ni una captura congelada de su estado.
+La lectura semántica parte de una instancia del workspace y sigue su topología hacia la definición de origen. La resolución se expresa mediante direcciones semánticas dentro de esa estructura, no depende de que los identificadores físicos de los archivos sean la semántica del modelo. El mismo criterio debe poder aplicarse aunque la persistencia futura use TOML, JSON, una base de datos o un protocolo remoto.
 
-Las reglas conceptuales acordadas son:
+### 3.1 Máscaras puntuales
 
-- **Solo diferencias locales:** una máscara almacena únicamente los valores que se hayan modificado localmente; no duplica como estado propio los valores que siguen heredándose.
-- **Herencia dinámica:** si un valor no tiene una modificación local, la instancia lo resuelve desde la definición actual del recurso. Por tanto, los cambios posteriores en la definición se reflejan automáticamente en los valores no modificados localmente.
-- **Edición compartida sin máscara:** editar un valor heredado sin crear una modificación local puede cambiar directamente la definición del recurso. Es una mutación compartida y puede afectar a otras instancias que hereden ese valor.
-- **Edición local con máscara:** editar un valor mediante una máscara modifica la representación local de esa instancia, no la definición compartida.
-- **Alcance por segmento:** una máscara afecta al segmento que representa; no convierte toda la instancia en una copia independiente ni aísla automáticamente los demás segmentos.
-- **Permisos separados:** los permisos y su resolución no se confunden con la herencia de contenido. Su precedencia y aplicación efectiva requieren reglas propias.
+- Una máscara es un **Segment** local de una instancia y debe contener al menos un Concept o Component.
+- Una máscara puntual puede dirigirse a un **Concept** o **Component** concreto.
+- La creación de una máscara puntual registra diferencias locales; no copia indiscriminadamente todo el contenido heredado.
+- Si no existe una modificación local, el valor se resuelve desde la definición vigente. Los cambios posteriores de la definición se reflejan en los elementos no modificados localmente.
+- Editar un elemento heredado sin crear una máscara local modifica directamente el recurso compartido y puede afectar a otras instancias.
+- Editar un elemento mediante una máscara puntual crea o cambia la diferencia local de esa instancia.
+- Eliminar la máscara local devuelve ese elemento al comportamiento de herencia correspondiente.
+- La redefinición del recurso de origen no elimina por sí sola las máscaras locales existentes. Una modificación de política que prohíba operaciones de máscara puede afectar a su efectividad, pero no debe confundirse con una redefinición ordinaria del contenido.
 
-La resolución debe consultar la definición vigente para cada valor no sobrescrito y usar el valor local cuando exista una modificación local válida. La lógica debe residir en un mecanismo común del modelo, no duplicarse en cada interfaz o adaptador.
+### 3.2 Máscaras Snapshot
 
-### Detalles pendientes antes de implementar
+Una máscara **Snapshot** congela la definición de origen vigente para las partes maskables comprendidas en la Snapshot y evita que cambios posteriores de esas partes se propaguen como herencia dinámica. No debe confundirse con una máscara puntual: son modos distintos con efectos distintos.
 
-La decisión conceptual anterior no determina todavía todos los detalles operativos. Antes de implementar máscaras se deben especificar y probar, como mínimo:
+La semántica de una Snapshot no autoriza a congelar automáticamente todos los segmentos de una instancia si el modelo no los ha incluido en su alcance. El alcance de la máscara debe quedar explícito en la estructura semántica.
 
-- cómo se identifica un concepto o componente al comparar la definición con una modificación local;
-- qué sucede si una modificación local vuelve a ser igual al valor definido;
-- cómo se representa la eliminación local de un valor heredado sin que reaparezca inmediatamente por herencia;
-- qué significa retirar o restablecer una modificación local y qué datos se descartan;
-- cómo se valida una máscara cuando cambia la estructura del segmento definido;
-- cuál es la precedencia exacta de los permisos de definición y de instancia.
+### 3.3 Lectura y exclusión de elementos ya representados localmente
 
-Estas preguntas no deben resolverse mediante comportamiento accidental del formato TOML/JSON ni mediante reglas independientes en la CLI.
+La instancia puede declarar en su estructura semántica segmentos o elementos que ya están representados localmente. Al leer la definición de origen, el resolvedor debe reconocer esas direcciones y evitar incorporar de nuevo los elementos que ya fueron tratados por la estructura local.
 
-## 4. Permisos y máscaras de permisos
+Los segmentos de control/estructurales pueden gobernar la navegación o la instanciación sin añadirse como contenido semántico ordinario. La resolución debe seguir la topología del modelo, no una lista de nombres especiales dispersa por las interfaces.
 
-Los permisos y la herencia de contenido están relacionados, pero no son la misma regla.
+### 3.4 Permisos
 
-- Un segmento de permisos en el recurso pertenece al espacio de definición. No se hereda como segmento de contenido en la instancia, pero sus reglas sí afectan al acceso y a las operaciones sobre esa instancia.
-- Una instancia puede tener una máscara de permisos propia. Esta política es local a esa instancia y limita el acceso de terceros a esa instancia; no debe cambiar los permisos del recurso ni propagarse automáticamente a otras instancias.
-- La política de permisos del recurso puede expresar reglas generales mediante conceptos o casos concretos mediante componentes, según el modelo que se termine de definir.
-- La existencia de una regla documentada no equivale a una implementación de autorización. Toda operación protegida deberá comprobar permisos en una capa efectiva común, no confiar únicamente en lo que muestre la CLI.
+- Los permisos tienen un segmento propio en la definición; no son contenido ordinario que simplemente se hereda y se muestra.
+- Los permisos definidos en el recurso siguen afectando al acceso y a las operaciones sobre sus instancias, aunque la política no se copie como contenido visible.
+- Una instancia puede tener una máscara local de permisos que modifique la política aplicable a esa instancia.
+- La máscara local no adquiere automáticamente precedencia sobre la jerarquía de permisos de origen ni modifica la política del recurso compartido.
+- La autorización efectiva debe resolverse en un mecanismo común, no depender de lo que muestre una interfaz.
 
-Quedan por especificar los actores, las operaciones protegidas, la denegación por defecto y la interacción entre máscaras de permisos y segmentos enmascarados.
+### 3.5 Reglas de combinación
 
-## 5. Resolución del modelo
+La resolución debe distinguir, como mínimo:
 
-Debe existir un mecanismo de resolución que determine, a partir de la composición estructural del modelo general:
+1. la definición de origen vigente;
+2. los elementos estructurales que indican qué segmentos o elementos participan en la lectura;
+3. las máscaras puntuales locales;
+4. las máscaras Snapshot y su alcance;
+5. el comportamiento específico de cada tipo de componente;
+6. las referencias que amplían la lectura hacia otras partes del modelo;
+7. las reglas de permisos, separadas de la presentación del contenido.
 
-1. qué segmentos pertenecen a la definición de un recurso;
-2. qué segmentos se heredan directamente en una instancia;
-3. qué valores se resuelven desde la definición vigente y cuáles están modificados localmente;
-4. cómo se aplican las reglas de permisos sin confundir autorización con contenido heredado.
+No se debe reducir el sistema a una sobrescritura genérica de clave/valor: esa simplificación perdería la topología, las direcciones semánticas, los componentes con reglas propias y los segmentos de control.
 
-El mecanismo debe basarse en reglas de composición explícitas, no en nombres especiales codificados para cada futura función. Más adelante deberá poder reutilizarse para determinar casos estructurales de tareas, responsabilidades y proyectos.
+## 4. Qué está acordado y qué queda por implementar
 
-Esto **no significa** que haya que construir desde el inicio un motor genérico para cualquier dominio. La primera implementación debe cubrir los casos reales de Resource, Segment, Concept, Component e Instance, manteniendo puntos de extensión claros.
+### Acordado conceptualmente
 
-## 6. Invariantes y preguntas pendientes
+- La definición y la instancia tienen identidades distintas.
+- La instancia resuelve información siguiendo la topología semántica hacia el recurso de origen.
+- Las direcciones semánticas, y no los identificadores físicos de persistencia, gobiernan la correspondencia de elementos.
+- Las máscaras puntuales representan diferencias locales; lo no modificado conserva la herencia dinámica.
+- Editar sin máscara puede modificar el recurso compartido.
+- Las máscaras Snapshot congelan explícitamente las partes incluidas en su alcance.
+- Las referencias se expanden; el comportamiento de combinación depende del tipo de componente.
+- Los segmentos estructurales/de control no se confunden con contenido semántico ordinario.
+- Los permisos tienen reglas propias y una resolución efectiva común.
 
-### Reglas acordadas
+### Pendiente de implementación y verificación
 
-- Una máscara representa diferencias locales de un segmento en una instancia; no es una instantánea completa.
-- Los valores sin modificación local se resuelven desde la definición vigente.
-- Los cambios en la definición actualizan los valores heredados que no estén modificados localmente.
-- Sin máscara local, una edición puede mutar el recurso de origen y afectar otras instancias.
-- Una modificación mediante máscara es local a la instancia.
-- Los permisos del recurso afectan a las instancias sin heredarse como contenido.
-- Una máscara de permisos de instancia limita esa instancia, sin cambiar la definición original.
-- Los conceptos y componentes están segmentados y pueden repetirse entre segmentos.
-- Los valores de Concept son texto provisionalmente.
+- Incorporar al núcleo el modelo general Segment/Concept/Component y las estructuras semánticas de instancia.
+- Implementar el recorrido por topología y la resolución por direcciones semánticas.
+- Persistir y resolver máscaras puntuales y Snapshot según el contrato, sin atar su semántica a TOML/JSON.
+- Implementar la combinación específica de componentes y la expansión de referencias.
+- Implementar la resolución efectiva de permisos.
+- Añadir pruebas unitarias de resolución y pruebas de integración con las definiciones y las instancias persistidas.
 
-### Decisiones necesarias antes de implementar máscaras
-
-- ¿Cómo se identifican de forma estable los conceptos y componentes entre definición y máscara?
-- ¿Cómo se trata una modificación local cuyo valor coincide con el valor actual de la definición?
-- ¿Cómo se representa una eliminación local de un valor heredado?
-- ¿Cómo se retira una modificación local sin confundirlo con eliminar el valor heredado?
-- ¿Qué ocurre cuando cambia la estructura de un segmento definido?
-- ¿Cuál es la precedencia exacta de los permisos de definición y de instancia?
-
-Estas preguntas deben resolverse con ejemplos concretos y pruebas antes de convertirlas en restricciones de código.
+Estas tareas son de implementación, integración y verificación; no deben describirse como si el contrato de máscaras siguiera sin decidirse. Si durante la implementación aparece una contradicción real con estas reglas, se debe registrar el caso concreto y proponer una decisión explícita antes de cambiar el contrato.

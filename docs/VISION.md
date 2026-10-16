@@ -1,7 +1,7 @@
 # Bittopos — Product and Architectural Vision
 
 **Status:** Active strategic vision; implementation is incremental  
-**Last reviewed:** 2026-10-14  
+**Last reviewed:** 2026-10-15  
 **Authority:** Defines product intent and principles. Normative contracts, ADRs, code, and tests govern concrete requirements and verified behavior.
 
 ## 1. Purpose
@@ -44,11 +44,13 @@ These terms express intended responsibilities; the current implementation may su
 - **Resource:** reusable definition with a stable identity.
 - **Instance:** identity-bearing occurrence of a Resource within a workspace; instances may be nested by containment.
 - **Segment:** named unit grouping related information or capabilities.
-- **Detail / Concept:** standard descriptive or key-value information, as defined by the applicable contract.
+- **Concept:** standard key-value information, with text values provisionally supported in the initial model.
 - **Component:** structured or specialized information that does not fit the standard descriptive role.
-- **Mask:** local, segment-scoped differences from a Resource definition. The current conceptual direction is sparse overrides with dynamic inheritance: unmodified values resolve from the latest definition, while locally modified values remain local. The normative contract must define identity, deletion, reset, validation, and conflict edge cases before implementation.
+- **Mask:** an explicit mechanism for resolving local instance structure against its source definition.
 
-Structural registration belongs to `management.structural`; allocation-related information belongs to `semantic.allocation`. Their precise schemas and invariants are defined by the current model contract, not by this vision.
+Masks do not mean that every instance becomes an independent copy. Point masks record local differences and retain dynamic inheritance for unmodified elements; Snapshot masks freeze explicitly scoped parts of the source definition. Resolution follows the model's semantic topology and addresses. The agreed rules are recorded in [the conceptual model](model.md) and [ADR 0004](decisions/0004-semantic-mask-resolution.md).
+
+Structural registration belongs to management.structural; allocation-related information belongs to semantic.allocation. Their schemas and invariants are defined by the current model and implementation documents, not by this strategic vision.
 
 Future higher-order spaces may include tasks, responsibilities, timelines, taxonomies, and collaboration. They should be compositions or extensions of the shared model, not unjustified parallel data systems.
 
@@ -77,18 +79,16 @@ Bittopos is not intended to become a universal document editor, replace speciali
 
 ## 8. Architectural direction
 
-```text
-Interfaces: CLI · Web · Mobile · Desktop · AI adapters
-                         |
-                         v
-Application: reusable use cases and orchestration
-                         |
-                         v
-Domain: model, invariants, semantics, resolution
-                         ^
-                         |
-Persistence adapters: serialization, files, journal, recovery
-```
+    Interfaces: CLI · Web · Mobile · Desktop · AI adapters
+                             |
+                             v
+    Application: reusable use cases and orchestration
+                             |
+                             v
+    Domain: model, invariants, semantics, resolution
+                             ^
+                             |
+    Persistence adapters: serialization, files, journal, recovery
 
 The diagram expresses responsibility and dependency direction, not a mandatory folder or crate layout. The domain should not depend on interface presentation, filesystem paths, or a particular serialization format. Application operations should be reusable across interfaces. Persistence adapters must preserve consistency and recovery guarantees without becoming the primary home of semantic rules.
 
