@@ -74,6 +74,7 @@ PRs integrados relevantes en la secuencia actual:
 - **#25 y #26 — frontera de aplicación y navegación:** introdujeron casos de uso para preparar el workspace, crear en la ubicación actual y eliminar actualizando la navegación.
 - **#27 — regresiones de estados inconsistentes:** protege instancias y journal cuando la información persistida contradice la operación pendiente.
 - **#28 — separación física del journal:** mueve lectura/escritura/formato/limpieza a `journal.rs`, manteniendo en `lifecycle.rs` la coordinación semántica.
+- **#29 — reconciliación documental:** alinea visión, modelo, ADR, arquitectura, estado y changelog; añade este documento de continuidad y registra que las máscaras están revisadas conceptualmente, mientras su motor sigue pendiente. Se integró mediante squash merge en el commit `c0c02605eebce36173d396381ea085c6ecfe2c92`; CI pasó en la rama del PR.
 
 La secuencia se debe leer como una progresión de garantías y límites de responsabilidad, no como una invitación a repetir las pruebas o rehacer la separación del journal.
 
@@ -152,4 +153,4 @@ Cuando dos documentos parezcan discrepar, determinar cuál es la fuente normativ
 - [ ] No afirmar que se ejecutaron comandos, pasó CI o se modificó código si no se verificó.
 - [ ] Antes de refactorizar persistencia, anotar las garantías existentes que deben conservarse.
 
-**Estado al cerrar esta actualización:** se han preparado cambios de documentación en una rama dedicada. La documentación no debe considerarse integrada en `main` hasta que se revise y se fusione el PR correspondiente.
+**Estado al cerrar esta actualización:** la documentación de continuidad está integrada en `main` mediante el PR [#29](https://github.com/sebastianbellinkai/bittopos/pull/29). La comprobación de CI del PR pasó (formato, compilación y pruebas del workspace). No se ejecutaron comandos de Cargo localmente.
