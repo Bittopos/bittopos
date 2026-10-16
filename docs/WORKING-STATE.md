@@ -51,6 +51,7 @@ Las fuentes conceptuales vigentes son:
 
 - [Modelo conceptual](model.md)
 - [ADR 0004: resolución semántica y modos de máscara](decisions/0004-semantic-mask-resolution.md)
+- [ADR 0005: reglas y límites de las máscaras](decisions/0005-mask-contract-boundaries.md)
 
 Resumen de la dirección acordada:
 
@@ -63,7 +64,7 @@ Resumen de la dirección acordada:
 - Los segmentos estructurales/de control gobiernan la organización o instanciación sin confundirse con contenido semántico ordinario.
 - Los permisos se resuelven como una preocupación propia y común; una máscara local no obtiene automáticamente precedencia sobre la jerarquía de permisos de origen.
 
-El motor de resolución, las estructuras genéricas Segment/Concept/Component, las máscaras en código y la autorización efectiva todavía no están implementados. Esta es una brecha de implementación, no una razón para volver a abrir el diseño por defecto. Si al implementar aparece una contradicción concreta, documentar el caso reproducible y su impacto antes de proponer modificar el contrato.
+El motor de resolución, las estructuras genéricas Segment/Concept/Component, las máscaras en código y la autorización efectiva todavía no están implementados. Además, algunos casos estructurales requieren una decisión explícita: cambios del origen, eliminación/ocultación local, reubicación semántica, eliminación de recursos referenciados, composición exacta de permisos y cambios estructurales bajo Snapshot. Están enumerados en ADR 0005. Esto no reabre las reglas centrales ya acordadas. No inventar una regla: presentar un ejemplo reproducible, decidir el resultado y documentarlo antes de implementar ese caso.
 
 ## 5. Trabajo de ingeniería reciente y por qué importa
 
@@ -153,4 +154,4 @@ Cuando dos documentos parezcan discrepar, determinar cuál es la fuente normativ
 - [ ] No afirmar que se ejecutaron comandos, pasó CI o se modificó código si no se verificó.
 - [ ] Antes de refactorizar persistencia, anotar las garantías existentes que deben conservarse.
 
-**Estado al cerrar esta actualización:** la documentación de continuidad está integrada en `main` mediante el PR [#29](https://github.com/sebastianbellinkai/bittopos/pull/29). La comprobación de CI del PR pasó (formato, compilación y pruebas del workspace). No se ejecutaron comandos de Cargo localmente.
+**Última actualización de continuidad:** consultar el historial de Git y los PR más recientes; este documento no sustituye la comprobación del estado actual de `main` ni de CI.
