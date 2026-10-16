@@ -65,7 +65,11 @@ Los segmentos de control/estructurales pueden gobernar la navegación o la insta
 - La máscara local no adquiere automáticamente precedencia sobre la jerarquía de permisos de origen ni modifica la política del recurso compartido.
 - La autorización efectiva debe resolverse en un mecanismo común, no depender de lo que muestre una interfaz.
 
-### 3.5 Reglas de combinación
+### 3.5 Límites pendientes del contrato
+
+Las reglas centrales anteriores están acordadas; no significa que todos los casos estructurales estén decididos. Para evitar que la implementación invente comportamientos, los cambios estructurales del origen, la eliminación local de elementos heredados, la reubicación semántica, la eliminación del recurso de origen, la composición exacta de permisos y los cambios estructurales que afectan a Snapshot deben tratarse según [ADR 0005: reglas y límites de las máscaras](decisions/0005-mask-contract-boundaries.md). Esos casos requieren ejemplos y una decisión explícita antes de implementarse; no reabren por sí solos las reglas centrales de herencia dinámica, diferencias locales y Snapshot.
+
+### 3.6 Reglas de combinación
 
 La resolución debe distinguir, como mínimo:
 
@@ -88,7 +92,8 @@ No se debe reducir el sistema a una sobrescritura genérica de clave/valor: esa 
 - Las direcciones semánticas, y no los identificadores físicos de persistencia, gobiernan la correspondencia de elementos.
 - Las máscaras puntuales representan diferencias locales; lo no modificado conserva la herencia dinámica.
 - Editar sin máscara puede modificar el recurso compartido.
-- Las máscaras Snapshot congelan explícitamente las partes incluidas en su alcance.
+- Las máscaras Snapshot congelan explícitamente las partes maskables incluidas en su alcance.
+- Los casos de borde pendientes se delimitan en [ADR 0005](decisions/0005-mask-contract-boundaries.md).
 - Las referencias se expanden; el comportamiento de combinación depende del tipo de componente.
 - Los segmentos estructurales/de control no se confunden con contenido semántico ordinario.
 - Los permisos tienen reglas propias y una resolución efectiva común.
