@@ -52,7 +52,7 @@ Los archivos persistidos deben validarse al cargarse. Ante una discrepancia que 
 
 El contrato conceptual de máscaras está revisado y registrado en [ADR 0004](decisions/0004-semantic-mask-resolution.md) y [model.md](model.md). La implementación del motor de resolución, las máscaras puntuales y Snapshot, los componentes con comportamiento específico, la expansión de referencias y la autorización efectiva sigue pendiente.
 
-No debe volver a plantearse como tarea de diseño abierta la decisión básica sobre herencia dinámica de máscaras puntuales. La siguiente prioridad de ingeniería inmediata está en la frontera de aplicación de la CLI, no en reabrir el contrato de máscaras.
+No debe volver a plantearse como tarea de diseño abierta la decisión básica sobre herencia dinámica de máscaras puntuales. La prioridad inmediata es preparar una reestructuración del núcleo centrada en el modelo semántico y las máscaras; el flujo combinado de la CLI queda pausado. El alcance y los criterios de preparación se registran en [Preparación para la reestructuración del núcleo](CORE-REWRITE-READINESS.md).
 
 ## Cómo evolucionar la arquitectura
 

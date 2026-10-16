@@ -6,7 +6,11 @@ Mientras no existan versiones publicadas, Unreleased reúne los cambios que se p
 
 ## [Unreleased]
 
+### Engineering
+- Se prepara una reestructuración del núcleo centrada en el modelo semántico y las máscaras; el flujo de `bitto create` queda pausado hasta nuevo alcance.
+
 ### Documentation
+- Se añade una guía de preparación con límites de compatibilidad, criterios de aceptación y secuencia incremental para el cambio del núcleo.
 - Se crea un estado de continuidad que registra la dirección del producto, el inventario real, las decisiones vigentes, los PR integrados y el siguiente trabajo concreto.
 - Se alinea la visión, el modelo conceptual, la arquitectura, el estado del proyecto y el README para distinguir el contrato acordado de su implementación pendiente.
 - Se corrige la clasificación de las máscaras: su semántica está revisada conceptualmente; lo pendiente es implementar y verificar el motor, no reabrir el diseño.
