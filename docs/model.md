@@ -36,16 +36,18 @@ La lectura semántica parte de una instancia del workspace y sigue su topología
 
 ### 3.1 Máscaras puntuales
 
+- Una máscara es un **Segment** local de una instancia y debe contener al menos un Concept o Component.
 - Una máscara puntual puede dirigirse a un **Concept** o **Component** concreto.
 - La creación de una máscara puntual registra diferencias locales; no copia indiscriminadamente todo el contenido heredado.
 - Si no existe una modificación local, el valor se resuelve desde la definición vigente. Los cambios posteriores de la definición se reflejan en los elementos no modificados localmente.
 - Editar un elemento heredado sin crear una máscara local modifica directamente el recurso compartido y puede afectar a otras instancias.
 - Editar un elemento mediante una máscara puntual crea o cambia la diferencia local de esa instancia.
 - Eliminar la máscara local devuelve ese elemento al comportamiento de herencia correspondiente.
+- La redefinición del recurso de origen no elimina por sí sola las máscaras locales existentes. Una modificación de política que prohíba operaciones de máscara puede afectar a su efectividad, pero no debe confundirse con una redefinición ordinaria del contenido.
 
 ### 3.2 Máscaras Snapshot
 
-Una máscara **Snapshot** congela la definición de origen vigente para las partes a las que se aplica y evita que cambios posteriores de esas partes se propaguen como herencia dinámica. No debe confundirse con una máscara puntual: son modos distintos con efectos distintos.
+Una máscara **Snapshot** congela la definición de origen vigente para las partes maskables comprendidas en la Snapshot y evita que cambios posteriores de esas partes se propaguen como herencia dinámica. No debe confundirse con una máscara puntual: son modos distintos con efectos distintos.
 
 La semántica de una Snapshot no autoriza a congelar automáticamente todos los segmentos de una instancia si el modelo no los ha incluido en su alcance. El alcance de la máscara debe quedar explícito en la estructura semántica.
 
