@@ -56,9 +56,9 @@ Resumen de la dirección acordada:
 
 - La lectura parte de una instancia y sigue la topología hacia la definición de origen.
 - La correspondencia se hace mediante direcciones semánticas, no por rutas físicas ni por asumir que el ID de almacenamiento define la semántica.
-- Las máscaras puntuales dirigidas a Concept o Component registran diferencias locales; los elementos no modificados siguen la definición vigente.
+- Una máscara es un Segment local de una instancia y contiene al menos un Concept o Component. Las máscaras puntuales dirigidas a Concept o Component registran diferencias locales; los elementos no modificados siguen la definición vigente.
 - Editar un elemento heredado sin máscara local puede modificar la definición compartida.
-- Una máscara Snapshot congela la definición vigente para las partes explícitamente incluidas en su alcance.
+- Una máscara Snapshot congela la definición vigente para las partes maskables comprendidas en la Snapshot. La redefinición ordinaria del recurso no elimina máscaras locales; cambios de política que prohíban esas operaciones pueden afectar a su efectividad.
 - Los componentes pueden tener reglas específicas de combinación; las referencias se expanden siguiendo la referencia.
 - Los segmentos estructurales/de control gobiernan la organización o instanciación sin confundirse con contenido semántico ordinario.
 - Los permisos se resuelven como una preocupación propia y común; una máscara local no obtiene automáticamente precedencia sobre la jerarquía de permisos de origen.
