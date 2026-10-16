@@ -26,12 +26,12 @@ La lista es un inventario del código; no implica que toda ruta de error esté e
 
 - Modelo semántico general de Segment, Concept y Component.
 - Resolución desde la instancia hacia la definición mediante topología y direcciones semánticas.
-- Máscaras puntuales de diferencias locales y máscaras Snapshot, según [ADR 0004](decisions/0004-semantic-mask-resolution.md).
+- Máscaras puntuales de diferencias locales y máscaras Snapshot, según [ADR 0004](decisions/0004-semantic-mask-resolution.md) y [ADR 0005](decisions/0005-mask-contract-boundaries.md).
 - Combinación específica por tipo de componente y expansión de referencias.
 - Resolución efectiva de permisos, separada de la lectura de contenido.
 - Motor reutilizable de resolución para futuros dominios como tareas, responsabilidades y proyectos.
 
-**El contrato conceptual de máscaras ya fue revisado.** No es un pendiente de diseño ni debe volver a abrirse por defecto. Lo pendiente es implementar el contrato y probarlo. Las fuentes normativas actuales son [model.md](model.md) y [ADR 0004](decisions/0004-semantic-mask-resolution.md).
+**Las reglas centrales del contrato conceptual de máscaras ya fueron revisadas.** No deben reabrirse por defecto. Además de implementar y probar esas reglas, quedan por decidir algunos casos de borde estructurales enumerados en [ADR 0005](decisions/0005-mask-contract-boundaries.md): cambios estructurales del origen, ocultación/eliminación local, reubicación semántica, eliminación de recursos referenciados, precedencia precisa de permisos y cambios estructurales bajo Snapshot. No inventar esas reglas al implementar. Las fuentes normativas actuales son [model.md](model.md), [ADR 0004](decisions/0004-semantic-mask-resolution.md) y [ADR 0005](decisions/0005-mask-contract-boundaries.md).
 
 ## Aplazado
 
@@ -75,7 +75,7 @@ Una vez especificadas y probadas las garantías de bitto create, decidir si ese 
 
 ### 5. Implementar el motor semántico conforme al contrato acordado
 
-No reabrir el diseño de máscaras como primer paso. Implementar el contrato de [ADR 0004](decisions/0004-semantic-mask-resolution.md) de forma incremental: pruebas puras de resolución, topología/direcciones, máscaras puntuales y Snapshot, comportamiento de componentes, referencias y permisos. Mantener la persistencia como adaptador y no duplicar la semántica en la CLI o en la web.
+No reabrir el diseño de máscaras como primer paso. Implementar las reglas acordadas de [ADR 0004](decisions/0004-semantic-mask-resolution.md) de forma incremental y cerrar los casos de borde de [ADR 0005](decisions/0005-mask-contract-boundaries.md) antes de implementar las operaciones que dependan de ellos: pruebas puras de resolución, topología/direcciones, máscaras puntuales y Snapshot, comportamiento de componentes, referencias y permisos. Mantener la persistencia como adaptador y no duplicar la semántica en la CLI o en la web.
 
 ### 6. Integrar futuras interfaces cuando exista una operación compartida
 

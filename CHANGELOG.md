@@ -11,6 +11,7 @@ Mientras no existan versiones publicadas, Unreleased reúne los cambios que se p
 - Se alinea la visión, el modelo conceptual, la arquitectura, el estado del proyecto y el README para distinguir el contrato acordado de su implementación pendiente.
 - Se corrige la clasificación de las máscaras: su semántica está revisada conceptualmente; lo pendiente es implementar y verificar el motor, no reabrir el diseño.
 - Se registra ADR 0004 para la resolución semántica mediante topología, direcciones, máscaras puntuales y Snapshot, comportamiento de componentes, referencias y permisos.
+- Se añade ADR 0005 para precisar que una máscara es un Segment local de instancia, conservar las reglas acordadas de diferencias locales/herencia dinámica/Snapshot y separar seis casos estructurales que requieren decisiones explícitas.
 - Se aclara que la secuencia de ingeniería inmediata es una cola de trabajo posterior al PR #28 y no reemplaza la hoja de ruta general original de diez etapas.
 
 ### Engineering
@@ -22,6 +23,7 @@ Mientras no existan versiones publicadas, Unreleased reúne los cambios que se p
 - Se documenta la resolución desde la instancia hacia el recurso de origen mediante topología y direcciones semánticas.
 - Se distinguen las máscaras puntuales de diferencias locales de las máscaras Snapshot, que congelan las partes maskables comprendidas en la Snapshot; las redefiniciones ordinarias no eliminan máscaras locales.
 - Se aclara que los componentes pueden tener reglas específicas de combinación, que las referencias se expanden y que los permisos se resuelven separadamente del contenido.
+- Se documentan como pendientes explícitos la evolución estructural del origen, eliminación local/ocultación de elementos heredados, identidad ante reubicación, eliminación de recursos referenciados, precedencia exacta de permisos y evolución de elementos congelados por Snapshot.
 
 ### Notes
 - Estos cambios son documentales. No implementan el motor semántico, las máscaras, la autorización efectiva, un servidor HTTP ni una integración de la interfaz web con el núcleo Rust.

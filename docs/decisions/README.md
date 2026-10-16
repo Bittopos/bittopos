@@ -32,3 +32,4 @@ No se reescriben los ADR aceptados para ocultar la historia. Si una decisión ca
 - [ADR 0002: máscaras como segmentos locales de instancia (sustituido)](0002-segment-masks.md)
 - [ADR 0003: máscaras dispersas y herencia dinámica (marco parcial sustituido)](0003-sparse-mask-overrides.md)
 - [ADR 0004: resolución semántica y modos de máscara](0004-semantic-mask-resolution.md)
+- [ADR 0005: reglas y límites de las máscaras](0005-mask-contract-boundaries.md)
