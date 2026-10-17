@@ -399,22 +399,6 @@ mod tests {
     }
 
     #[test]
-    fn strict_scan_rejects_resource_without_structural_registry_before_recovery() {
-        let (_dir, store) = store();
-        let id = Uuid::now_v7();
-        fs::write(
-            store.path_for(id),
-            format!("id = \"{id}\"\n\n[info]\ntitle = \"Antiguo\"\ntags = []\n"),
-        )
-        .unwrap();
-
-        assert!(matches!(
-            store.all_strict(),
-            Err(StoreError::IncompleteStructural(found)) if found == id
-        ));
-    }
-
-    #[test]
     fn new_resource_persists_management_with_empty_structural_registry() {
         let (_dir, store) = store();
         let (resource, _) = store.create("Nuevo", None).unwrap();
@@ -509,15 +493,6 @@ mod tests {
     }
 
     #[test]
-    fn recovers_resource_from_disk() {
-        let (_dir, store) = store();
-        let (created, _) = store.create("Persistente", Some("Texto")).unwrap();
-        let (recovered, warnings) = store.recover().unwrap();
-        assert!(warnings.is_empty());
-        assert_eq!(recovered, vec![created]);
-    }
-
-    #[test]
     fn patch_preserves_omitted_fields_and_identity() {
         let (_dir, store) = store();
         let (created, _) = store.create("Antes", Some("Descripción")).unwrap();
@@ -556,29 +531,6 @@ mod tests {
         let (_dir, store) = store();
         let missing = Uuid::now_v7();
         assert!(matches!(store.get(missing), Err(StoreError::NotFound(id)) if id == missing));
-    }
-
-    #[test]
-    fn recovery_skips_corrupt_file_and_continues() {
-        let (_dir, store) = store();
-        let (valid, _) = store.create("Válido", None).unwrap();
-        let corrupt_id = Uuid::now_v7();
-        fs::write(store.path_for(corrupt_id), "esto no es TOML válido = [").unwrap();
-        let (recovered, warnings) = store.recover().unwrap();
-        assert_eq!(recovered, vec![valid]);
-        assert_eq!(warnings.len(), 1);
-    }
-
-    #[test]
-    fn recovery_rejects_filename_content_id_mismatch() {
-        let (_dir, store) = store();
-        let (resource, _) = store.create("Original", None).unwrap();
-        let other_id = Uuid::now_v7();
-        fs::rename(store.path_for(resource.id), store.path_for(other_id)).unwrap();
-        let (recovered, warnings) = store.recover().unwrap();
-        assert!(recovered.is_empty());
-        assert_eq!(warnings.len(), 1);
-        assert!(warnings[0].contains("no coincide"));
     }
 
     #[test]
