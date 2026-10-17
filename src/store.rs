@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 use crate::resource::{
-    normalize_description, normalize_name, validate_stored_name, Info, Resource,
-    ResourceError, ResourcePatch, ResourceWarning,
+    normalize_description, normalize_name, validate_stored_name, Info, Resource, ResourceError,
+    ResourcePatch, ResourceWarning,
 };
 use crate::semantic_masks::{ResourceDefinition, Segment, SegmentRole};
 
@@ -47,7 +47,9 @@ impl std::fmt::Display for StoreError {
                 "el ID no aparece en la primera línea de {}",
                 path.display()
             ),
-            Self::InvalidSemanticModel(message) => write!(f, "modelo semántico inválido: {message}"),
+            Self::InvalidSemanticModel(message) => {
+                write!(f, "modelo semántico inválido: {message}")
+            }
         }
     }
 }
