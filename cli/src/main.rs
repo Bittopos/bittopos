@@ -3,9 +3,10 @@ use std::path::PathBuf;
 use std::process;
 
 use bittopos_core::{
-    children_of, create_instance_at_current_location, create_instance_under, prepare_workspace,
-    remove_instance_and_update_navigation, Instance, NavigationState, NavigationStore,
-    ResourcePatch, ResourceStore, Workspace, WorkspaceModelError, WorkspaceStore,
+    children_of, create_instance_at_current_location, create_instance_under, create_relation,
+    is_relation, prepare_workspace, relation_endpoints, remove_instance_and_update_navigation,
+    Instance, NavigationState, NavigationStore, RelationEndpoints, ResourcePatch, ResourceStore,
+    Workspace, WorkspaceModelError, WorkspaceStore,
 };
 use clap::{Parser, Subcommand};
 use uuid::Uuid;
@@ -47,6 +48,22 @@ enum Command {
     Add { id: Uuid },
     /// Elimina una instancia hoja por su UUID propio.
     Remove { id: Uuid },
+    /// Crea una relación entre dos recursos.
+    RelateResources {
+        title: String,
+        source: Uuid,
+        target: Uuid,
+        #[arg(long)]
+        description: Option<String>,
+    },
+    /// Crea una relación entre dos instancias existentes.
+    RelateInstances {
+        title: String,
+        source: Uuid,
+        target: Uuid,
+        #[arg(long)]
+        description: Option<String>,
+    },
 }
 
 struct Paths {
@@ -164,6 +181,13 @@ fn run() -> Result<(), String> {
             if !resource.info.tags.is_empty() {
                 println!("Etiquetas: {}", resource.info.tags.join(", "));
             }
+            if is_relation(&resource) {
+                println!("Tipo: relación");
+                println!(
+                    "Extremos: {:?}",
+                    relation_endpoints(&resource).map_err(|error| error.to_string())?
+                );
+            }
         }
         Command::Show { id: None } => {
             print_workspace(&startup_workspace, &resources)?;
@@ -255,6 +279,40 @@ fn run() -> Result<(), String> {
                 );
             }
             println!("Instancia removida: {id}");
+        }
+        Command::RelateResources {
+            title,
+            source,
+            target,
+            description,
+        } => {
+            let relation = create_relation(
+                &resources,
+                &workspaces,
+                WORKSPACE_FILE,
+                &title,
+                description.as_deref(),
+                RelationEndpoints::Resources { source, target },
+            )
+            .map_err(|error| error.to_string())?;
+            println!("Relación creada: {} ({})", relation.info.title, relation.id);
+        }
+        Command::RelateInstances {
+            title,
+            source,
+            target,
+            description,
+        } => {
+            let relation = create_relation(
+                &resources,
+                &workspaces,
+                WORKSPACE_FILE,
+                &title,
+                description.as_deref(),
+                RelationEndpoints::Instances { source, target },
+            )
+            .map_err(|error| error.to_string())?;
+            println!("Relación creada: {} ({})", relation.info.title, relation.id);
         }
     }
 

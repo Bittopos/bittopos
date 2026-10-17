@@ -7,7 +7,9 @@
 use std::fmt;
 use uuid::Uuid;
 
-use crate::{Instance, ResourceStore, StoreError, Workspace, WorkspaceError, WorkspaceStore};
+use crate::{
+    is_relation, Instance, ResourceStore, StoreError, Workspace, WorkspaceError, WorkspaceStore,
+};
 
 #[derive(Debug)]
 pub enum LifecycleError {
@@ -15,6 +17,7 @@ pub enum LifecycleError {
     Workspace(WorkspaceError),
     ParentRequired,
     InstanceNotFound(Uuid),
+    RelationCannotBeInstantiated(Uuid),
 }
 
 impl fmt::Display for LifecycleError {
@@ -24,6 +27,10 @@ impl fmt::Display for LifecycleError {
             Self::Workspace(error) => write!(f, "error de estructura: {error}"),
             Self::ParentRequired => write!(f, "la instancia padre no existe"),
             Self::InstanceNotFound(id) => write!(f, "no existe la instancia {id}"),
+            Self::RelationCannotBeInstantiated(id) => write!(
+                f,
+                "la relación {id} se lee directamente y no puede instanciarse"
+            ),
         }
     }
 }
@@ -63,7 +70,10 @@ pub fn load_workspace(
 
     workspace.validate()?;
     for instance in workspace.all_instances() {
-        resources.get(instance.source.id)?;
+        let resource = resources.get(instance.source.id)?;
+        if is_relation(&resource) {
+            return Err(LifecycleError::RelationCannotBeInstantiated(resource.id));
+        }
     }
     Ok(workspace)
 }
@@ -86,7 +96,10 @@ pub fn create_instance_under(
     resource_id: Uuid,
     parent_id: Option<Uuid>,
 ) -> Result<Uuid, LifecycleError> {
-    resources.get(resource_id)?;
+    let resource = resources.get(resource_id)?;
+    if is_relation(&resource) {
+        return Err(LifecycleError::RelationCannotBeInstantiated(resource_id));
+    }
     let mut workspace = load_workspace(resources, workspaces, workspace_name)?;
 
     if let Some(parent) = parent_id {
@@ -191,5 +204,29 @@ mod tests {
         .unwrap();
 
         assert!(remove_instance(&resources, &workspaces, "principal", root).is_err());
+    }
+
+    #[test]
+    fn refuses_to_instantiate_a_relation_resource() {
+        let (_dir, resources, workspaces) = setup();
+        let (source, _) = resources.create("Origen", None).unwrap();
+        let (target, _) = resources.create("Destino", None).unwrap();
+        let relation = crate::create_relation(
+            &resources,
+            &workspaces,
+            "principal",
+            "Relación",
+            None,
+            crate::RelationEndpoints::Resources {
+                source: source.id,
+                target: target.id,
+            },
+        )
+        .unwrap();
+
+        assert!(matches!(
+            create_instance(&resources, &workspaces, "principal", relation.id),
+            Err(LifecycleError::RelationCannotBeInstantiated(id)) if id == relation.id
+        ));
     }
 }

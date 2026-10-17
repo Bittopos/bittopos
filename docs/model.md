@@ -6,6 +6,12 @@ Este documento define el modelo conceptual vigente.
 
 Un recurso es un archivo TOML individual. Contiene una definición reutilizable y sus segmentos. Su identidad es distinta de la identidad de cualquier instancia que lo use.
 
+## Relación
+
+Una relación es un tipo especial de recurso que vive en el mismo espacio de definición. Tiene identidad propia y el segmento descriptivo reservado `info`, pero se consulta directamente: no puede instanciarse ni enmascararse. Puede conectar dos recursos o dos instancias; nunca se mezclan los tipos de extremos. La relación no modifica la contención estructural.
+
+En esta primera implementación, los extremos se guardan en un segmento de control reservado y no se presentan como contenido semántico ordinario. Las relaciones se leen por su identificador de recurso; la lectura no crea instancias.
+
 ## Estructura
 
 La estructura es un archivo JSON que organiza las instancias de forma jerárquica. Es también el espacio de trabajo: no existe un segundo concepto independiente de workspace.
@@ -14,7 +20,7 @@ La estructura conserva cada instancia y sus hijos directos. La jerarquía comple
 
 ## Instancia
 
-Una instancia es una aparición identificable de un recurso dentro de la estructura. Conserva su propia identidad y una referencia al recurso de origen. No es una copia completa del recurso.
+Una instancia es una aparición identificable de un recurso dentro de la estructura. Los recursos que representan relaciones no pueden ser origen de instancias. Conserva su propia identidad y una referencia al recurso de origen. No es una copia completa del recurso.
 
 ## Segmento, concepto y componente
 
@@ -41,7 +47,7 @@ La jerarquía de resolución se ampliará solo mediante reglas explícitas del m
 
 ## Persistencia actual
 
-- Recursos: archivos TOML individuales.
+- Recursos y relaciones: archivos TOML individuales en el mismo almacén de definiciones.
 - Estructura e instancias: archivo JSON.
 - Navegación: archivo TOML local.
 - Máscaras de instancia: datos persistidos dentro de la instancia.
