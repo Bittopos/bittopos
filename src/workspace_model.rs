@@ -160,7 +160,9 @@ impl Instance {
         if self
             .semantic
             .as_ref()
-            .is_some_and(|semantic| semantic.allocation.is_empty() && semantic.references.is_empty())
+            .is_some_and(|semantic| {
+                semantic.allocation.is_empty() && semantic.references.is_empty()
+            })
         {
             self.semantic = None;
         }
