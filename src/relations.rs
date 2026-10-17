@@ -197,8 +197,16 @@ mod tests {
 
         assert!(is_relation(&stored));
         assert_eq!(stored.info.title, "Relacionado con");
-        let control = stored.segments.iter().find(|segment| segment.key == "__relation").unwrap();
-        let keys: Vec<_> = control.components.iter().map(|component| component.key.as_str()).collect();
+        let control = stored
+            .segments
+            .iter()
+            .find(|segment| segment.key == "__relation")
+            .unwrap();
+        let keys: Vec<_> = control
+            .components
+            .iter()
+            .map(|component| component.key.as_str())
+            .collect();
         assert_eq!(keys, vec!["from", "to"]);
         assert_eq!(
             relation_endpoints(&stored).unwrap(),
