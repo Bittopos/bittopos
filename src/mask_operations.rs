@@ -126,7 +126,7 @@ pub fn edit_instance_component(
     component: &str,
     value: serde_json::Value,
 ) -> Result<(), MaskOperationError> {
-    let (mut workspace, _) = reconcile_workspace(resources, workspaces, workspace_name)?;
+    let mut workspace = load_workspace(resources, workspaces, workspace_name)?;
     let instance = load_instance(&mut workspace, instance_id)?;
     let resource = resources.get(instance.source.id)?;
     instance.edit_local_component(&resource, segment, component, value)?;
@@ -144,7 +144,7 @@ pub fn create_snapshot(
     segment: &str,
     scope: &[ElementAddress],
 ) -> Result<(), MaskOperationError> {
-    let (mut workspace, _) = reconcile_workspace(resources, workspaces, workspace_name)?;
+    let mut workspace = load_workspace(resources, workspaces, workspace_name)?;
     let instance = load_instance(&mut workspace, instance_id)?;
     let resource = resources.get(instance.source.id)?;
     instance.create_mask_snapshot(&resource, segment, scope)?;
@@ -162,7 +162,7 @@ pub fn remove_mask(
     segment: &str,
     mode: MaskMode,
 ) -> Result<(), MaskOperationError> {
-    let (mut workspace, _) = reconcile_workspace(resources, workspaces, workspace_name)?;
+    let mut workspace = load_workspace(resources, workspaces, workspace_name)?;
     load_instance(&mut workspace, instance_id)?.remove_semantic_mask(segment, mode)?;
     workspace.validate().map_err(WorkspaceError::from)?;
     workspaces.save(workspace_name, &workspace)?;
