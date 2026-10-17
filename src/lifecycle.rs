@@ -42,6 +42,12 @@ impl From<WorkspaceError> for LifecycleError {
     }
 }
 
+impl From<crate::WorkspaceModelError> for LifecycleError {
+    fn from(error: crate::WorkspaceModelError) -> Self {
+        Self::Workspace(WorkspaceError::from(error))
+    }
+}
+
 /// Carga la estructura. Si aún no existe, comienza vacía.
 /// Comprueba que cada instancia referencia un recurso existente.
 pub fn load_workspace(
