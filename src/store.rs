@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 use crate::resource::{
-    normalize_description, normalize_name, validate_stored_name, Info, Management, Resource,
+    normalize_description, normalize_name, validate_stored_name, Info, Resource,
     ResourceError, ResourcePatch, ResourceWarning,
 };
 use crate::semantic_masks::{ResourceDefinition, Segment, SegmentRole};
@@ -19,7 +19,6 @@ pub enum StoreError {
     InvalidFileName(PathBuf),
     IdMismatch { expected: Uuid, found: Uuid },
     IdNotFirstLine(PathBuf),
-    StructuralConflict(Uuid),
     InvalidSemanticModel(String),
 }
 
@@ -47,10 +46,6 @@ impl std::fmt::Display for StoreError {
                 f,
                 "el ID no aparece en la primera línea de {}",
                 path.display()
-            ),
-            Self::StructuralConflict(id) => write!(
-                f,
-                "la instancia {id} ya figura en la asignación del recurso"
             ),
             Self::InvalidSemanticModel(message) => write!(f, "modelo semántico inválido: {message}"),
         }
@@ -110,7 +105,6 @@ impl ResourceStore {
         let description = normalize_description(description.map(str::to_owned));
         let resource = Resource {
             id,
-            management: Management::default(),
             info: Info {
                 title: name,
                 description,
@@ -131,43 +125,6 @@ impl ResourceStore {
             return Err(StoreError::NotFound(id));
         }
         self.read_file(&path, id)
-    }
-
-    /// Registra una identidad de instancia en el espacio administrativo de la definición.
-    /// Es una operación de ciclo de vida; no permite editar directamente el segmento
-    /// administrativo ni reemplazar la asignación completa.
-    pub(crate) fn register_instance(
-        &self,
-        resource_id: Uuid,
-        instance_id: Uuid,
-    ) -> Result<(), StoreError> {
-        let mut resource = self.get(resource_id)?;
-        if resource.management.structural.contains(&instance_id) {
-            return Err(StoreError::StructuralConflict(instance_id));
-        }
-        resource.management.structural.push(instance_id);
-        self.write_existing(&resource)
-    }
-
-    /// Retira una identidad de instancia del registro administrativo.
-    /// Devuelve false si el registro ya no contenía esa identidad.
-    pub(crate) fn unregister_instance(
-        &self,
-        resource_id: Uuid,
-        instance_id: Uuid,
-    ) -> Result<bool, StoreError> {
-        let mut resource = self.get(resource_id)?;
-        let Some(position) = resource
-            .management
-            .structural
-            .iter()
-            .position(|id| *id == instance_id)
-        else {
-            return Ok(false);
-        };
-        resource.management.structural.remove(position);
-        self.write_existing(&resource)?;
-        Ok(true)
     }
 
     pub fn update(
@@ -358,108 +315,6 @@ mod tests {
         let file = fs::read_to_string(store.path_for(resource.id)).unwrap();
         assert!(file.lines().next().unwrap().starts_with("id = "));
         assert!(file.contains("title = \"Primer recurso\""));
-    }
-
-    #[test]
-    fn loads_legacy_resource_without_management_with_empty_structural_registry() {
-        let (_dir, store) = store();
-        let id = Uuid::now_v7();
-        let path = store.path_for(id);
-        fs::write(
-            &path,
-            format!("id = \"{id}\"\n\n[info]\ntitle = \"Recurso antiguo\"\ntags = []\n"),
-        )
-        .unwrap();
-
-        let resource = store.get(id).unwrap();
-        assert_eq!(resource.info.title, "Recurso antiguo");
-        assert!(resource.management.structural.is_empty());
-    }
-
-    #[test]
-    fn new_resource_persists_management_with_empty_structural_registry() {
-        let (_dir, store) = store();
-        let (resource, _) = store.create("Nuevo", None).unwrap();
-        let file = fs::read_to_string(store.path_for(resource.id)).unwrap();
-
-        assert!(file.contains("[management]"));
-        assert!(file.contains("structural = []"));
-        assert!(resource.management.structural.is_empty());
-    }
-
-    #[test]
-    fn reads_legacy_allocation_and_writes_structural_on_next_update() {
-        let (_dir, store) = store();
-        let id = Uuid::now_v7();
-        let instance_id = Uuid::now_v7();
-        let path = store.path_for(id);
-        fs::write(
-            &path,
-            format!(
-                "id = \"{id}\"\n\n[management]\nallocation = [\"{instance_id}\"]\n\n[info]\ntitle = \"Legado\"\ntags = []\n"
-            ),
-        )
-        .unwrap();
-
-        let loaded = store.get(id).unwrap();
-        assert_eq!(loaded.management.structural, vec![instance_id]);
-
-        store
-            .update(
-                id,
-                ResourcePatch {
-                    title: Some("Actualizado".to_owned()),
-                    ..Default::default()
-                },
-            )
-            .unwrap();
-
-        let persisted = fs::read_to_string(path).unwrap();
-        assert!(persisted.contains("structural = ["));
-        assert!(!persisted.contains("allocation = ["));
-        assert_eq!(
-            store.get(id).unwrap().management.structural,
-            vec![instance_id]
-        );
-    }
-
-    #[test]
-    fn structural_registry_registers_and_unregisters_instance_ids() {
-        let (_dir, store) = store();
-        let (resource, _) = store.create("Asignación", None).unwrap();
-        let instance_id = Uuid::now_v7();
-
-        store.register_instance(resource.id, instance_id).unwrap();
-        assert_eq!(
-            store.get(resource.id).unwrap().management.structural,
-            vec![instance_id]
-        );
-
-        assert!(store.unregister_instance(resource.id, instance_id).unwrap());
-        assert!(store
-            .get(resource.id)
-            .unwrap()
-            .management
-            .structural
-            .is_empty());
-        assert!(!store.unregister_instance(resource.id, instance_id).unwrap());
-    }
-
-    #[test]
-    fn structural_registry_rejects_duplicate_instance_ids() {
-        let (_dir, store) = store();
-        let (resource, _) = store.create("Asignación", None).unwrap();
-        let instance_id = Uuid::now_v7();
-
-        store.register_instance(resource.id, instance_id).unwrap();
-        assert!(matches!(
-            store.register_instance(resource.id, instance_id),
-            Err(StoreError::StructuralConflict(id)) if id == instance_id
-        ));
-        assert_eq!(
-            store.get(resource.id).unwrap().management.structural,
-            vec![instance_id]
-        );
     }
 
     #[test]

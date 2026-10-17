@@ -96,7 +96,6 @@ pub fn create_instance_under(
     }
 
     let instance = Instance::new(Uuid::now_v7(), resource_id);
-    resources.register_instance(resource_id, instance.id)?;
     match parent_id {
         Some(parent) => workspace.insert_child(parent, instance.clone())?,
         None => workspace.insert_root(instance.clone())?,
@@ -123,7 +122,6 @@ pub fn remove_instance(
     }
 
     workspace.remove_leaf(instance_id)?;
-    resources.unregister_instance(instance.source.id, instance_id)?;
     workspaces.save(workspace_name, &workspace)?;
     Ok(())
 }

@@ -7,10 +7,6 @@ pub struct Resource {
     /// Identidad estable del recurso.
     /// Se serializa primero para facilitar la comprobación del archivo.
     pub id: Uuid,
-    /// Metadatos administrativos reservados al núcleo.
-    /// No se exponen a consumidores externos ni a operaciones de instancia.
-    #[serde(default)]
-    pub(crate) management: Management,
     pub info: Info,
     /// Segmentos semánticos adicionales; ausente en recursos históricos equivale a vacío.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -56,12 +52,6 @@ impl Resource {
 }
 
 /// Estado administrativo del recurso. Su contenido no forma parte de la API pública.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct Management {
-    /// Identidades de instancias creadas a partir de esta definición.
-    #[serde(default, alias = "allocation")]
-    pub(crate) structural: Vec<Uuid>,
-}
 
 /// Información descriptiva del recurso.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
