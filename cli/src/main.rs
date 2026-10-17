@@ -277,18 +277,38 @@ fn run() -> Result<(), String> {
             }
             println!("Instancia removida: {id}");
         }
-        Command::RelateResources { title, source, target, description } => {
+        Command::RelateResources {
+            title,
+            source,
+            target,
+            description,
+        } => {
             let relation = create_relation(
-                &resources, &workspaces, WORKSPACE_FILE, &title, description.as_deref(),
+                &resources,
+                &workspaces,
+                WORKSPACE_FILE,
+                &title,
+                description.as_deref(),
                 RelationEndpoints::Resources { source, target },
-            ).map_err(|error| error.to_string())?;
+            )
+            .map_err(|error| error.to_string())?;
             println!("Relación creada: {} ({})", relation.info.title, relation.id);
         }
-        Command::RelateInstances { title, source, target, description } => {
+        Command::RelateInstances {
+            title,
+            source,
+            target,
+            description,
+        } => {
             let relation = create_relation(
-                &resources, &workspaces, WORKSPACE_FILE, &title, description.as_deref(),
+                &resources,
+                &workspaces,
+                WORKSPACE_FILE,
+                &title,
+                description.as_deref(),
                 RelationEndpoints::Instances { source, target },
-            ).map_err(|error| error.to_string())?;
+            )
+            .map_err(|error| error.to_string())?;
             println!("Relación creada: {} ({})", relation.info.title, relation.id);
         }
 
