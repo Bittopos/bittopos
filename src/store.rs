@@ -165,9 +165,17 @@ impl ResourceStore {
         segments: Vec<Segment>,
     ) -> Result<Resource, StoreError> {
         let mut resource = self.get(id)?;
-        let is_relation = resource.segments.iter().any(|segment| segment.key == "__relation" && segment.role == SegmentRole::Control);
-        if is_relation && !segments.iter().any(|segment| segment.key == "__relation" && segment.role == SegmentRole::Control) {
-            return Err(StoreError::InvalidSemanticModel("no se puede retirar el segmento de control de una relación".to_owned()));
+        let is_relation = resource.segments.iter().any(|segment| {
+            segment.key == "__relation" && segment.role == SegmentRole::Control
+        });
+        if is_relation
+            && !segments.iter().any(|segment| {
+                segment.key == "__relation" && segment.role == SegmentRole::Control
+            })
+        {
+            return Err(StoreError::InvalidSemanticModel(
+                "no se puede retirar el segmento de control de una relación".to_owned(),
+            ));
         }
         resource.segments = segments;
         resource
@@ -247,9 +255,17 @@ impl ResourceStore {
             }
         };
         let mut resource = self.get(id)?;
-        let is_relation = resource.segments.iter().any(|segment| segment.key == "__relation" && segment.role == SegmentRole::Control);
-        if is_relation && !definition.segments.iter().any(|segment| segment.key == "__relation" && segment.role == SegmentRole::Control) {
-            return Err(StoreError::InvalidSemanticModel("no se puede retirar el segmento de control de una relación".to_owned()));
+        let is_relation = resource.segments.iter().any(|segment| {
+            segment.key == "__relation" && segment.role == SegmentRole::Control
+        });
+        if is_relation
+            && !definition.segments.iter().any(|segment| {
+                segment.key == "__relation" && segment.role == SegmentRole::Control
+            })
+        {
+            return Err(StoreError::InvalidSemanticModel(
+                "no se puede retirar el segmento de control de una relación".to_owned(),
+            ));
         }
         let (title, _) = normalize_name(&title)?;
         resource.info.title = title;
