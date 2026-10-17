@@ -6,16 +6,17 @@
 CLI bitto
    ↓
 operaciones del núcleo
-   ├── recurso TOML
+   ├── recursos y relaciones TOML
    ├── estructura JSON con instancias
    └── resolución semántica
 ```
 
-La estructura es el único contenedor de organización de las instancias. Los recursos son archivos independientes. La resolución combina la definición compartida con las diferencias locales de la instancia.
+La estructura es el único contenedor de organización de las instancias. Los recursos y relaciones son archivos independientes; las relaciones se leen directamente sin instanciación. La resolución combina la definición compartida con las diferencias locales de la instancia.
 
 ## Módulos
 
 - `resource.rs`: modelo de recurso y metadatos.
+- `relations.rs`: creación, lectura y validación de extremos de relaciones.
 - `store.rs`: lectura y escritura de recursos TOML.
 - `workspace_model.rs`: instancias, contención y reglas del modelo de estructura.
 - `workspace.rs`: serialización JSON de la estructura.
