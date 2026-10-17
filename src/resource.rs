@@ -145,7 +145,6 @@ mod tests {
     }
 }
 
-
 const REFERENCE_SEGMENT: &str = "__reference";
 
 /// Errores al crear o interpretar recursos de referencia.
@@ -256,7 +255,6 @@ pub fn reference_target(resource: &Resource) -> Result<Uuid, ReferenceError> {
     Uuid::parse_str(value)
         .map_err(|_| ReferenceError::Invalid(format!("UUID de instancia inválido: {value}")))
 }
-
 
 #[cfg(test)]
 mod reference_tests {
