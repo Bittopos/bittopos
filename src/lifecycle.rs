@@ -7,9 +7,7 @@
 use std::fmt;
 use uuid::Uuid;
 
-use crate::{
-    Instance, ResourceStore, StoreError, Workspace, WorkspaceError, WorkspaceStore,
-};
+use crate::{Instance, ResourceStore, StoreError, Workspace, WorkspaceError, WorkspaceStore};
 
 #[derive(Debug)]
 pub enum LifecycleError {
@@ -152,7 +150,10 @@ mod tests {
 
         let structure = workspaces.load("principal").unwrap();
         assert_eq!(structure.parent_of(child), Some(root));
-        assert_eq!(structure.find_instance(child).unwrap().source.id, child_resource.id);
+        assert_eq!(
+            structure.find_instance(child).unwrap().source.id,
+            child_resource.id
+        );
     }
 
     #[test]
@@ -163,7 +164,11 @@ mod tests {
 
         remove_instance(&resources, &workspaces, "principal", id).unwrap();
 
-        assert!(workspaces.load("principal").unwrap().find_instance(id).is_none());
+        assert!(workspaces
+            .load("principal")
+            .unwrap()
+            .find_instance(id)
+            .is_none());
         assert!(resources.get(resource.id).is_ok());
     }
 
@@ -172,7 +177,14 @@ mod tests {
         let (_dir, resources, workspaces) = setup();
         let (resource, _) = resources.create("Recurso", None).unwrap();
         let root = create_instance(&resources, &workspaces, "principal", resource.id).unwrap();
-        create_instance_under(&resources, &workspaces, "principal", resource.id, Some(root)).unwrap();
+        create_instance_under(
+            &resources,
+            &workspaces,
+            "principal",
+            resource.id,
+            Some(root),
+        )
+        .unwrap();
 
         assert!(remove_instance(&resources, &workspaces, "principal", root).is_err());
     }

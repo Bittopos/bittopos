@@ -4,9 +4,8 @@ use std::fmt;
 use uuid::Uuid;
 
 use crate::{
-    load_workspace, ComponentMerge, ElementAddress, Instance, LifecycleError, MaskError,
-    MaskMode, Resource, ResourceDefinition, ResourceStore, StoreError, WorkspaceError,
-    WorkspaceStore,
+    load_workspace, ComponentMerge, ElementAddress, Instance, LifecycleError, MaskError, MaskMode,
+    Resource, ResourceDefinition, ResourceStore, StoreError, WorkspaceError, WorkspaceStore,
 };
 
 #[derive(Debug)]
