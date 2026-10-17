@@ -1,7 +1,7 @@
 use crate::semantic_masks::{Component, Segment, SegmentRole};
 use crate::{load_workspace, LifecycleError, ResourceStore, StoreError, WorkspaceStore};
-use std::fmt;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -242,7 +242,9 @@ pub fn reference_target(resource: &Resource) -> Result<Uuid, ReferenceError> {
         .components
         .iter()
         .find(|component| component.key == "point")
-        .ok_or_else(|| ReferenceError::Invalid("falta el componente reservado 'point'".to_owned()))?;
+        .ok_or_else(|| {
+            ReferenceError::Invalid("falta el componente reservado 'point'".to_owned())
+        })?;
     if point.kind != "instance-id" {
         return Err(ReferenceError::Invalid(
             "el componente 'point' debe ser de tipo 'instance-id'".to_owned(),
@@ -268,8 +270,10 @@ mod reference_tests {
         let workspaces = WorkspaceStore::new(directory.path().join("workspaces")).unwrap();
         let (owner_resource, _) = resources.create("Propietario", None).unwrap();
         let (target_resource, _) = resources.create("Destino", None).unwrap();
-        let owner = create_instance(&resources, &workspaces, "principal", owner_resource.id).unwrap();
-        let target = create_instance(&resources, &workspaces, "principal", target_resource.id).unwrap();
+        let owner =
+            create_instance(&resources, &workspaces, "principal", owner_resource.id).unwrap();
+        let target =
+            create_instance(&resources, &workspaces, "principal", target_resource.id).unwrap();
 
         let reference = create_reference(
             &resources,
@@ -286,7 +290,13 @@ mod reference_tests {
         assert_eq!(reference_target(&reference).unwrap(), target);
         let workspace = workspaces.load("principal").unwrap();
         assert_eq!(
-            workspace.find_instance(owner).unwrap().semantic.as_ref().unwrap().references,
+            workspace
+                .find_instance(owner)
+                .unwrap()
+                .semantic
+                .as_ref()
+                .unwrap()
+                .references,
             vec![reference.id]
         );
         assert!(matches!(
