@@ -19,6 +19,18 @@ Prototipo local en Rust. La CLI `bitto` es la interfaz operativa principal. Hay 
 
 La persistencia entre archivos no es transaccional: las operaciones escriben directamente sus archivos y una interrupción puede dejar cambios parciales. No existe journal ni recuperación automática.
 
+## Relaciones
+
+Las relaciones son recursos de definición con identidad propia; no se instancian. Se pueden crear relaciones entre recursos o entre instancias, sin mezclar los tipos de extremos:
+
+```bash
+bitto relate-resources "Relacionado con" <ID_RECURSO_ORIGEN> <ID_RECURSO_DESTINO>
+bitto relate-instances "Depende de" <ID_INSTANCIA_ORIGEN> <ID_INSTANCIA_DESTINO>
+bitto show <ID_RELACION>
+```
+
+`bitto show <ID_RELACION>` muestra los metadatos y los extremos de la relación.
+
 ## Inicio rápido
 
 Requisitos: Rust y Cargo.
