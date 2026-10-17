@@ -65,7 +65,10 @@ pub fn load_workspace(
 
     workspace.validate()?;
     for instance in workspace.all_instances() {
-        resources.get(instance.source.id)?;
+        let resource = resources.get(instance.source.id)?;
+        if is_relation(&resource) {
+            return Err(LifecycleError::RelationCannotBeInstantiated(resource.id));
+        }
     }
     Ok(workspace)
 }
