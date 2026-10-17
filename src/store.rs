@@ -134,5 +134,4 @@ impl std::fmt::Display for StoreError {
             .unwrap();
         assert_eq!(updated.info.description, None);
     }
-
 }
