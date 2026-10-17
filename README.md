@@ -2,7 +2,7 @@
 
 Bittopos es un sistema de estructuración semántica y control de ejecución. El proyecto permite modelar, organizar y navegar información mediante recursos, instancias y relaciones estructurales, con un modelo que las personas conservan bajo su control.
 
-> **Estado:** prototipo local en desarrollo. La CLI bitto es la interfaz operativa actual. El contrato conceptual de máscaras está revisado, pero el motor general Segment/Concept/Component, la resolución semántica y los permisos efectivos todavía no están implementados.
+> **Estado:** prototipo local en desarrollo. La CLI bitto es la interfaz operativa actual. El motor de dominio de máscaras puntuales y Snapshot ya existe en el núcleo y su estado se persiste en los formatos locales; los comandos CLI, la expansión de referencias y la autorización efectiva todavía no están implementados.
 
 ## Qué existe hoy
 
@@ -13,6 +13,9 @@ Bittopos es un sistema de estructuración semántica y control de ejecución. El
 - Navegación persistente local.
 - Operaciones de ciclo de vida coordinadas mediante journal durable y recuperación.
 - Frontera de aplicación para preparar el workspace, crear instancias en la ubicación actual y eliminar instancias actualizando la navegación.
+- Motor semántico inicial para Segment/Concept/Component, roles de segmento, máscaras puntuales y Snapshot, con resolución por definición vigente y diferencias locales.
+- Máscaras serializadas en instancias y segmentos semánticos adicionales persistidos en TOML; la metadata histórica se proyecta como segmento reservado info.
+- Operaciones de núcleo para editar conceptos/componentes locales o compartidos, crear Snapshot, retirar máscaras y resolver una instancia.
 - Pruebas de integridad y recuperación para distintos estados intermedios e inconsistentes.
 
 Consulta [Estado del proyecto](docs/status.md) para el inventario completo y [Estado de trabajo y continuidad](docs/WORKING-STATE.md) para el punto exacto de continuación.
@@ -58,6 +61,7 @@ Consulta [CONTRIBUTING.md](CONTRIBUTING.md) para ramas, commits y Pull Requests,
 - [Estado del proyecto y alcance](docs/status.md)
 - [Estado de trabajo y continuidad](docs/WORKING-STATE.md)
 - [Modelo conceptual](docs/model.md)
+- [Implementación del motor de máscaras](docs/semantic-masks-engine.md)
 - [Arquitectura actual y dirección](docs/architecture.md)
 - [Decisiones arquitectónicas (ADR)](docs/decisions/README.md)
 - [Guía de ingeniería](docs/DEVELOPMENT-GUIDE.md)

@@ -7,6 +7,7 @@ use crate::resource::{
     normalize_description, normalize_name, validate_stored_name, Info, Management, Resource,
     ResourceError, ResourcePatch, ResourceWarning,
 };
+use crate::semantic_masks::{ResourceDefinition, Segment, SegmentRole};
 
 #[derive(Debug)]
 pub enum StoreError {
@@ -22,6 +23,7 @@ pub enum StoreError {
     PreparedContentMismatch(Uuid),
     StructuralConflict(Uuid),
     IncompleteStructural(Uuid),
+    InvalidSemanticModel(String),
 }
 
 impl std::fmt::Display for StoreError {
@@ -66,6 +68,7 @@ impl std::fmt::Display for StoreError {
                 f,
                 "el recurso {id} no contiene management.structural; se detuvo la recuperación para evitar perder instancias"
             ),
+            Self::InvalidSemanticModel(message) => write!(f, "modelo semántico inválido: {message}"),
         }
     }
 }
@@ -145,6 +148,7 @@ impl ResourceStore {
                 description,
                 tags: Vec::new(),
             },
+            segments: Vec::new(),
         };
         self.write_new(&resource)?;
         if resource.info.title.starts_with(' ') {
@@ -260,6 +264,105 @@ impl ResourceStore {
 
         self.write_existing(&resource)?;
         Ok((resource, warnings))
+    }
+
+    /// Reemplaza los segmentos semánticos adicionales del recurso.
+    /// El segmento reservado info se deriva de Resource.info y no se persiste dos veces.
+    pub fn update_segments(
+        &self,
+        id: Uuid,
+        segments: Vec<Segment>,
+    ) -> Result<Resource, StoreError> {
+        let mut resource = self.get(id)?;
+        resource.segments = segments;
+        resource
+            .semantic_definition()
+            .validate()
+            .map_err(|error| StoreError::InvalidSemanticModel(error.to_string()))?;
+        self.write_existing(&resource)?;
+        Ok(resource)
+    }
+
+    /// Persiste una definición semántica resuelta sobre el recurso existente.
+    /// Solo admite el esquema conocido del segmento info; los demás segmentos se conservan.
+    pub fn update_semantic_definition(
+        &self,
+        id: Uuid,
+        definition: ResourceDefinition,
+    ) -> Result<Resource, StoreError> {
+        if definition.id != id {
+            return Err(StoreError::InvalidSemanticModel(format!(
+                "la definición pertenece a {}, no a {id}",
+                definition.id
+            )));
+        }
+        definition
+            .validate()
+            .map_err(|error| StoreError::InvalidSemanticModel(error.to_string()))?;
+        let info = definition.segment("info").ok_or_else(|| {
+            StoreError::InvalidSemanticModel("falta el segmento reservado info".to_owned())
+        })?;
+        if info.role != SegmentRole::Semantic {
+            return Err(StoreError::InvalidSemanticModel(
+                "el segmento reservado info debe tener rol semantic".to_owned(),
+            ));
+        }
+        if info.concepts.len() != 2 || info.components.len() != 1 {
+            return Err(StoreError::InvalidSemanticModel(
+                "info debe contener title, description y el componente tags".to_owned(),
+            ));
+        }
+        let title = info
+            .concepts
+            .iter()
+            .find(|item| item.key == "title")
+            .ok_or_else(|| StoreError::InvalidSemanticModel("falta info.title".to_owned()))?
+            .value
+            .clone();
+        let description = info
+            .concepts
+            .iter()
+            .find(|item| item.key == "description")
+            .ok_or_else(|| StoreError::InvalidSemanticModel("falta info.description".to_owned()))?
+            .value
+            .clone();
+        let tags_component = info
+            .components
+            .iter()
+            .find(|item| item.key == "tags")
+            .ok_or_else(|| StoreError::InvalidSemanticModel("falta info.tags".to_owned()))?;
+        if tags_component.kind != "string-list" {
+            return Err(StoreError::InvalidSemanticModel(
+                "info.tags debe usar el tipo string-list".to_owned(),
+            ));
+        }
+        let tags = match &tags_component.value {
+            serde_json::Value::Array(values) => values
+                .iter()
+                .map(|value| {
+                    value.as_str().map(str::to_owned).ok_or_else(|| {
+                        StoreError::InvalidSemanticModel("info.tags solo admite cadenas".to_owned())
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+            _ => {
+                return Err(StoreError::InvalidSemanticModel(
+                    "info.tags debe ser una lista".to_owned(),
+                ))
+            }
+        };
+        let mut resource = self.get(id)?;
+        let (title, _) = normalize_name(&title)?;
+        resource.info.title = title;
+        resource.info.description = normalize_description(Some(description));
+        resource.info.tags = tags;
+        resource.segments = definition
+            .segments
+            .into_iter()
+            .filter(|segment| segment.key != "info")
+            .collect();
+        self.write_existing(&resource)?;
+        Ok(resource)
     }
 
     /// Inspecciona un temporal abandonado sin promoverlo ni eliminarlo.
@@ -818,6 +921,7 @@ mod tests {
                 description: None,
                 tags: Vec::new(),
             },
+            segments: Vec::new(),
         };
         let temporary_path = store.temporary_path_for(id);
         let destination_path = store.path_for(id);

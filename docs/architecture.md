@@ -50,9 +50,9 @@ Los archivos persistidos deben validarse al cargarse. Ante una discrepancia que 
 
 ## Modelo semántico y máscaras
 
-El contrato conceptual de máscaras está revisado y registrado en [ADR 0004](decisions/0004-semantic-mask-resolution.md) y [model.md](model.md). La implementación del motor de resolución, las máscaras puntuales y Snapshot, los componentes con comportamiento específico, la expansión de referencias y la autorización efectiva sigue pendiente.
+El contrato conceptual está registrado en [ADR 0004](decisions/0004-semantic-mask-resolution.md) y [model.md](model.md). El PR #33 implementa el motor inicial de máscaras puntuales y Snapshot, persistencia de máscaras y segmentos, y casos de uso del núcleo. La CLI, expansión de referencias y autorización efectiva siguen pendientes.
 
-No debe volver a plantearse como tarea de diseño abierta la decisión básica sobre herencia dinámica de máscaras puntuales. La prioridad inmediata es preparar una reestructuración del núcleo centrada en el modelo semántico y las máscaras; el flujo combinado de la CLI queda pausado. El alcance y los criterios de preparación se registran en [Preparación para la reestructuración del núcleo](CORE-REWRITE-READINESS.md).
+No debe volver a plantearse como tarea de diseño abierta la decisión básica sobre herencia dinámica de máscaras puntuales. La implementación se revisa en el PR #33; el flujo combinado de la CLI permanece pausado. Los casos pendientes del ADR 0005 no se resuelven por inferencia.
 
 ## Cómo evolucionar la arquitectura
 
@@ -64,4 +64,4 @@ No debe volver a plantearse como tarea de diseño abierta la decisión básica s
 6. Añadir interfaces y adaptadores cuando exista un caso de uso real.
 7. Revisar límites arquitectónicos cuando una dependencia real lo justifique.
 
-No se implementan todavía el motor de máscaras, permisos efectivos, servidor HTTP ni persistencia alternativa. Esta documentación describe la dirección y el vocabulario compartido, no declara esas capacidades terminadas.
+No se implementan todavía los permisos efectivos, la expansión de referencias, los comandos CLI de máscaras, servidor HTTP ni persistencia alternativa. Esta documentación describe la dirección y el vocabulario compartido, no declara esas capacidades terminadas.

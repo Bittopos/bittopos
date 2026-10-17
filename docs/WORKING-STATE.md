@@ -1,7 +1,7 @@
 # Estado de trabajo y continuidad de Bittopos
 
 **Última reconciliación documental:** 2026-10-16  
-**Base de código examinada:** `main` en `296a76a84b28d181c904a6ab34e2db4a269f1acb` (PR #31 integrado).  
+**Base de código base:** `main` en `85a1189a9f7adb34b843de25f87b155ab4430942` (PR #32 integrado). La implementación de máscaras se desarrolla en el PR #33.  
 **Tipo de cambio de esta actualización:** documentación; no modifica el código de ejecución.
 
 Esta página existe para que una conversación nueva pueda continuar el trabajo sin reconstruirlo por memoria, repetir pruebas existentes ni reabrir decisiones ya revisadas.
@@ -77,7 +77,9 @@ PRs integrados relevantes en la secuencia actual:
 - **#28 — separación física del journal:** mueve lectura/escritura/formato/limpieza a `journal.rs`, manteniendo en `lifecycle.rs` la coordinación semántica.
 - **#29 — reconciliación documental:** alinea visión, modelo, ADR, arquitectura, estado y changelog; añade este documento de continuidad y registra que las máscaras están revisadas conceptualmente, mientras su motor sigue pendiente. Se integró mediante squash merge en el commit `c0c02605eebce36173d396381ea085c6ecfe2c92`; CI pasó en la rama del PR.
 - **#30 — cierre del registro de continuidad:** actualiza la continuidad después de la integración del PR #29.
-- **#31 — límites del contrato de máscaras:** añade ADR 0005 para separar las reglas centrales acordadas de los casos estructurales que todavía necesitan decisiones explícitas. El estado actual de `main` se verificó en el commit `296a76a84b28d181c904a6ab34e2db4a269f1acb`.
+- **#31 — límites del contrato de máscaras:** añade ADR 0005 para separar las reglas centrales acordadas de los casos estructurales que todavía necesitan decisiones explícitas.
+- **#32 — preparación para la reestructuración del núcleo:** registra el cambio de prioridad y los criterios de aceptación antes de iniciar la implementación semántica.
+- **#33 — motor de máscaras semánticas (abierto, en revisión):** añade resolución puntual/Snapshot, persistencia de segmentos y máscaras y casos de uso del núcleo. Su estado de CI debe verificarse antes de considerar la implementación validada.
 
 La secuencia se debe leer como una progresión de garantías y límites de responsabilidad, no como una invitación a repetir las pruebas o rehacer la separación del journal.
 
@@ -100,19 +102,19 @@ Los nombres confirmados incluyen `journal_recovers_creation_after_resource_write
 
 No proponer otra prueba con la misma precondición y el mismo resultado esperado. La línea base solo se puede marcar como cerrada después de revisar también las pruebas relevantes de temporales inválidos/ausentes en `store.rs` y comprobar el CI de la revisión actual. No se ha confirmado ese cierre aquí.
 
-## 7. Siguiente trabajo concreto
+## 7. Trabajo actual
 
-La prioridad inmediata es preparar el núcleo para una reestructuración arquitectónica amplia. No continuar por ahora el flujo combinado de `bitto create` ni iniciar refactors de persistencia que no sean necesarios para preparar ese cambio.
+El PR #33 implementa la primera integración del motor semántico de máscaras en el núcleo. Su alcance y límites están descritos en [Implementación del motor de máscaras](semantic-masks-engine.md). El PR está abierto y no debe considerarse validado hasta revisar sus pruebas y CI.
 
-El plan de preparación y sus criterios están en [Preparación para la reestructuración del núcleo](CORE-REWRITE-READINESS.md). Este documento ordena el alcance y el proceso; no autoriza por sí solo la implementación posterior.
+La prioridad anterior de auditoría de bitto create sigue pausada. No abrir otra fase de trabajo automáticamente tras la fusión: esperar las instrucciones del usuario.
 
-Antes de iniciar código nuevo, consultar el PR de preparación, verificar el estado de `main` y CI, y acordar el alcance del siguiente incremento. Las reglas centrales de máscaras no se reabren por defecto; los casos no resueltos permanecen delimitados en el ADR 0005.
+## 8. Límites actuales
 
-## 8. Prioridad y límites
-
-La dirección estratégica de producto y la cola inmediata de ingeniería son escalas diferentes. La prioridad inmediata deja de ser la auditoría de `bitto create`: el usuario ha decidido pausar ese trabajo para preparar una reestructuración del núcleo centrada en el modelo semántico y las máscaras.
-
-No se debe interpretar esta preparación como autorización para implementar todo el motor en un solo cambio. La reestructuración debe proponerse en incrementos revisables, conservar las garantías de persistencia salvo decisión explícita y no introducir migraciones silenciosas. No borrar ramas antiguas ni cambiar configuración de GitHub como parte de un PR documental.
+- La CLI aún no expone comandos de máscaras.
+- Las referencias y la autorización efectiva no se implementan en el PR #33.
+- Los casos estructurales del ADR 0005 siguen pendientes y no se resuelven por inferencia.
+- Los formatos históricos se leen con valores por defecto; cualquier evolución adicional debe preservar la compatibilidad o declarar una migración.
+- No afirmar que la compilación, las pruebas o CI pasan hasta comprobar el resultado real del PR.
 
 ## 9. Documentación y fuentes de verdad
 
