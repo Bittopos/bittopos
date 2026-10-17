@@ -1,39 +1,25 @@
-# Bittopos Web — prototipo local
+# Interfaz web experimental
 
-Esta carpeta contiene una primera interfaz web estática para el modelo que existe hoy en Bittopos. No forma parte todavía de la arquitectura ejecutable del núcleo Rust.
+Esta carpeta contiene una interfaz estática que funciona con datos del navegador. No está conectada al núcleo Rust ni escribe directamente en los archivos locales.
 
-## Qué incluye
+## Uso
 
-- Árbol de instancias con contención recursiva.
-- Inspector que distingue la identidad de instancia (`id`) de la identidad del recurso de origen (`source.id`).
-- Vista de árbol y vista jerárquica de mapa.
-- Creación local de definiciones y de instancias.
-- Importación de workspace JSON e importación múltiple de definiciones TOML.
-- Exportación del workspace con `content.instances`, `semantic.allocation` y `source.id`.
-- Exportación de definiciones como archivos TOML.
-- Persistencia temporal en `localStorage` del navegador.
+Abre `index.html` en un navegador moderno. No requiere Node.js ni un servidor.
 
-## Ejecutar
+1. Importa los recursos TOML.
+2. Importa la estructura JSON.
+3. Organiza las instancias, crea recursos o modifica sus metadatos.
+4. Exporta la estructura y los recursos modificados para guardarlos manualmente.
 
-Abre `web/index.html` en un navegador moderno. No requiere Node.js, un paquete frontend ni un servidor HTTP para esta etapa.
+## Modelo de archivos
 
-## Uso recomendado
+- Cada recurso se exporta como un TOML individual con `id` e `info`.
+- La estructura JSON contiene las instancias y su jerarquía.
+- Cada instancia conserva su propio `id` y la referencia `source.id`.
+- La contención de hijos se representa en `content.instances`; `semantic.allocation` enumera los hijos directos.
 
-1. Importa `proyecto.json` desde el directorio de workspaces de Bittopos.
-2. Importa los archivos TOML del directorio de recursos. Puedes seleccionar varios a la vez.
-3. Explora el árbol, crea recursos o añade instancias.
-4. Exporta `proyecto.json` y las definiciones TOML modificadas para guardarlas manualmente en sus directorios correspondientes.
+La interfaz no mantiene un registro de instancias dentro de los archivos de recursos.
 
-Los archivos permanecen en el directorio elegido por el usuario: el navegador no puede leerlos ni sobrescribirlos automáticamente. Los recursos TOML se descargan uno por uno al exportar.
+## Límites
 
-## Límites conocidos
-
-- No existe integración HTTP con `bittopos-core`; los cambios no se escriben directamente en el workspace real.
-- La persistencia del navegador no sustituye una copia de seguridad. Exporta los archivos después de editar.
-- El importador TOML cubre los campos actuales (`id`, `management.structural`, `info.title`, `info.description` y `info.tags`); no es un parser TOML general.
-- El editor de metadatos es deliberadamente sencillo. El modelo general Segment/Concept/Component, las máscaras y los permisos efectivos no están implementados en esta interfaz.
-- La eliminación respeta la regla actual de no borrar implícitamente descendientes: solo permite eliminar instancias hoja.
-
-## Siguiente paso de integración
-
-Cuando se acuerde el servidor HTTP, la interfaz deberá consumir operaciones explícitas del núcleo y dejar de mantener una copia local independiente del workspace. La integración deberá validar los mismos invariantes que `bittopos-core`, no duplicar reglas de dominio en la interfaz.
+La interfaz web es un prototipo independiente. No implementa la resolución semántica completa ni las máscaras y no comparte automáticamente las reglas del núcleo Rust. Las operaciones y los formatos pueden cambiar mientras se desarrolla el modelo.

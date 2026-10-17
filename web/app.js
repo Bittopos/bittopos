@@ -21,7 +21,7 @@
     if (token.trim()) parts.push(tomlString(token)); return parts;
   }
   function parseToml(text) {
-    const out = { id:"", title:"", description:null, tags:[], structural:[] }; let section = "";
+    const out = { id:"", title:"", description:null, tags:[] }; let section = "";
     text.split(/\r?\n/).forEach(line => {
       const s = line.trim(); if (!s || s.startsWith("#")) return;
       const h = s.match(/^\[([^\]]+)\]$/); if (h) { section = h[1]; return; }
@@ -30,14 +30,13 @@
       if (section === "info" && p[1] === "title") out.title = tomlString(p[2]);
       if (section === "info" && p[1] === "description") out.description = tomlString(p[2]);
       if (section === "info" && p[1] === "tags") out.tags = tomlArray(p[2]);
-      if (section === "management" && p[1] === "structural") out.structural = tomlArray(p[2]);
     });
     if (!out.id || !out.title) throw new Error("El TOML debe incluir id e info.title.");
-    return { id:out.id, info:{title:out.title, description:out.description, tags:out.tags}, management:{structural:out.structural} };
+    return { id:out.id, info:{title:out.title, description:out.description, tags:out.tags} };
   }
   function normalizeResource(r) {
     if (!r || typeof r.id !== "string" || !r.info || typeof r.info.title !== "string") throw new Error("Recurso inválido: se esperaba id e info.title.");
-    return { id:r.id, info:{title:r.info.title, description:typeof r.info.description === "string" ? r.info.description : null, tags:Array.isArray(r.info.tags) ? r.info.tags.filter(t => typeof t === "string") : []}, management:{structural:r.management && Array.isArray(r.management.structural) ? r.management.structural.slice() : []} };
+    return { id:r.id, info:{title:r.info.title, description:typeof r.info.description === "string" ? r.info.description : null, tags:Array.isArray(r.info.tags) ? r.info.tags.filter(t => typeof t === "string") : []} };
   }
   function normalizeInstance(i, seen) {
     if (!i || typeof i.id !== "string" || !i.source || typeof i.source.id !== "string") throw new Error("Cada instancia debe contener id y source.id.");
@@ -160,7 +159,7 @@
   function openResourceDialog(){ $("resource-form").reset();$("create-instance-now").checked=true;dialog.showModal();$("resource-title").focus(); }
   function createResource(event) {
     event.preventDefault();const name=$("resource-title").value.trim();if(!name){notify("Escribe un nombre para el recurso.","error");return;}
-    const id=uuid(),r={id,management:{structural:[]},info:{title:name,description:$("resource-description").value.trim()||null,tags:$("resource-tags").value.split(",").map(t=>t.trim()).filter(Boolean)}};
+    const id=uuid(),r={id,info:{title:name,description:$("resource-description").value.trim()||null,tags:$("resource-tags").value.split(",").map(t=>t.trim()).filter(Boolean)}};
     state.resources[id]=r;
     if($("create-instance-now").checked)addInstance(id,state.selected);
     dialog.close();renderAndSave();notify("Recurso creado en el navegador. Exporta el TOML para conservarlo.","success");
@@ -170,14 +169,14 @@
     const i={id:uuid(),source:{id:resourceId}};
     if(parent){const p=find(parent);if(!p)throw new Error("No se encontró la instancia padre.");if(!p.content)p.content={instances:[]};p.content.instances.push(i);if(!p.semantic)p.semantic={allocation:[]};p.semantic.allocation.push(i.id);state.expanded.add(parent);}
     else state.workspace.content.instances.push(i);
-    r.management.structural=Array.from(new Set([...(r.management.structural||[]),i.id]));state.selected=i.id;
+    state.selected=i.id;
   }
   function removeInstance(id) {
     const i=find(id);if(!i)return;if(children(i).length){notify("Solo puedes eliminar instancias hoja; elimina primero sus hijas.","error");return;}
     if(!confirm("¿Eliminar esta instancia del workspace? La definición del recurso se conservará."))return;
     const p=parentId(id),list=p?find(p).content.instances:state.workspace.content.instances,index=list.findIndex(x=>x.id===id);if(index>=0)list.splice(index,1);
     if(p){const par=find(p);if(par.semantic){par.semantic.allocation=par.semantic.allocation.filter(x=>x!==id);if(!par.semantic.allocation.length)delete par.semantic;}if(par.content&&!par.content.instances.length)delete par.content;}
-    const r=state.resources[i.source.id];if(r)r.management.structural=r.management.structural.filter(x=>x!==id);state.selected=p||null;renderAndSave();notify("Instancia eliminada; la definición se conserva.","success");
+    state.selected=p||null;renderAndSave();notify("Instancia eliminada; la definición se conserva.","success");
   }
   function pickResource(parent) {
     const ids=Object.keys(state.resources);if(!ids.length){openResourceDialog();return;}
@@ -206,7 +205,7 @@
   function exportWorkspace(){download("proyecto.json",JSON.stringify(normalizeWorkspace(state.workspace),null,2)+"\n","application/json;charset=utf-8");notify("Workspace exportado. Exporta también los TOML si modificaste definiciones.","success");}
   function exportResources() {
     const ids=Object.keys(state.resources);if(!ids.length){notify("No hay definiciones para exportar.","error");return;}
-    ids.forEach(id=>{const r=state.resources[id],structural=Array.from(new Set(r.management.structural||[]));const lines=["id = "+quoteToml(r.id),"","[management]","structural = ["+structural.map(quoteToml).join(", ")+"]","","[info]","title = "+quoteToml(r.info.title)];if(r.info.description)lines.push("description = "+quoteToml(r.info.description));lines.push("tags = ["+r.info.tags.map(quoteToml).join(", ")+"]","");download(id+".toml",lines.join("\n"),"text/plain;charset=utf-8");});
+    ids.forEach(id=>{const r=state.resources[id];const lines=["id = "+quoteToml(r.id),"","[info]","title = "+quoteToml(r.info.title)];if(r.info.description)lines.push("description = "+quoteToml(r.info.description));lines.push("tags = ["+r.info.tags.map(quoteToml).join(", ")+"]","");download(id+".toml",lines.join("\n"),"text/plain;charset=utf-8");});
     notify("Se prepararon "+ids.length+" archivos TOML. El navegador puede pedir permiso para varias descargas.","success");
   }
   $("create-resource").addEventListener("click",openResourceDialog);$("cancel-resource").addEventListener("click",()=>dialog.close());$("resource-form").addEventListener("submit",createResource);
