@@ -32,8 +32,8 @@ pub use relations::{
     create_relation, is_relation, relation_endpoints, RelationEndpoints, RelationError,
 };
 pub use resource::{
-    create_reference, is_reference, reference_target, Info, ReferenceError, Resource, ResourcePatch,
-    ResourceWarning,
+    create_reference, is_reference, reference_target, Info, ReferenceError, Resource,
+    ResourcePatch, ResourceWarning,
 };
 pub use semantic_masks::{
     resolve as resolve_semantics, Component, ComponentMerge, Concept, ElementAddress,
