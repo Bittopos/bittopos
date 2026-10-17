@@ -200,13 +200,28 @@ mod tests {
 
         assert!(remove_instance(&resources, &workspaces, "principal", root).is_err());
     }
+
     #[test]
     fn refuses_to_instantiate_a_relation_resource() {
         let (_dir, resources, workspaces) = setup();
         let (source, _) = resources.create("Origen", None).unwrap();
         let (target, _) = resources.create("Destino", None).unwrap();
-        let relation = crate::create_relation(&resources, &workspaces, "principal", "Relación", None, crate::RelationEndpoints::Resources { source: source.id, target: target.id }).unwrap();
-        assert!(matches!(create_instance(&resources, &workspaces, "principal", relation.id), Err(LifecycleError::RelationCannotBeInstantiated(id)) if id == relation.id));
-    }
+        let relation = crate::create_relation(
+            &resources,
+            &workspaces,
+            "principal",
+            "Relación",
+            None,
+            crate::RelationEndpoints::Resources {
+                source: source.id,
+                target: target.id,
+            },
+        )
+        .unwrap();
 
+        assert!(matches!(
+            create_instance(&resources, &workspaces, "principal", relation.id),
+            Err(LifecycleError::RelationCannotBeInstantiated(id)) if id == relation.id
+        ));
+    }
 }
