@@ -87,10 +87,27 @@ pub fn relation_endpoints(resource: &Resource) -> Result<RelationEndpoints, Rela
     let parse_id = |value: &str| Uuid::parse_str(value)
         .map_err(|_| RelationError::Invalid(format!("UUID de extremo inválido: {value}")));
     match kind.as_str() {
-        "resource_resource" => Ok(RelationEndpoints::Resources { source: parse_id(&source)?, target: parse_id(&target)? }),
-        "instance_instance" => Ok(RelationEndpoints::Instances { source: parse_id(&source)?, target: parse_id(&target)? }),
+        "resource_resource" => {
+            ensure_component_kind(segment, "source", "resource-id")?;
+            ensure_component_kind(segment, "target", "resource-id")?;
+            Ok(RelationEndpoints::Resources { source: parse_id(&source)?, target: parse_id(&target)? })
+        }
+        "instance_instance" => {
+            ensure_component_kind(segment, "source", "instance-id")?;
+            ensure_component_kind(segment, "target", "instance-id")?;
+            Ok(RelationEndpoints::Instances { source: parse_id(&source)?, target: parse_id(&target)? })
+        }
         _ => Err(RelationError::Invalid(format!("tipo de extremos desconocido: {kind}"))),
     }
+}
+
+fn ensure_component_kind(segment: &SemanticSegment, key: &str, expected: &str) -> Result<(), RelationError> {
+    let component = segment.components.iter().find(|item| item.key == key)
+        .ok_or_else(|| RelationError::Invalid(format!("falta el componente reservado '{key}'")))?;
+    if component.kind != expected {
+        return Err(RelationError::Invalid(format!("el extremo '{key}' debe ser de tipo '{expected}'")));
+    }
+    Ok(())
 }
 
 fn component_string(segment: &SemanticSegment, key: &str) -> Result<String, RelationError> {
