@@ -254,3 +254,44 @@ pub fn reference_target(resource: &Resource) -> Result<Uuid, ReferenceError> {
     Uuid::parse_str(value)
         .map_err(|_| ReferenceError::Invalid(format!("UUID de instancia inválido: {value}")))
 }
+
+
+#[cfg(test)]
+mod reference_tests {
+    use super::*;
+    use crate::{create_instance, ResourceStore, WorkspaceStore};
+
+    #[test]
+    fn reference_points_to_an_instance_and_is_registered_without_instantiation() {
+        let directory = tempfile::tempdir().unwrap();
+        let resources = ResourceStore::new(directory.path().join("resources")).unwrap();
+        let workspaces = WorkspaceStore::new(directory.path().join("workspaces")).unwrap();
+        let (owner_resource, _) = resources.create("Propietario", None).unwrap();
+        let (target_resource, _) = resources.create("Destino", None).unwrap();
+        let owner = create_instance(&resources, &workspaces, "principal", owner_resource.id).unwrap();
+        let target = create_instance(&resources, &workspaces, "principal", target_resource.id).unwrap();
+
+        let reference = create_reference(
+            &resources,
+            &workspaces,
+            "principal",
+            owner,
+            target,
+            "Apunta a destino",
+            None,
+        )
+        .unwrap();
+
+        assert!(is_reference(&reference));
+        assert_eq!(reference_target(&reference).unwrap(), target);
+        let workspace = workspaces.load("principal").unwrap();
+        assert_eq!(
+            workspace.find_instance(owner).unwrap().semantic.as_ref().unwrap().references,
+            vec![reference.id]
+        );
+        assert!(matches!(
+            crate::create_instance(&resources, &workspaces, "principal", reference.id),
+            Err(crate::LifecycleError::ReferenceCannotBeInstantiated(id)) if id == reference.id
+        ));
+    }
+}
