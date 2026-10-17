@@ -19,10 +19,7 @@ pub enum StoreError {
     InvalidFileName(PathBuf),
     IdMismatch { expected: Uuid, found: Uuid },
     IdNotFirstLine(PathBuf),
-    TemporaryExists(PathBuf),
-    PreparedContentMismatch(Uuid),
     StructuralConflict(Uuid),
-    IncompleteStructural(Uuid),
     InvalidSemanticModel(String),
 }
 
@@ -51,22 +48,9 @@ impl std::fmt::Display for StoreError {
                 "el ID no aparece en la primera línea de {}",
                 path.display()
             ),
-            Self::TemporaryExists(path) => write!(
-                f,
-                "ya existe un temporal de guardado; se conserva sin sobrescribir: {}",
-                path.display()
-            ),
-            Self::PreparedContentMismatch(id) => write!(
-                f,
-                "el contenido temporal preparado no coincide con el recurso esperado {id}"
-            ),
             Self::StructuralConflict(id) => write!(
                 f,
                 "la instancia {id} ya figura en la asignación del recurso"
-            ),
-            Self::IncompleteStructural(id) => write!(
-                f,
-                "el recurso {id} no contiene management.structural; se detuvo la recuperación para evitar perder instancias"
             ),
             Self::InvalidSemanticModel(message) => write!(f, "modelo semántico inválido: {message}"),
         }
