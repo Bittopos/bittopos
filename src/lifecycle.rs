@@ -7,7 +7,9 @@
 use std::fmt;
 use uuid::Uuid;
 
-use crate::{is_relation, Instance, ResourceStore, StoreError, Workspace, WorkspaceError, WorkspaceStore};
+use crate::{
+    is_relation, Instance, ResourceStore, StoreError, Workspace, WorkspaceError, WorkspaceStore,
+};
 
 #[derive(Debug)]
 pub enum LifecycleError {
@@ -25,7 +27,10 @@ impl fmt::Display for LifecycleError {
             Self::Workspace(error) => write!(f, "error de estructura: {error}"),
             Self::ParentRequired => write!(f, "la instancia padre no existe"),
             Self::InstanceNotFound(id) => write!(f, "no existe la instancia {id}"),
-            Self::RelationCannotBeInstantiated(id) => write!(f, "la relación {id} se lee directamente y no puede instanciarse"),
+            Self::RelationCannotBeInstantiated(id) => write!(
+                f,
+                "la relación {id} se lee directamente y no puede instanciarse"
+            ),
         }
     }
 }

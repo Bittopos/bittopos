@@ -28,7 +28,9 @@ pub use mask_operations::{
 };
 pub use model_operations::children_of;
 pub use navigation::{NavigationError, NavigationState, NavigationStore};
-pub use relations::{create_relation, is_relation, relation_endpoints, RelationEndpoints, RelationError};
+pub use relations::{
+    create_relation, is_relation, relation_endpoints, RelationEndpoints, RelationError,
+};
 pub use resource::{Info, Resource, ResourcePatch, ResourceWarning};
 pub use semantic_masks::{
     resolve as resolve_semantics, Component, ComponentMerge, Concept, ElementAddress,

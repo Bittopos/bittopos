@@ -4,7 +4,7 @@ use std::process;
 
 use bittopos_core::{
     children_of, create_instance_at_current_location, create_instance_under, create_relation,
-    is_relation, relation_endpoints, prepare_workspace, remove_instance_and_update_navigation,
+    is_relation, prepare_workspace, relation_endpoints, remove_instance_and_update_navigation,
     Instance, NavigationState, NavigationStore, RelationEndpoints, ResourcePatch, ResourceStore,
     Workspace, WorkspaceModelError, WorkspaceStore,
 };
@@ -183,7 +183,10 @@ fn run() -> Result<(), String> {
             }
             if is_relation(&resource) {
                 println!("Tipo: relación");
-                println!("Extremos: {:?}", relation_endpoints(&resource).map_err(|error| error.to_string())?);
+                println!(
+                    "Extremos: {:?}",
+                    relation_endpoints(&resource).map_err(|error| error.to_string())?
+                );
             }
         }
         Command::Show { id: None } => {
@@ -311,7 +314,6 @@ fn run() -> Result<(), String> {
             .map_err(|error| error.to_string())?;
             println!("Relación creada: {} ({})", relation.info.title, relation.id);
         }
-
     }
 
     Ok(())

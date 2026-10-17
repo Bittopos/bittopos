@@ -7,7 +7,7 @@ use std::fmt;
 use uuid::Uuid;
 
 use crate::{
-    load_workspace, Resource, ResourceStore, SemanticSegment, SegmentRole, StoreError,
+    load_workspace, Resource, ResourceStore, SegmentRole, SemanticSegment, StoreError,
     WorkspaceStore,
 };
 
@@ -79,9 +79,10 @@ pub fn create_relation(
 
 /// Detecta una relación por su segmento de control reservado.
 pub fn is_relation(resource: &Resource) -> bool {
-    resource.segments.iter().any(|segment| {
-        segment.key == RELATION_SEGMENT && segment.role == SegmentRole::Control
-    })
+    resource
+        .segments
+        .iter()
+        .any(|segment| segment.key == RELATION_SEGMENT && segment.role == SegmentRole::Control)
 }
 
 /// Lee los extremos directamente, sin crear una instancia ni mutar datos.
@@ -89,9 +90,7 @@ pub fn relation_endpoints(resource: &Resource) -> Result<RelationEndpoints, Rela
     let segment = resource
         .segments
         .iter()
-        .find(|segment| {
-            segment.key == RELATION_SEGMENT && segment.role == SegmentRole::Control
-        })
+        .find(|segment| segment.key == RELATION_SEGMENT && segment.role == SegmentRole::Control)
         .ok_or_else(|| RelationError::Invalid("el recurso no es una relación".to_owned()))?;
     let kind = component_string(segment, "kind")?;
     let source = component_string(segment, "source")?;
@@ -157,12 +156,20 @@ fn component_string(segment: &SemanticSegment, key: &str) -> Result<String, Rela
 
 fn relation_segment(endpoints: RelationEndpoints) -> SemanticSegment {
     let (kind, source_kind, target_kind, source, target) = match endpoints {
-        RelationEndpoints::Resources { source, target } => {
-            ("resource_resource", "resource-id", "resource-id", source, target)
-        }
-        RelationEndpoints::Instances { source, target } => {
-            ("instance_instance", "instance-id", "instance-id", source, target)
-        }
+        RelationEndpoints::Resources { source, target } => (
+            "resource_resource",
+            "resource-id",
+            "resource-id",
+            source,
+            target,
+        ),
+        RelationEndpoints::Instances { source, target } => (
+            "instance_instance",
+            "instance-id",
+            "instance-id",
+            source,
+            target,
+        ),
     };
 
     SemanticSegment {
