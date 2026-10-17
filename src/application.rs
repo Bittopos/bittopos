@@ -3,8 +3,8 @@
 use std::fmt;
 
 use crate::{
-    create_instance_under, reconcile_workspace, remove_instance, LifecycleError, NavigationError,
-    NavigationState, NavigationStore, RecoveryReport, ResourceStore, Workspace, WorkspaceStore,
+    create_instance_under, load_workspace, remove_instance, LifecycleError, NavigationError,
+    NavigationState, NavigationStore, ResourceStore, Workspace, WorkspaceStore,
 };
 
 /// Error producido al preparar el contexto operativo del workspace.
@@ -43,25 +43,23 @@ pub struct PreparedWorkspace {
     pub workspace: Workspace,
     pub navigation_state: NavigationState,
     pub navigation_reset: bool,
-    pub recovery: RecoveryReport,
 }
 
-/// Reconcilia las vistas persistidas y valida el destino de navegación antes de usar la CLI
-/// u otra interfaz. Un destino inexistente se restablece a la raíz mediante NavigationStore.
+/// Carga la estructura y valida el destino de navegación antes de usar la CLI.
+/// Un destino inexistente se restablece a la raíz mediante NavigationStore.
 pub fn prepare_workspace(
     resources: &ResourceStore,
     workspaces: &WorkspaceStore,
     navigation: &NavigationStore,
     workspace_name: &str,
 ) -> Result<PreparedWorkspace, ApplicationError> {
-    let (workspace, recovery) = reconcile_workspace(resources, workspaces, workspace_name)?;
+    let workspace = load_workspace(resources, workspaces, workspace_name)?;
     let (navigation_state, navigation_reset) = navigation.load_validated(&workspace)?;
 
     Ok(PreparedWorkspace {
         workspace,
         navigation_state,
         navigation_reset,
-        recovery,
     })
 }
 
@@ -187,7 +185,6 @@ mod tests {
         assert!(prepared.workspace.all_instances().is_empty());
         assert_eq!(prepared.navigation_state.current_instance, None);
         assert!(prepared.navigation_reset);
-        assert_eq!(prepared.recovery, RecoveryReport::default());
         assert_eq!(navigation.load().unwrap().current_instance, None);
     }
 }
