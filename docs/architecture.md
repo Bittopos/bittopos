@@ -15,9 +15,8 @@ La estructura es el único contenedor de organización de las instancias. Los re
 
 ## Módulos
 
-- `resource.rs`: modelo de recurso y metadatos.
+- `resource.rs`: modelo de recurso, metadatos y referencias directas a instancias, identificadas por `__reference.point`.
 - `relations.rs`: creación, lectura y validación de extremos de relaciones.
-- `resource.rs`: recursos ordinarios y referencias directas a instancias, identificadas por `__reference.point`.
 - `store.rs`: lectura y escritura de recursos TOML.
 - `workspace_model.rs`: instancias, contención y reglas del modelo de estructura.
 - `workspace.rs`: serialización JSON de la estructura.
