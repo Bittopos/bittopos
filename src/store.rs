@@ -1,5 +1,5 @@
-use std::fs::{self, OpenOptions};
-use std::io::{self, Write};
+use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
@@ -19,8 +19,6 @@ pub enum StoreError {
     InvalidFileName(PathBuf),
     IdMismatch { expected: Uuid, found: Uuid },
     IdNotFirstLine(PathBuf),
-    TemporaryExists(PathBuf),
-    PreparedContentMismatch(Uuid),
     StructuralConflict(Uuid),
     IncompleteStructural(Uuid),
     InvalidSemanticModel(String),
@@ -99,22 +97,6 @@ impl From<toml::de::Error> for StoreError {
     }
 }
 
-/// Resultado de inspeccionar un temporal abandonado sin modificar ningún archivo.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TemporaryInspection {
-    Missing,
-    /// El temporal existe, pero no puede validarse como una definición completa.
-    Invalid {
-        reason: String,
-    },
-    /// El temporal contiene exactamente los mismos bytes que el recurso confirmado.
-    IdenticalToConfirmed,
-    /// El temporal es válido, pero no se puede saber automáticamente si debía confirmarse.
-    ValidUnconfirmed {
-        resource: Resource,
-    },
-}
-
 /// Almacén local de recursos. El prototipo presupone un solo proceso escritor.
 pub struct ResourceStore {
     root: PathBuf,
@@ -163,42 +145,6 @@ impl ResourceStore {
             return Err(StoreError::NotFound(id));
         }
         self.read_file(&path, id)
-    }
-
-    /// Lee todos los recursos confirmados y falla si alguno no puede validarse.
-    /// Es deliberadamente estricto: una recuperación no debe confundir un recurso
-    /// ilegible con una asignación vacía.
-    pub(crate) fn all_strict(&self) -> Result<Vec<Resource>, StoreError> {
-        let mut resources = Vec::new();
-        for entry in fs::read_dir(&self.root)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.extension().and_then(|ext| ext.to_str()) != Some("toml") {
-                continue;
-            }
-            let stem = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .ok_or_else(|| StoreError::InvalidFileName(path.clone()))?;
-            let expected_id =
-                Uuid::parse_str(stem).map_err(|_| StoreError::InvalidFileName(path.clone()))?;
-            let content = fs::read_to_string(&path)?;
-            let document: toml::Value = toml::from_str(&content)?;
-            if document
-                .get("management")
-                .and_then(|management| {
-                    management
-                        .get("structural")
-                        .or_else(|| management.get("allocation"))
-                })
-                .is_none()
-            {
-                return Err(StoreError::IncompleteStructural(expected_id));
-            }
-            resources.push(self.read_file(&path, expected_id)?);
-        }
-        resources.sort_by_key(|resource| resource.id);
-        Ok(resources)
     }
 
     /// Registra una identidad de instancia en el espacio administrativo de la definición.
@@ -365,174 +311,6 @@ impl ResourceStore {
         Ok(resource)
     }
 
-    /// Inspecciona un temporal abandonado sin promoverlo ni eliminarlo.
-    ///
-    /// Un temporal válido distinto del archivo definitivo sigue siendo ambiguo: puede
-    /// representar una escritura interrumpida antes de confirmar. La decisión de
-    /// promoverlo o descartarlo debe ser explícita.
-    pub fn inspect_temporary(&self, id: Uuid) -> Result<TemporaryInspection, StoreError> {
-        let temporary_path = self.temporary_path_for(id);
-        if !temporary_path.exists() {
-            return Ok(TemporaryInspection::Missing);
-        }
-
-        let candidate = match self.read_file(&temporary_path, id) {
-            Ok(resource) => resource,
-            Err(error) => {
-                return Ok(TemporaryInspection::Invalid {
-                    reason: error.to_string(),
-                });
-            }
-        };
-
-        // read_file permite compatibilidad al leer recursos antiguos; para recuperar
-        // un temporal exigimos el contrato completo de structural.
-        let content = fs::read_to_string(&temporary_path)?;
-        let document: toml::Value = match toml::from_str(&content) {
-            Ok(document) => document,
-            Err(error) => {
-                return Ok(TemporaryInspection::Invalid {
-                    reason: error.to_string(),
-                });
-            }
-        };
-        if document
-            .get("management")
-            .and_then(|management| {
-                management
-                    .get("structural")
-                    .or_else(|| management.get("allocation"))
-            })
-            .is_none()
-        {
-            return Ok(TemporaryInspection::Invalid {
-                reason: format!(
-                    "el temporal {} no contiene management.structural",
-                    temporary_path.display()
-                ),
-            });
-        }
-
-        let confirmed_path = self.path_for(id);
-        if confirmed_path.exists() {
-            let confirmed_bytes = fs::read(&confirmed_path)?;
-            let temporary_bytes = fs::read(&temporary_path)?;
-            if confirmed_bytes == temporary_bytes {
-                return Ok(TemporaryInspection::IdenticalToConfirmed);
-            }
-
-            // No sustituimos un archivo definitivo ilegible ni lo interpretamos como
-            // vacío: el estado requiere intervención explícita fuera de esta operación.
-            self.read_file(&confirmed_path, id)?;
-        }
-
-        Ok(TemporaryInspection::ValidUnconfirmed {
-            resource: candidate,
-        })
-    }
-
-    /// Promueve explícitamente un temporal válido tras decisión del operador.
-    ///
-    /// Nunca se llama desde recover(): la validez del TOML no demuestra que la operación
-    /// hubiera alcanzado el punto de confirmación antes de una interrupción.
-    pub fn promote_temporary_explicitly(&self, id: Uuid) -> Result<Resource, StoreError> {
-        let temporary_path = self.temporary_path_for(id);
-        if !temporary_path.exists() {
-            return Err(StoreError::NotFound(id));
-        }
-
-        let inspection = self.inspect_temporary(id)?;
-        let resource = match inspection {
-            TemporaryInspection::ValidUnconfirmed { resource } => resource,
-            TemporaryInspection::IdenticalToConfirmed => {
-                // El definitivo ya contiene el mismo contenido; solo se limpia el duplicado.
-                fs::remove_file(&temporary_path)?;
-                return self.get(id);
-            }
-            TemporaryInspection::Missing => return Err(StoreError::NotFound(id)),
-            TemporaryInspection::Invalid { reason } => {
-                return Err(StoreError::Io(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("temporal no recuperable: {reason}"),
-                )));
-            }
-        };
-
-        let replace = self.path_for(id).exists();
-        promote_temporary(&temporary_path, &self.path_for(id), replace)?;
-        Ok(resource)
-    }
-
-    /// Descarta explícitamente un temporal abandonado. No modifica el recurso definitivo.
-    pub fn discard_temporary_explicitly(&self, id: Uuid) -> Result<bool, StoreError> {
-        let temporary_path = self.temporary_path_for(id);
-        match fs::remove_file(temporary_path) {
-            Ok(()) => Ok(true),
-            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
-            Err(error) => Err(StoreError::Io(error)),
-        }
-    }
-
-    /// Recupera todos los TOML válidos. Los archivos inválidos se omiten y generan advertencias.
-    /// Los temporales de guardado se advierten, pero nunca se promueven automáticamente.
-    pub fn recover(&self) -> Result<(Vec<Resource>, Vec<String>), StoreError> {
-        let mut resources = Vec::new();
-        let mut warnings = Vec::new();
-
-        for entry in fs::read_dir(&self.root)? {
-            let entry = match entry {
-                Ok(entry) => entry,
-                Err(error) => {
-                    warnings.push(format!(
-                        "no se pudo leer una entrada del directorio: {error}"
-                    ));
-                    continue;
-                }
-            };
-            let path = entry.path();
-            let file_name = path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or_default();
-            if file_name.starts_with('.') && file_name.ends_with(".toml.tmp") {
-                warnings.push(format!(
-                    "se encontró un temporal de guardado abandonado; no se recuperó automáticamente: {}",
-                    path.display()
-                ));
-                continue;
-            }
-            if path.extension().and_then(|ext| ext.to_str()) != Some("toml") {
-                continue;
-            }
-
-            let stem = match path.file_stem().and_then(|s| s.to_str()) {
-                Some(stem) => stem,
-                None => {
-                    warnings.push(format!("nombre de archivo inválido: {}", path.display()));
-                    continue;
-                }
-            };
-            let expected_id = match Uuid::parse_str(stem) {
-                Ok(id) => id,
-                Err(_) => {
-                    warnings.push(format!(
-                        "nombre de archivo no contiene un UUID válido: {}",
-                        path.display()
-                    ));
-                    continue;
-                }
-            };
-
-            match self.read_file(&path, expected_id) {
-                Ok(resource) => resources.push(resource),
-                Err(error) => warnings.push(format!("se omitió {}: {error}", path.display())),
-            }
-        }
-
-        resources.sort_by_key(|resource| resource.id);
-        Ok((resources, warnings))
-    }
-
     fn path_for(&self, id: Uuid) -> PathBuf {
         self.root.join(format!("{id}.toml"))
     }
@@ -545,61 +323,20 @@ impl ResourceStore {
         self.write_resource(resource, true)
     }
 
-    fn temporary_path_for(&self, id: Uuid) -> PathBuf {
-        self.root.join(format!(".{id}.toml.tmp"))
-    }
-
-    fn write_resource(&self, resource: &Resource, replace: bool) -> Result<(), StoreError> {
+    fn write_new(&self, resource: &Resource) -> Result<(), StoreError> {
         let path = self.path_for(resource.id);
-        let temporary_path = self.temporary_path_for(resource.id);
-        let content = toml::to_string(resource)?;
-
-        if replace {
-            let confirmed_content = fs::read(&path)?;
-            if confirmed_content == content.as_bytes() {
-                return Ok(());
-            }
-        } else if path.exists() {
+        if path.exists() {
             return Err(StoreError::Io(io::Error::new(
                 io::ErrorKind::AlreadyExists,
                 format!("ya existe el recurso {}", path.display()),
             )));
         }
+        fs::write(path, toml::to_string(resource)?)?;
+        Ok(())
+    }
 
-        let mut temporary_file = match OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary_path)
-        {
-            Ok(file) => file,
-            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
-                return Err(StoreError::TemporaryExists(temporary_path));
-            }
-            Err(error) => return Err(StoreError::Io(error)),
-        };
-
-        // Fase 1: preparar y validar. Si falla, el temporal no se considera recuperable
-        // y se intenta limpiar; la limpieza no debe ocultar el error original.
-        let prepared = (|| -> Result<(), StoreError> {
-            temporary_file.write_all(content.as_bytes())?;
-            temporary_file.sync_all()?;
-            drop(temporary_file);
-
-            let checked = self.read_file(&temporary_path, resource.id)?;
-            if checked != *resource {
-                return Err(StoreError::PreparedContentMismatch(resource.id));
-            }
-            Ok(())
-        })();
-
-        if let Err(error) = prepared {
-            let _ = fs::remove_file(&temporary_path);
-            return Err(error);
-        }
-
-        // Fase 2: confirmar. Si falla la promoción, se conserva el temporal ya validado
-        // para no descartar la única copia de los nuevos datos.
-        promote_temporary(&temporary_path, &path, replace)?;
+    fn write_existing(&self, resource: &Resource) -> Result<(), StoreError> {
+        fs::write(self.path_for(resource.id), toml::to_string(resource)?)?;
         Ok(())
     }
 
@@ -623,29 +360,6 @@ impl ResourceStore {
 
 /// Promueve un temporal validado al destino definitivo.
 /// En caso de error no elimina el temporal: el llamador puede conservarlo para inspección.
-fn promote_temporary(temporary_path: &Path, path: &Path, replace: bool) -> Result<(), StoreError> {
-    if replace {
-        // En el entorno objetivo (Termux/Linux), rename en el mismo sistema de archivos
-        // sustituye el destino sin exponer una escritura parcial.
-        fs::rename(temporary_path, path)?;
-    } else {
-        // hard_link evita reemplazar un destino que aparezca después de la comprobación.
-        fs::hard_link(temporary_path, path)?;
-        fs::remove_file(temporary_path)?;
-    }
-
-    // Sincroniza también la entrada de directorio: sync_all del archivo temporal por sí
-    // solo no garantiza que el cambio de nombre sobreviva a una interrupción del sistema.
-    let parent = path.parent().ok_or_else(|| {
-        StoreError::Io(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "la ruta del recurso no tiene directorio padre",
-        ))
-    })?;
-    OpenOptions::new().read(true).open(parent)?.sync_all()?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -883,193 +597,5 @@ mod tests {
             .unwrap();
         assert_eq!(updated.info.description, None);
     }
-    #[test]
-    fn update_does_not_overwrite_abandoned_temporary() {
-        let (_dir, store) = store();
-        let (resource, _) = store.create("Confirmado", None).unwrap();
-        let confirmed_path = store.path_for(resource.id);
-        let confirmed_before = fs::read(&confirmed_path).unwrap();
-        let temporary_path = store.temporary_path_for(resource.id);
-        fs::write(&temporary_path, "borrador incompleto").unwrap();
 
-        let result = store.update(
-            resource.id,
-            ResourcePatch {
-                title: Some("Cambio".to_owned()),
-                description: None,
-                tags: None,
-            },
-        );
-
-        assert!(matches!(result, Err(StoreError::TemporaryExists(path)) if path == temporary_path));
-        assert_eq!(fs::read(&confirmed_path).unwrap(), confirmed_before);
-        assert_eq!(
-            fs::read_to_string(&temporary_path).unwrap(),
-            "borrador incompleto"
-        );
-    }
-
-    #[test]
-    fn failed_promotion_preserves_temporary() {
-        let (_dir, store) = store();
-        let id = Uuid::now_v7();
-        let resource = Resource {
-            id,
-            management: Management::default(),
-            info: Info {
-                title: "Temporal preparado".to_owned(),
-                description: None,
-                tags: Vec::new(),
-            },
-            segments: Vec::new(),
-        };
-        let temporary_path = store.temporary_path_for(id);
-        let destination_path = store.path_for(id);
-
-        // Un archivo no puede reemplazar un directorio mediante rename: fuerza un error
-        // de promoción sin depender de permisos, que pueden no fallar bajo Termux/root.
-        fs::write(&temporary_path, toml::to_string(&resource).unwrap()).unwrap();
-        fs::create_dir(&destination_path).unwrap();
-
-        assert!(promote_temporary(&temporary_path, &destination_path, true).is_err());
-        assert_eq!(
-            fs::read_to_string(&temporary_path).unwrap(),
-            toml::to_string(&resource).unwrap()
-        );
-        assert!(destination_path.is_dir());
-    }
-
-    #[test]
-    fn recovery_warns_about_temporary_without_promoting_it() {
-        let (_dir, store) = store();
-        let (resource, _) = store.create("Confirmado", None).unwrap();
-        let temporary_path = store.temporary_path_for(resource.id);
-        fs::write(
-            &temporary_path,
-            "id = \"00000000-0000-7000-8000-000000000000\"\nname = \"No confirmado\"\n",
-        )
-        .unwrap();
-
-        let (recovered, warnings) = store.recover().unwrap();
-        assert_eq!(recovered, vec![resource.clone()]);
-        assert_eq!(warnings.len(), 1);
-        assert!(warnings[0].contains("no se recuperó automáticamente"));
-        assert!(store.path_for(resource.id).exists());
-        assert!(temporary_path.exists());
-    }
-
-    #[test]
-    fn temporary_inspection_never_promotes_valid_unconfirmed_content() {
-        let (_dir, store) = store();
-        let (confirmed, _) = store.create("Confirmado", None).unwrap();
-        let mut candidate = confirmed.clone();
-        candidate.info.title = "Borrador".to_owned();
-        let temporary_path = store.temporary_path_for(confirmed.id);
-        fs::write(&temporary_path, toml::to_string(&candidate).unwrap()).unwrap();
-
-        let inspection = store.inspect_temporary(confirmed.id).unwrap();
-        assert!(matches!(
-            inspection,
-            TemporaryInspection::ValidUnconfirmed { resource } if resource == candidate
-        ));
-        assert_eq!(store.get(confirmed.id).unwrap(), confirmed);
-        assert!(temporary_path.exists());
-    }
-
-    #[test]
-    fn inspecting_invalid_temporary_preserves_both_files() {
-        let (_dir, store) = store();
-        let (confirmed, _) = store.create("Confirmado", None).unwrap();
-        let confirmed_path = store.path_for(confirmed.id);
-        let confirmed_before = fs::read(&confirmed_path).unwrap();
-        let temporary_path = store.temporary_path_for(confirmed.id);
-        fs::write(&temporary_path, "temporal incompleto").unwrap();
-
-        let inspection = store.inspect_temporary(confirmed.id).unwrap();
-
-        assert!(matches!(inspection, TemporaryInspection::Invalid { .. }));
-        assert_eq!(fs::read(&confirmed_path).unwrap(), confirmed_before);
-        assert_eq!(
-            fs::read_to_string(&temporary_path).unwrap(),
-            "temporal incompleto"
-        );
-    }
-
-    #[test]
-    fn inspecting_missing_temporary_reports_missing_without_mutation() {
-        let (_dir, store) = store();
-        let (confirmed, _) = store.create("Confirmado", None).unwrap();
-        let confirmed_path = store.path_for(confirmed.id);
-        let confirmed_before = fs::read(&confirmed_path).unwrap();
-
-        assert_eq!(
-            store.inspect_temporary(confirmed.id).unwrap(),
-            TemporaryInspection::Missing
-        );
-        assert_eq!(fs::read(confirmed_path).unwrap(), confirmed_before);
-    }
-
-    #[test]
-    fn explicit_temporary_promotion_validates_and_replaces_confirmed_file() {
-        let (_dir, store) = store();
-        let (confirmed, _) = store.create("Confirmado", None).unwrap();
-        let mut candidate = confirmed.clone();
-        candidate.info.title = "Candidato recuperado".to_owned();
-        let temporary_path = store.temporary_path_for(confirmed.id);
-        fs::write(&temporary_path, toml::to_string(&candidate).unwrap()).unwrap();
-
-        let promoted = store.promote_temporary_explicitly(confirmed.id).unwrap();
-        assert_eq!(promoted, candidate);
-        assert_eq!(store.get(confirmed.id).unwrap(), candidate);
-        assert!(!temporary_path.exists());
-    }
-
-    #[test]
-    fn explicit_temporary_discard_preserves_confirmed_file() {
-        let (_dir, store) = store();
-        let (confirmed, _) = store.create("Confirmado", None).unwrap();
-        let confirmed_path = store.path_for(confirmed.id);
-        let before = fs::read(&confirmed_path).unwrap();
-        let temporary_path = store.temporary_path_for(confirmed.id);
-        fs::write(&temporary_path, "temporal incompleto").unwrap();
-
-        assert!(store.discard_temporary_explicitly(confirmed.id).unwrap());
-        assert!(!temporary_path.exists());
-        assert_eq!(fs::read(confirmed_path).unwrap(), before);
-        assert!(!store.discard_temporary_explicitly(confirmed.id).unwrap());
-    }
-
-    #[test]
-    fn explicit_temporary_promotion_rejects_missing_structural_registry() {
-        let (_dir, store) = store();
-        let (confirmed, _) = store.create("Confirmado", None).unwrap();
-        let temporary_path = store.temporary_path_for(confirmed.id);
-        fs::write(
-            &temporary_path,
-            format!(
-                "id = \"{}\"\n\n[info]\ntitle = \"Sin structural\"\ntags = []\n",
-                confirmed.id
-            ),
-        )
-        .unwrap();
-
-        assert!(store.promote_temporary_explicitly(confirmed.id).is_err());
-        assert_eq!(store.get(confirmed.id).unwrap(), confirmed);
-        assert!(temporary_path.exists());
-    }
-
-    #[test]
-    fn identical_update_leaves_confirmed_file_unchanged_and_creates_no_temporary() {
-        let (_dir, store) = store();
-        let (resource, _) = store.create("Sin cambios", Some("Texto")).unwrap();
-        let confirmed_path = store.path_for(resource.id);
-        let before = fs::read(&confirmed_path).unwrap();
-
-        let (updated, warnings) = store.update(resource.id, ResourcePatch::default()).unwrap();
-
-        assert_eq!(updated, resource);
-        assert!(warnings.is_empty());
-        assert_eq!(fs::read(&confirmed_path).unwrap(), before);
-        assert!(!store.temporary_path_for(resource.id).exists());
-    }
 }

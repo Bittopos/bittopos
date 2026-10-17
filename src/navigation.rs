@@ -1,11 +1,10 @@
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::persistence::atomic_write;
+use serde::{Deserialize, Serialize};
+
 use crate::Workspace;
 
 /// Ubicación actual de navegación. La ausencia de una instancia representa la raíz.
@@ -81,17 +80,10 @@ impl NavigationStore {
         Ok((state, false))
     }
 
-    /// Persiste atómicamente el estado de navegación.
+    /// Persiste el estado de navegación.
     pub fn save(&self, state: &NavigationState) -> Result<(), NavigationError> {
         let content = toml::to_string_pretty(state).map_err(NavigationError::TomlSerialize)?;
-        let parent = self.path.parent().ok_or_else(|| {
-            NavigationError::Io(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "ruta de navegación sin directorio",
-            ))
-        })?;
-        let temporary = parent.join(format!(".navigation.{}.tmp", Uuid::now_v7()));
-        atomic_write(&temporary, &self.path, content.as_bytes())?;
+        fs::write(&self.path, content)?;
         Ok(())
     }
 }

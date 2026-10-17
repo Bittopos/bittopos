@@ -8,7 +8,6 @@ mod lifecycle;
 mod mask_operations;
 mod model_operations;
 mod navigation;
-mod persistence;
 mod resource;
 mod semantic_masks;
 mod store;
@@ -34,6 +33,6 @@ pub use semantic_masks::{
     InstanceSemantics, Mask, MaskError, MaskMode, ReplaceComponent, ResourceDefinition,
     Segment as SemanticSegment, SegmentRole,
 };
-pub use store::{ResourceStore, StoreError, TemporaryInspection};
+pub use store::{ResourceStore, StoreError};
 pub use workspace::{WorkspaceError, WorkspaceStore};
 pub use workspace_model::{Content, Instance, Semantic, Source, Workspace, WorkspaceModelError};
