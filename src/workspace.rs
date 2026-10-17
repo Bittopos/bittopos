@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::persistence::atomic_write;
 use crate::semantic_masks::Mask;
 use crate::workspace_model::{Content, Instance, Semantic, Source, Workspace, WorkspaceModelError};
 
@@ -29,7 +28,7 @@ struct PersistedSource {
     id: Uuid,
 }
 
-/// Serialización del modelo de instancia, compartida por el workspace y el journal.
+/// Representación persistida de una instancia.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PersistedInstance {
@@ -250,10 +249,8 @@ impl WorkspaceStore {
         workspace.validate().map_err(WorkspaceError::from)?;
 
         let path = self.path_for(name)?;
-        let temporary_path = self.root.join(format!(".{name}.{}.tmp", Uuid::now_v7()));
         let content = serde_json::to_vec_pretty(&PersistedWorkspace::from(workspace))?;
-
-        atomic_write(&temporary_path, &path, &content)?;
+        fs::write(path, content)?;
         Ok(())
     }
 
@@ -427,9 +424,9 @@ mod tests {
     }
 
     #[test]
-    fn listing_ignores_hidden_journal_files() {
+    fn listing_ignores_hidden_files() {
         let (_directory, _resources, workspaces) = setup();
-        fs::write(workspaces.root().join(".proyecto.journal.json"), "{}").unwrap();
+        fs::write(workspaces.root().join(".hidden.json"), "{}").unwrap();
         fs::write(
             workspaces.root().join("proyecto.json"),
             r#"{"content":{"instances":[]}}"#,

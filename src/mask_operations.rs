@@ -4,9 +4,8 @@ use std::fmt;
 use uuid::Uuid;
 
 use crate::{
-    reconcile_workspace, ComponentMerge, ElementAddress, Instance, LifecycleError, MaskError,
-    MaskMode, Resource, ResourceDefinition, ResourceStore, StoreError, WorkspaceError,
-    WorkspaceStore,
+    load_workspace, ComponentMerge, ElementAddress, Instance, LifecycleError, MaskError, MaskMode,
+    Resource, ResourceDefinition, ResourceStore, StoreError, WorkspaceError, WorkspaceStore,
 };
 
 #[derive(Debug)]
@@ -26,7 +25,7 @@ pub enum MaskOperationError {
 impl fmt::Display for MaskOperationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Lifecycle(error) => write!(f, "no se pudo reconciliar el workspace: {error}"),
+            Self::Lifecycle(error) => write!(f, "no se pudo cargar la estructura: {error}"),
             Self::Resource(error) => write!(f, "error de recurso: {error}"),
             Self::Workspace(error) => write!(f, "error de workspace: {error}"),
             Self::Mask(error) => write!(f, "error de máscara: {error}"),
@@ -107,7 +106,7 @@ pub fn edit_instance_concept(
     concept: &str,
     value: impl Into<String>,
 ) -> Result<(), MaskOperationError> {
-    let (mut workspace, _) = reconcile_workspace(resources, workspaces, workspace_name)?;
+    let mut workspace = load_workspace(resources, workspaces, workspace_name)?;
     let instance = load_instance(&mut workspace, instance_id)?;
     let resource = resources.get(instance.source.id)?;
     instance.edit_local_concept(&resource, segment, concept, value)?;
@@ -126,7 +125,7 @@ pub fn edit_instance_component(
     component: &str,
     value: serde_json::Value,
 ) -> Result<(), MaskOperationError> {
-    let (mut workspace, _) = reconcile_workspace(resources, workspaces, workspace_name)?;
+    let mut workspace = load_workspace(resources, workspaces, workspace_name)?;
     let instance = load_instance(&mut workspace, instance_id)?;
     let resource = resources.get(instance.source.id)?;
     instance.edit_local_component(&resource, segment, component, value)?;
@@ -144,7 +143,7 @@ pub fn create_snapshot(
     segment: &str,
     scope: &[ElementAddress],
 ) -> Result<(), MaskOperationError> {
-    let (mut workspace, _) = reconcile_workspace(resources, workspaces, workspace_name)?;
+    let mut workspace = load_workspace(resources, workspaces, workspace_name)?;
     let instance = load_instance(&mut workspace, instance_id)?;
     let resource = resources.get(instance.source.id)?;
     instance.create_mask_snapshot(&resource, segment, scope)?;
@@ -162,7 +161,7 @@ pub fn remove_mask(
     segment: &str,
     mode: MaskMode,
 ) -> Result<(), MaskOperationError> {
-    let (mut workspace, _) = reconcile_workspace(resources, workspaces, workspace_name)?;
+    let mut workspace = load_workspace(resources, workspaces, workspace_name)?;
     load_instance(&mut workspace, instance_id)?.remove_semantic_mask(segment, mode)?;
     workspace.validate().map_err(WorkspaceError::from)?;
     workspaces.save(workspace_name, &workspace)?;
@@ -177,7 +176,7 @@ pub fn resolve_instance(
     instance_id: Uuid,
     component_merge: &impl ComponentMerge,
 ) -> Result<ResourceDefinition, MaskOperationError> {
-    let (workspace, _) = reconcile_workspace(resources, workspaces, workspace_name)?;
+    let workspace = load_workspace(resources, workspaces, workspace_name)?;
     let instance = workspace
         .find_instance(instance_id)
         .ok_or(MaskOperationError::InstanceNotFound(instance_id))?;

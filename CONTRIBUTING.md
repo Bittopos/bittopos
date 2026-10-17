@@ -1,56 +1,19 @@
-# Desarrollo y contribución
+# Contribuir a Bittopos
 
-Esta guía describe el flujo normal de trabajo de Bittopos. Está pensada para cambios incrementales y revisables; no exige crear un documento formal para cada tarea.
+El desarrollo debe avanzar en incrementos pequeños que puedan explicarse, compilarse y revisarse.
 
-## 1. Antes de cambiar código
+## Flujo
 
-1. Lee [Estado del proyecto](docs/status.md) y la sección pertinente de la documentación.
-2. Busca una Issue existente. Si el trabajo es sustancial, crea una Issue con problema, alcance y criterios de aceptación.
-3. Si el cambio altera una regla conceptual o una frontera arquitectónica, actualiza la especificación o propone un ADR.
-4. Asegúrate de que el cambio no mezcla limpieza incidental con nuevas funcionalidades.
+1. Parte del `main` actualizado.
+2. Crea una rama por cambio lógico: `feat/`, `fix/`, `refactor/`, `docs/` o `test/`.
+3. Mantén el cambio limitado a una responsabilidad.
+4. Actualiza la documentación solo cuando cambie el modelo, el comportamiento o la forma de construir.
+5. Ejecuta las comprobaciones de la guía de desarrollo y comunica cuáles no pudiste ejecutar.
+6. Abre un Pull Request con motivo, alcance, pruebas y limitaciones.
 
-Las tareas pequeñas y obvias pueden ir directamente a una rama y PR sin crear una Issue por obligación.
+Usa mensajes de commit claros, preferiblemente Conventional Commits, por ejemplo `refactor(core): simplify instance lifecycle`.
 
-## 2. Ramas y commits
-
-Trabaja en una rama por cambio lógico; evita desarrollar continuamente sobre `main`.
-
-Nombres recomendados:
-
-- `docs/...`: documentación.
-- `feat/...`: funcionalidad nueva.
-- `fix/...`: corrección.
-- `refactor/...`: cambio interno sin alterar el comportamiento intencionado.
-- `test/...`: pruebas.
-- `ci/...`: automatización.
-
-Usa mensajes claros, preferiblemente con Conventional Commits:
-
-- `docs: clarify mask inheritance rules`
-- `feat(core): resolve inherited segments`
-- `fix(workspace): reject duplicate instance ids`
-- `refactor(core): separate model validation`
-- `test(core): cover mask fallback`
-
-Conventional Commits ayuda a leer el historial y automatizar versiones; no sustituye la revisión ni exige que cada commit sea una versión.
-
-## 3. Pull Request
-
-Una PR debe explicar:
-
-- **Motivo:** qué problema resuelve.
-- **Cambio:** qué se modificó y qué queda fuera.
-- **Criterios de aceptación:** cómo se comprobará.
-- **Pruebas:** qué comandos se ejecutaron y sus resultados.
-- **Documentación:** qué páginas o decisiones se actualizaron.
-
-Mantén las PR pequeñas cuando eso facilite la revisión. Una PR puede incluir documentación y código si describen el mismo cambio.
-
-No marques como implementado algo que solo está documentado. Integra en `main` después de revisar el diff y el resultado de CI.
-
-## 4. Verificación local
-
-Desde la raíz del repositorio:
+## Comprobaciones
 
 ```bash
 cargo fmt --all -- --check
@@ -59,26 +22,13 @@ cargo test --workspace --locked
 git diff --check
 ```
 
-Si un comando no se ejecutó, indícalo explícitamente en la PR. Las pruebas del workspace importan porque el repositorio contiene más de un paquete Cargo.
+No declares pruebas como exitosas si no se ejecutaron. No añadas capas, abstracciones, recuperación automática ni preparación para plataformas futuras sin una necesidad actual demostrable.
 
-## 5. Responsabilidades documentales
+## Documentos
 
-- **README:** presentación y puerta de entrada.
-- **`docs/VISION.md`:** propósito y dirección estratégica.
-- **`docs/model.md`:** reglas conceptuales vigentes.
-- **`docs/architecture.md`:** límites actuales y dirección técnica.
-- **`docs/status.md`:** capacidades implementadas, pendientes y aplazadas.
-- **ADR:** decisiones técnicas importantes, alternativas y consecuencias.
-- **`docs/DEVELOPMENT-GUIDE.md`:** normas de ingeniería y límites de responsabilidad.
-- **Issues:** trabajo pendiente y criterios de aceptación.
-- **PR:** registro revisable de un cambio concreto.
-- **CHANGELOG:** cambios relevantes agrupados por versión.
-- **Histórico:** contratos antiguos y decisiones sustituidas.
+- [Visión](docs/VISION.md)
+- [Modelo](docs/model.md)
+- [Arquitectura](docs/architecture.md)
+- [Guía de desarrollo](docs/DEVELOPMENT-GUIDE.md)
 
-Evita mantener la misma especificación completa en varios documentos. Enlaza la fuente de autoridad en lugar de copiarla.
-
-## 6. Versiones y changelog
-
-La versión de un paquete Rust se declara en su `Cargo.toml`; Git registra commits y referencias, pero no decide automáticamente qué versión debe tener la aplicación. Las etiquetas Git y GitHub Releases se crean cuando se decide publicar una versión.
-
-Mientras Bittopos sea un prototipo, registra en `CHANGELOG.md` los cambios funcionales y arquitectónicos relevantes. No incrementes la versión del paquete por cada PR. Al preparar una publicación, decide el incremento SemVer según compatibilidad y alcance, actualiza los metadatos pertinentes, valida el workspace y etiqueta el commit publicado.
+El README es la entrada al proyecto; el modelo define las reglas conceptuales y la arquitectura explica cómo están repartidas en el código.

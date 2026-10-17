@@ -1,16 +1,13 @@
 //! Núcleo mínimo de Bittopos.
 //!
-//! Los recursos se guardan individualmente en TOML. Los espacios de trabajo
-//! se guardan en JSON y contienen instancias con identidad propia, separada
-//! de la identidad del recurso de origen.
+//! Los recursos se guardan en archivos TOML individuales. La estructura se guarda
+//! en un archivo JSON y contiene instancias con identidad propia.
 
 mod application;
-mod journal;
 mod lifecycle;
 mod mask_operations;
 mod model_operations;
 mod navigation;
-mod persistence;
 mod resource;
 mod semantic_masks;
 mod store;
@@ -22,8 +19,7 @@ pub use application::{
     ApplicationError, PreparedWorkspace,
 };
 pub use lifecycle::{
-    create_instance, create_instance_under, reconcile_workspace, remove_instance, LifecycleError,
-    RecoveryReport,
+    create_instance, create_instance_under, load_workspace, remove_instance, LifecycleError,
 };
 pub use mask_operations::{
     create_snapshot, edit_instance_component, edit_instance_concept, edit_shared_component,
@@ -37,6 +33,6 @@ pub use semantic_masks::{
     InstanceSemantics, Mask, MaskError, MaskMode, ReplaceComponent, ResourceDefinition,
     Segment as SemanticSegment, SegmentRole,
 };
-pub use store::{ResourceStore, StoreError, TemporaryInspection};
+pub use store::{ResourceStore, StoreError};
 pub use workspace::{WorkspaceError, WorkspaceStore};
 pub use workspace_model::{Content, Instance, Semantic, Source, Workspace, WorkspaceModelError};

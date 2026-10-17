@@ -21,7 +21,7 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Crea una definición y, salvo --no-instance, una instancia en la ubicación actual.
+    /// Crea un recurso y, salvo --no-instance, una instancia en la ubicación actual.
     Create {
         title: String,
         #[arg(long)]
@@ -39,16 +39,14 @@ enum Command {
     Enter { id: Uuid },
     /// Sube a la instancia padre; desde la raíz permanece en la raíz.
     Up,
-    /// Vuelve a la raíz del espacio de trabajo.
+    /// Vuelve a la raíz de la estructura.
     Root,
-    /// Muestra la ubicación de navegación actual.
+    /// Muestra la ubicación de navegación actual dentro de la estructura.
     Pwd,
     /// Crea una instancia de una definición existente dentro de la ubicación actual.
     Add { id: Uuid },
     /// Elimina una instancia hoja por su UUID propio.
     Remove { id: Uuid },
-    /// Verifica y recupera el workspace a partir de los registros confirmados.
-    Recover,
 }
 
 struct Paths {
@@ -98,7 +96,6 @@ fn run() -> Result<(), String> {
     // La capa de aplicación prepara el contexto consistente para la interfaz.
     let prepared = prepare_workspace(&resources, &workspaces, &navigation, WORKSPACE_FILE)
         .map_err(|error| error.to_string())?;
-    report_recovery(prepared.recovery.restored, prepared.recovery.removed);
     let startup_workspace = prepared.workspace;
     let mut nav_state = prepared.navigation_state;
     let navigation_reset = prepared.navigation_reset;
@@ -222,7 +219,7 @@ fn run() -> Result<(), String> {
             navigation
                 .save(&nav_state)
                 .map_err(|error| error.to_string())?;
-            println!("Ubicación actual: raíz del espacio de trabajo.");
+            println!("Ubicación actual: raíz de la estructura.");
         }
         Command::Pwd => {
             print_location(&nav_state, &startup_workspace, &resources)?;
@@ -259,23 +256,9 @@ fn run() -> Result<(), String> {
             }
             println!("Instancia removida: {id}");
         }
-        Command::Recover => {
-            println!(
-                "Workspace consistente: {} instancia(s).",
-                startup_workspace.all_instances().len()
-            );
-        }
     }
 
     Ok(())
-}
-
-fn report_recovery(restored: usize, removed: usize) {
-    if restored > 0 || removed > 0 {
-        eprintln!(
-            "Recuperación aplicada: {restored} instancia(s) reconstruida(s), {removed} instancia(s) residual(es) eliminada(s)."
-        );
-    }
 }
 
 fn print_location(
@@ -303,7 +286,7 @@ fn print_location(
 
 fn print_workspace(workspace: &Workspace, resources: &ResourceStore) -> Result<(), String> {
     if workspace.all_instances().is_empty() {
-        println!("El workspace está vacío.");
+        println!("La estructura está vacía.");
         return Ok(());
     }
     print_instances(workspace.instances(), resources, 0)
