@@ -28,7 +28,7 @@ struct PersistedSource {
     id: Uuid,
 }
 
-/// Serialización del modelo de instancia, compartida por el workspace y el journal.
+/// Representación persistida de una instancia.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PersistedInstance {
@@ -424,9 +424,9 @@ mod tests {
     }
 
     #[test]
-    fn listing_ignores_hidden_journal_files() {
+    fn listing_ignores_hidden_files() {
         let (_directory, _resources, workspaces) = setup();
-        fs::write(workspaces.root().join(".proyecto.journal.json"), "{}").unwrap();
+        fs::write(workspaces.root().join(".hidden.json"), "{}").unwrap();
         fs::write(
             workspaces.root().join("proyecto.json"),
             r#"{"content":{"instances":[]}}"#,
