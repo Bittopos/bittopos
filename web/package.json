@@ -1,0 +1,8 @@
+{
+  "name": "bittopos-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check src/api.js && node --check src/model.js && node --check src/ui.js && node --check src/main.js"
+  }
+}
