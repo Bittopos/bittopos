@@ -23,7 +23,10 @@ export function makeInstance(resourceId, parentId, workspace) {
     const parent = findInstance(workspace, parentId)?.instance;
     if (!parent) throw new Error("No se encontró la instancia contenedora.");
     parent.content ||= {}; parent.content.instances ||= []; parent.content.instances.push(instance);
-    parent.semantic ||= {}; parent.semantic.allocation ||= []; parent.semantic.allocation.push(instance.id);
+    parent.semantic ||= {};
+    if (parent.semantic.allocation === undefined) parent.semantic.allocation = [];
+    if (!Array.isArray(parent.semantic.allocation)) throw new Error("semantic.allocation debe ser una lista; no se modificó la estructura.");
+    parent.semantic.allocation.push(instance.id);
   }
   return instance;
 }
@@ -36,8 +39,14 @@ export function removeInstance(workspace, id) {
   if (row.parentId) {
     const parent = findInstance(workspace, row.parentId)?.instance;
     if (parent?.semantic?.allocation) parent.semantic.allocation = parent.semantic.allocation.filter(childId => childId !== id);
-    if (parent?.content?.instances?.length === 0) delete parent.content;
-    if (parent?.semantic?.allocation?.length === 0) delete parent.semantic.allocation;
+    if (parent?.content?.instances?.length === 0) {
+      delete parent.content.instances;
+      if (Object.keys(parent.content).length === 0) delete parent.content;
+    }
+    if (parent?.semantic?.allocation?.length === 0) {
+      delete parent.semantic.allocation;
+      if (Object.keys(parent.semantic).length === 0) delete parent.semantic;
+    }
   }
   return removed;
 }
