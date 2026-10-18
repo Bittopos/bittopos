@@ -1,42 +1,42 @@
-# Interfaz web experimental
+# Bittopos Web
 
-Esta carpeta contiene una interfaz estática que funciona con datos del navegador. No está conectada al núcleo Rust ni escribe directamente en los archivos locales.
+Frontend reescrito como SPA modular con HTML, CSS y módulos ES nativos. Consume `/api/v1` y no utiliza `localStorage` como almacén principal. La persistencia inicial la gestiona el adaptador SQLite del directorio `backend/`.
 
-## Uso local
+## Ejecutar el MVP local
 
-Desde la raíz del repositorio, ejecuta:
+Requiere Python 3.11 o superior y un navegador moderno. No necesita paquetes externos.
 
 ```bash
-python3 -m http.server 8000 --directory web
+python3 backend/server.py
 ```
 
-Abre `http://localhost:8000`. No requiere compilación ni dependencias de Node para servir la aplicación. Servirla por HTTP evita restricciones que algunos navegadores aplican a archivos abiertos con `file://`.
+Abre `http://127.0.0.1:8787`. El mismo proceso sirve los assets estáticos y el API en el mismo origen. La base se crea en `backend/data/bittopos.sqlite3`, ignorada por Git.
 
-1. Importa los recursos TOML.
-2. Importa la estructura JSON.
-3. Organiza las instancias y crea recursos.
-4. Exporta la estructura y los recursos para guardarlos manualmente.
+Para comprobar sintaxis del frontend desde `web/`:
 
-## Despliegue en Cloudflare Pages
+```bash
+npm run check
+```
 
-Para el frontend actual, que no requiere bundler:
+Para las pruebas del adaptador desde la raíz:
 
-- Repositorio: `jasperslimbell/bittopos`
-- Rama: la rama que se decida publicar después de la revisión
-- Directorio raíz: `/` (raíz del repositorio)
-- Comando de compilación: vacío
-- Directorio de salida: `web`
-- Variables de entorno: ninguna
+```bash
+python -m unittest discover -s backend/tests -v
+```
 
-Esto publica solamente HTML, CSS y JavaScript. No compila Rust a WASM ni crea un backend. No se deben guardar secretos en el frontend.
+## Funcionalidad actual
 
-## Modelo de archivos
+- Cargar recursos y estructura desde la API.
+- Crear/editar definiciones de recurso.
+- Crear/eliminar instancias, manteniendo separados el ID de recurso y el ID de instancia.
+- Buscar en la estructura.
+- Importar TOML y JSON; exportar una copia JSON de recursos y estructura.
+- Persistir estructura con contador de revisión para detectar escrituras obsoletas.
 
-- Cada recurso se exporta como un TOML individual con `id` e `info`.
-- La estructura JSON contiene las instancias y su jerarquía.
-- Cada instancia conserva su propio `id` y la referencia `source.id`.
-- La contención se representa mediante `content.instances`; `semantic.allocation` enumera los hijos directos.
+La API preserva campos desconocidos en los documentos JSON. La edición de instancias aún no implementa máscaras ni resolución semántica completa; los cambios de contención actualizan `content.instances` y `semantic.allocation` juntos según el contrato provisional.
 
-## Límites
+## Cloudflare Pages y backend
 
-La interfaz es un prototipo independiente. No implementa la resolución semántica completa ni todas las reglas de máscaras, relaciones y referencias del núcleo. Los datos de `localStorage` pertenecen al navegador y origen actual; no son sincronización ni copia de seguridad. El parser TOML del navegador solo admite el subconjunto implementado en `app.js`.
+Cloudflare Pages puede servir los archivos estáticos, pero no ejecuta este servidor Python. Para usar la SPA desde un despliegue remoto hace falta alojar el API en un entorno compatible y resolver HTTPS, CORS, autenticación, autorización y secretos. No se ha desplegado el backend en la nube y no debe exponerse directamente a Internet.
+
+Consulta [la guía del backend](../backend/README.md) y [el límite arquitectónico de esta iteración](../docs/api-backed-frontend.md).
