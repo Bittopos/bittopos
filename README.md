@@ -47,9 +47,9 @@ Crear una definición sin instancia:
 cargo run -p bitto-cli -- create "Idea pendiente" --no-instance
 ```
 
-## Frontend web
+## Frontend y API experimental
 
-La SPA estática se encuentra en `web/`. Consulta [su guía](web/README.md) para ejecutar localmente y desplegar en Cloudflare Pages. La [propuesta de refactorización](docs/frontend-refactor-proposal.md) describe las fases y el contrato pendiente de integración con Rust.
+La nueva SPA modular está en `web/` y consume la API HTTP v1. El adaptador experimental Python/SQLite está en `backend/`; ambos se ejecutan juntos en local con `python3 backend/server.py`. Esta API es una frontera de persistencia exploratoria, no el núcleo semántico Rust ni un servicio multiusuario listo para Internet. Consulta [la guía web](web/README.md), [la guía del backend](backend/README.md) y [el límite arquitectónico](docs/api-backed-frontend.md). La propuesta inicial de base frontend permanece en [docs/frontend-refactor-proposal.md](docs/frontend-refactor-proposal.md).
 
 ## Verificación
 
@@ -60,8 +60,8 @@ cargo fmt --all -- --check
 cargo build --workspace --locked
 cargo test --workspace --locked
 git diff --check
-node --check web/app.js
-node web/scripts/check.mjs
+npm --prefix web run check
+python -m unittest discover -s backend/tests -v
 ```
 
 ## Documentación
