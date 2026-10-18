@@ -336,6 +336,8 @@ def main():
     init_db()
     host = os.environ.get("BITTOPOS_HOST", "127.0.0.1")
     port = int(os.environ.get("BITTOPOS_PORT", "8787"))
+    if host not in {"127.0.0.1", "::1", "localhost"} and not API_TOKEN:
+        raise RuntimeError("Refusing to bind to a non-loopback address without BITTOPOS_API_TOKEN. This prototype is not production-hardened.")
     server = ThreadingHTTPServer((host, port), Handler)
     print(f"Bittopos API escuchando en http://{host}:{port} (SQLite: {DB_PATH})")
     try:
