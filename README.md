@@ -47,6 +47,10 @@ Crear una definición sin instancia:
 cargo run -p bitto-cli -- create "Idea pendiente" --no-instance
 ```
 
+## Frontend web
+
+La SPA estática se encuentra en `web/`. Consulta [su guía](web/README.md) para ejecutar localmente y desplegar en Cloudflare Pages. La [propuesta de refactorización](docs/frontend-refactor-proposal.md) describe las fases y el contrato pendiente de integración con Rust.
+
 ## Verificación
 
 Desde la raíz:
@@ -56,6 +60,8 @@ cargo fmt --all -- --check
 cargo build --workspace --locked
 cargo test --workspace --locked
 git diff --check
+node --check web/app.js
+node web/scripts/check.mjs
 ```
 
 ## Documentación
