@@ -80,22 +80,33 @@ $("json-file").addEventListener("change", async event => {
   const file = event.target.files?.[0]; if (!file) return;
   try {
     const payload = JSON.parse(await file.text());
-    if (!Array.isArray(payload.resources) || !payload.workspace) throw new Error("Se esperaba {resources, workspace}.");
-    for (const resource of payload.resources) {
-      try { await api.createResource(resource); }
-      catch (error) { if (error.status === 409) await api.updateResource(resource.id, resource); else throw error; }
+    const bundled = Array.isArray(payload.resources) && payload.workspace;
+    const workspace = bundled ? payload.workspace : payload;
+    if (!workspace?.content || !Array.isArray(workspace.content.instances)) throw new Error("Se esperaba un workspace con content.instances o un paquete {resources, workspace}.");
+    if (bundled) {
+      for (const resource of payload.resources) {
+        try { await api.createResource(resource); }
+        catch (error) { if (error.status === 409) await api.updateResource(resource.id, resource); else throw error; }
+      }
     }
-    const state = await api.getState(), result = await api.saveWorkspace(payload.workspace, state.revision);
-    app.revision = result.revision; await app.reload(); toast("JSON importado a la base de datos.", "success");
+    const state = await api.getState(), result = await api.saveWorkspace(workspace, state.revision);
+    app.revision = result.revision; await app.reload();
+    toast(bundled ? "Paquete JSON importado a la base de datos." : "Workspace JSON importado; las definiciones TOML deben importarse por separado.", "success");
   } catch (error) { toast("No se pudo importar el JSON: " + error.message, "error"); }
   finally { event.target.value = ""; }
 });
 $("import-resource").addEventListener("click", () => $("toml-file").click());
 $("toml-file").addEventListener("change", async event => {
-  const file = event.target.files?.[0]; if (!file) return;
-  try { const result = await api.importToml(await file.text()); await app.reload(); toast("Definición importada: " + result.resource.info.title, "success"); }
-  catch (error) { toast("No se pudo importar TOML: " + error.message, "error"); }
-  finally { event.target.value = ""; }
+  const files = Array.from(event.target.files || []); if (!files.length) return;
+  let imported = 0; const errors = [];
+  for (const file of files) {
+    try { await api.importToml(await file.text()); imported++; }
+    catch (error) { errors.push(file.name + ": " + error.message); }
+  }
+  await app.reload();
+  if (imported) toast(imported + " recurso(s) TOML importado(s) a SQLite.", "success");
+  if (errors.length) toast(errors.slice(0, 2).join(" · "), "error");
+  event.target.value = "";
 });
 document.querySelectorAll("[data-close]").forEach(button => button.addEventListener("click", () => $(button.dataset.close).close()));
 document.addEventListener("keydown", event => { if (event.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) { event.preventDefault(); $("search").focus(); } });
