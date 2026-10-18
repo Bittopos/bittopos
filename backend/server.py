@@ -2,7 +2,7 @@
 """Small HTTP/SQLite persistence adapter for the Bittopos browser prototype.
 
 This is an API boundary experiment, not the semantic core and not a production
-multi-user service. See docs/backend-api.md before exposing it to the internet.
+multi-user service. See docs/api-backed-frontend.md before exposing it to the internet.
 """
 from __future__ import annotations
 
