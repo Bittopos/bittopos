@@ -57,7 +57,7 @@ Bittopos separará tres responsabilidades: **Workspace**, la interfaz de trabajo
 
 - [Límites entre Workspace, Cloud y multi-tenancy](docs/product-boundaries.md): visión de producto, repositorios y modelo de acceso.
 - [Estructura objetivo del repositorio](docs/repository-structure.md): límites de núcleo, CLI, servidor, web, pruebas y despliegue.
-- [Límites entre Workspace, Cloud y multi-tenancy](docs/product-boundaries.md): separación entre la interfaz de trabajo, el servidor portable y el plano de control comercial.
+- [Encuesta de extracción de características de Kaneo](docs/kaneo-feature-extraction.md): inventario, adaptación al modelo de Bittopos, prioridades y fases propuestas.
 
 ## Verificación
 
