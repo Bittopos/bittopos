@@ -68,8 +68,9 @@ python -m unittest discover -s backend/tests -v
 
 - [Visión](docs/VISION.md): propósito y dirección.
 - [Modelo](docs/model.md): conceptos y reglas semánticas.
-- [Arquitectura](docs/architecture.md): archivos, módulos y flujo de datos.
+- [Arquitectura actual](docs/architecture.md): módulos y flujo de datos existente.
+- [Estructura objetivo del repositorio](docs/repository-structure.md): límites de núcleo, CLI, servidor, web, pruebas y despliegue.
 - [Guía de desarrollo](docs/DEVELOPMENT-GUIDE.md): cambios pequeños y comandos.
 - [Contribución](CONTRIBUTING.md): ramas y Pull Requests.
 
-La documentación describe el comportamiento vigente. Las decisiones sustituidas y los contratos históricos no se conservan como parte de la documentación operativa.
+La documentación distingue el comportamiento implementado de la arquitectura objetivo; la estructura objetivo se migrará en pasos pequeños y revisables.
