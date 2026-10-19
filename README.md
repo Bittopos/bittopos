@@ -49,7 +49,14 @@ cargo run -p bitto-cli -- create "Idea pendiente" --no-instance
 
 ## Frontend y API experimental
 
-La nueva SPA modular está en `web/` y consume la API HTTP v1. El adaptador experimental Python/SQLite está en `backend/`; ambos se ejecutan juntos en local con `python3 backend/server.py`. Esta API es una frontera de persistencia exploratoria, no el núcleo semántico Rust ni un servicio multiusuario listo para Internet. Consulta [la guía web](web/README.md), [la guía del backend](backend/README.md) y [el límite arquitectónico](docs/api-backed-frontend.md). La propuesta inicial de base frontend permanece en [docs/frontend-refactor-proposal.md](docs/frontend-refactor-proposal.md).
+La SPA modular está en `web/` y consume la API HTTP v1. El adaptador experimental Python/SQLite está en `backend/`; ambos se ejecutan juntos en local con `python3 backend/server.py`. Esta API es una frontera de persistencia exploratoria, no el núcleo semántico Rust ni un servicio multiusuario listo para Internet. Consulta [la guía web](web/README.md), [la guía del backend](backend/README.md) y [el límite arquitectónico](docs/api-backed-frontend.md).
+
+## Dirección del producto
+
+Bittopos separará tres responsabilidades: **Workspace**, la interfaz de trabajo; **Server**, el servicio portable que ejecuta operaciones y protege los datos; y **Cloud**, el plano de control comercial para cuentas, organizaciones, suscripciones y aprovisionamiento de espacios alojados. Son límites de arquitectura propuestos, no funcionalidades ya implementadas.
+
+- [Límites entre Workspace, Cloud y multi-tenancy](docs/product-boundaries.md): visión de producto, repositorios y modelo de acceso.
+- [Estructura objetivo del repositorio](docs/repository-structure.md): límites de núcleo, CLI, servidor, web, pruebas y despliegue.
 
 ## Verificación
 
@@ -69,7 +76,6 @@ python -m unittest discover -s backend/tests -v
 - [Visión](docs/VISION.md): propósito y dirección.
 - [Modelo](docs/model.md): conceptos y reglas semánticas.
 - [Arquitectura actual](docs/architecture.md): módulos y flujo de datos existente.
-- [Estructura objetivo del repositorio](docs/repository-structure.md): límites de núcleo, CLI, servidor, web, pruebas y despliegue.
 - [Guía de desarrollo](docs/DEVELOPMENT-GUIDE.md): cambios pequeños y comandos.
 - [Contribución](CONTRIBUTING.md): ramas y Pull Requests.
 
