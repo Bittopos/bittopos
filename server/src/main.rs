@@ -14,7 +14,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use bittopos_core::{Resource, ResourceStore, WorkspaceStore};
+use bittopos_core::{ResourceStore, WorkspaceStore};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio::net::TcpListener;
@@ -75,8 +75,11 @@ async fn login(State(state): State<AppState>, Json(input): Json<LoginRequest>) -
         SESSION_TTL.as_secs()
     ) + secure;
 
-    let mut response = Json(json!({ "authenticated": true, "username": state.username.as_ref() }))
-        .into_response();
+    let mut response = Json(json!({
+        "authenticated": true,
+        "username": state.username.as_ref()
+    }))
+    .into_response();
     match HeaderValue::from_str(&cookie) {
         Ok(value) => {
             response.headers_mut().insert(header::SET_COOKIE, value);
