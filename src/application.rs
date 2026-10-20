@@ -4,7 +4,8 @@ use std::fmt;
 
 use crate::{
     create_instance_under, load_workspace, remove_instance, LifecycleError, NavigationError,
-    NavigationState, NavigationStore, ResourceStore, Workspace, WorkspaceStore,
+    NavigationState, NavigationStore, Profile, ProfileError, ProfileStore, ResourceStore,
+    Workspace, WorkspaceStore,
 };
 
 /// Error producido al preparar el contexto operativo del workspace.
@@ -43,6 +44,13 @@ pub struct PreparedWorkspace {
     pub workspace: Workspace,
     pub navigation_state: NavigationState,
     pub navigation_reset: bool,
+}
+
+/// Caso de uso compartido para crear la identidad de un perfil local.
+/// Las interfaces solo proporcionan el almacén configurado; las reglas de
+/// creación y persistencia permanecen en el núcleo.
+pub fn create_profile(profiles: &ProfileStore) -> Result<Profile, ProfileError> {
+    profiles.create()
 }
 
 /// Carga la estructura y valida el destino de navegación antes de usar la CLI.
@@ -104,6 +112,30 @@ pub fn remove_instance_and_update_navigation(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shared_use_case_creates_profile_without_initializing_a_workspace() {
+        let dir = tempfile::tempdir().unwrap();
+        let profiles = ProfileStore::new(dir.path());
+
+        let profile = create_profile(&profiles).unwrap();
+
+        assert_eq!(profiles.load().unwrap(), profile);
+        assert!(!dir.path().join("workspaces").exists());
+        assert!(!dir.path().join("resources").exists());
+    }
+
+    #[test]
+    fn shared_use_case_preserves_single_profile_rule() {
+        let dir = tempfile::tempdir().unwrap();
+        let profiles = ProfileStore::new(dir.path());
+
+        create_profile(&profiles).unwrap();
+        assert!(matches!(
+            create_profile(&profiles),
+            Err(ProfileError::AlreadyExists)
+        ));
+    }
 
     #[test]
     fn creates_instance_under_current_navigation_location() {
