@@ -89,7 +89,11 @@ enum ProfileCommand {
 #[derive(Debug, Subcommand)]
 enum ProjectCommand {
     /// Crea un proyecto dentro del perfil local.
-    Create { name: String, #[arg(long)] description: Option<String> },
+    Create {
+        name: String,
+        #[arg(long)]
+        description: Option<String>,
+    },
     /// Lista los proyectos del perfil local.
     List,
 }
@@ -122,7 +126,11 @@ impl Paths {
 
     fn for_project(&self, project_id: Uuid) -> Self {
         let project_root = self.root.join("projects").join(project_id.to_string());
-        Self { root: self.root.clone(), resources: project_root.join("resources"), workspaces: project_root.join("workspaces") }
+        Self {
+            root: self.root.clone(),
+            resources: project_root.join("resources"),
+            workspaces: project_root.join("workspaces"),
+        }
     }
 }
 
@@ -145,20 +153,34 @@ fn run() -> Result<(), String> {
     let project_store = ProjectStore::new(&paths.root);
 
     match &command {
-        Command::Profile { command: ProfileCommand::Create } => {
+        Command::Profile {
+            command: ProfileCommand::Create,
+        } => {
             let profile = create_profile(&profiles).map_err(|error| error.to_string())?;
-            println!("Perfil creado: {} (ID: {})", paths.root.join("profile.json").display(), profile.id);
+            println!(
+                "Perfil creado: {} (ID: {})",
+                paths.root.join("profile.json").display(),
+                profile.id
+            );
             return Ok(());
         }
-        Command::Project { command: ProjectCommand::Create { name, description } } => {
+        Command::Project {
+            command: ProjectCommand::Create { name, description },
+        } => {
             let project = create_project(&profiles, &project_store, name, description.as_deref())
                 .map_err(|error| error.to_string())?;
             println!("Proyecto creado: {} ({})", project.name, project.id);
-            println!("Directorio: {}", project_store.root().join(project.id.to_string()).display());
+            println!(
+                "Directorio: {}",
+                project_store.root().join(project.id.to_string()).display()
+            );
             return Ok(());
         }
-        Command::Project { command: ProjectCommand::List } => {
-            let projects = list_projects(&profiles, &project_store).map_err(|error| error.to_string())?;
+        Command::Project {
+            command: ProjectCommand::List,
+        } => {
+            let projects =
+                list_projects(&profiles, &project_store).map_err(|error| error.to_string())?;
             if projects.is_empty() {
                 println!("Este perfil todavía no tiene proyectos.");
             } else {
@@ -175,17 +197,27 @@ fn run() -> Result<(), String> {
     }
 
     let profile = profiles.load().map_err(|error| {
-        format!("no se pudo cargar el perfil local; ejecuta primero 'bitto profile create': {error}")
+        format!(
+            "no se pudo cargar el perfil local; ejecuta primero 'bitto profile create': {error}"
+        )
     })?;
-    let available_projects = project_store.list(profile.id).map_err(|error| error.to_string())?;
+    let available_projects = project_store
+        .list(profile.id)
+        .map_err(|error| error.to_string())?;
     let selected_project = match cli.project {
-        Some(id) => project_store.load(profile.id, id).map_err(|error| error.to_string())?,
+        Some(id) => project_store
+            .load(profile.id, id)
+            .map_err(|error| error.to_string())?,
         None if available_projects.len() == 1 => available_projects[0].clone(),
-        None if available_projects.is_empty() => return Err(
-            "este perfil no tiene proyectos; crea uno con 'bitto project create <nombre>'".to_owned()
-        ),
+        None if available_projects.is_empty() => {
+            return Err(
+                "este perfil no tiene proyectos; crea uno con 'bitto project create <nombre>'"
+                    .to_owned(),
+            )
+        }
         None => return Err(
-            "hay varios proyectos; indica uno con --project <UUID> (consulta 'bitto project list')".to_owned()
+            "hay varios proyectos; indica uno con --project <UUID> (consulta 'bitto project list')"
+                .to_owned(),
         ),
     };
     let paths = paths.for_project(selected_project.id);
