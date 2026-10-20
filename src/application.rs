@@ -53,7 +53,6 @@ pub fn create_profile(profiles: &ProfileStore) -> Result<Profile, ProfileError> 
     profiles.create()
 }
 
-
 /// Error de aplicación al operar con proyectos del perfil local.
 #[derive(Debug)]
 pub enum ProjectApplicationError {
@@ -79,7 +78,9 @@ pub fn create_project(
     description: Option<&str>,
 ) -> Result<Project, ProjectApplicationError> {
     let profile = profiles.load().map_err(ProjectApplicationError::Profile)?;
-    projects.create(profile.id, name, description).map_err(ProjectApplicationError::Project)
+    projects
+        .create(profile.id, name, description)
+        .map_err(ProjectApplicationError::Project)
 }
 
 /// Lista los proyectos asociados al perfil local existente.
@@ -88,7 +89,9 @@ pub fn list_projects(
     projects: &ProjectStore,
 ) -> Result<Vec<Project>, ProjectApplicationError> {
     let profile = profiles.load().map_err(ProjectApplicationError::Profile)?;
-    projects.list(profile.id).map_err(ProjectApplicationError::Project)
+    projects
+        .list(profile.id)
+        .map_err(ProjectApplicationError::Project)
 }
 
 /// Carga la estructura y valida el destino de navegación antes de usar la CLI.
