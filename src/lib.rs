@@ -9,6 +9,7 @@ mod mask_operations;
 mod model_operations;
 mod navigation;
 mod profile;
+mod project;
 mod relations;
 mod resource;
 mod semantic_masks;
@@ -17,8 +18,9 @@ mod workspace;
 mod workspace_model;
 
 pub use application::{
-    create_instance_at_current_location, create_profile, prepare_workspace,
-    remove_instance_and_update_navigation, ApplicationError, PreparedWorkspace,
+    create_instance_at_current_location, create_profile, create_project, list_projects,
+    prepare_workspace, remove_instance_and_update_navigation, ApplicationError, PreparedWorkspace,
+    ProjectApplicationError,
 };
 pub use lifecycle::{
     create_instance, create_instance_under, load_workspace, remove_instance, LifecycleError,
@@ -30,6 +32,7 @@ pub use mask_operations::{
 pub use model_operations::children_of;
 pub use navigation::{NavigationError, NavigationState, NavigationStore};
 pub use profile::{Profile, ProfileError, ProfileStore};
+pub use project::{Project, ProjectError, ProjectStore};
 pub use relations::{
     create_relation, is_relation, relation_endpoints, RelationEndpoints, RelationError,
 };
