@@ -1,4 +1,6 @@
 /target/
+/data/
+/server/data/
 /dist/
 .env
 .env.*
