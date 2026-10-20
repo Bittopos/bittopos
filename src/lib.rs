@@ -8,6 +8,7 @@ mod lifecycle;
 mod mask_operations;
 mod model_operations;
 mod navigation;
+mod profile_model;
 mod relations;
 mod resource;
 mod semantic_masks;
@@ -28,6 +29,7 @@ pub use mask_operations::{
 };
 pub use model_operations::children_of;
 pub use navigation::{NavigationError, NavigationState, NavigationStore};
+pub use profile_model::{DomainModelError, Ficha, Profile, Project};
 pub use relations::{
     create_relation, is_relation, relation_endpoints, RelationEndpoints, RelationError,
 };
