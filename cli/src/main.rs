@@ -5,7 +5,8 @@ use std::process;
 use bittopos_core::{
     children_of, create_instance_at_current_location, create_instance_under, create_relation,
     is_relation, prepare_workspace, relation_endpoints, remove_instance_and_update_navigation,
-    Instance, NavigationState, NavigationStore, ProfileStore, RelationEndpoints, ResourcePatch,
+    create_profile, Instance, NavigationState, NavigationStore, ProfileStore, RelationEndpoints,
+    ResourcePatch,
     ResourceStore, Workspace, WorkspaceModelError, WorkspaceStore,
 };
 use clap::{Parser, Subcommand};
@@ -120,8 +121,7 @@ fn run() -> Result<(), String> {
 
     if let Command::Profile { command: ProfileCommand::Create } = &command {
         let paths = Paths::discover()?;
-        let profile = ProfileStore::new(&paths.root)
-            .create()
+        let profile = create_profile(&ProfileStore::new(&paths.root))
             .map_err(|error| error.to_string())?;
         println!(
             "Perfil creado: {} (ID: {})",
