@@ -7,7 +7,6 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 use std::path::Path;
 use std::ptr;
-use uuid::Uuid;
 
 #[repr(C)]
 struct Sqlite3 {
@@ -75,7 +74,7 @@ impl Drop for Database {
 
 impl Database {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, DatabaseError> {
-        if let Some(parent) = path.as_ref().parent() {
+        if let Some(parent) = path.as_ref().parent().filter(|parent| !parent.as_os_str().is_empty()) {
             std::fs::create_dir_all(parent)
                 .map_err(|error| DatabaseError::Sql(error.to_string()))?;
         }
@@ -232,6 +231,22 @@ impl Database {
             "SELECT document_json FROM project_resources WHERE project_id={} ORDER BY created_at, id",
             sql_text(project_id)?
         ))
+    }
+
+    /// Returns the exact TOML source retained on import, if this resource came from TOML.
+    pub fn load_resource_toml(
+        &mut self,
+        project_id: &str,
+        resource_id: &str,
+    ) -> Result<Option<String>, DatabaseError> {
+        let rows = self.query(&format!(
+            "SELECT source_toml FROM project_resources WHERE project_id={} AND id={}",
+            sql_text(project_id)?,
+            sql_text(resource_id)?
+        ))?;
+        let row = rows.first()
+            .ok_or_else(|| DatabaseError::NotFound(format!("recurso {resource_id}")))?;
+        Ok(row.first().and_then(Clone::clone))
     }
 
     pub fn load_workspace(
@@ -481,21 +496,6 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
 
-    fn setup() -> (tempfile::TempDir, Database, serde_json::Value) {
-        let dir = tempdir().unwrap();
-        let database = Database::open(dir.path().join("bittopos.sqlite3")).unwrap();
-        let profile = serde_json::json!({"id":"profile-1"});
-        database_profile(&profile, database)
-    }
-
-    fn database_profile(
-        profile: &serde_json::Value,
-        mut database: Database,
-    ) -> (tempfile::TempDir, Database, serde_json::Value) {
-        database.create_profile(profile).unwrap();
-        (tempfile::tempdir().unwrap(), database, profile.clone())
-    }
-
     #[test]
     fn persists_profiles_projects_resources_and_original_toml() {
         let dir = tempdir().unwrap();
@@ -513,6 +513,7 @@ mod tests {
         assert_eq!(db.list_profiles().unwrap(), vec![profile]);
         assert_eq!(db.list_projects("p1").unwrap(), vec![project]);
         assert_eq!(db.list_resources("j1").unwrap(), vec![resource]);
+        assert_eq!(db.load_resource_toml("j1", "r1").unwrap().as_deref(), Some(source));
     }
 
     #[test]
