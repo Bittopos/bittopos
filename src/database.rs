@@ -393,9 +393,12 @@ impl Database {
         }
         let message = if error.is_null() {
             unsafe { CStr::from_ptr(sqlite3_errmsg(self.raw)) }
-                .to_string_lossy().into_owned()
+                .to_string_lossy()
+                .into_owned()
         } else {
-            let message = unsafe { CStr::from_ptr(error) }.to_string_lossy().into_owned();
+            let message = unsafe { CStr::from_ptr(error) }
+                .to_string_lossy()
+                .into_owned();
             unsafe { sqlite3_free(error.cast()) };
             message
         };
