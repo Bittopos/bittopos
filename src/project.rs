@@ -198,8 +198,8 @@ impl ProjectStore {
             let name = name
                 .to_str()
                 .ok_or_else(|| ProjectError::InvalidDirectory(path.clone()))?;
-            let id = Uuid::parse_str(name)
-                .map_err(|_| ProjectError::InvalidDirectory(path.clone()))?;
+            let id =
+                Uuid::parse_str(name).map_err(|_| ProjectError::InvalidDirectory(path.clone()))?;
             projects.push(self.load(profile_id, id)?);
         }
         projects.sort_by(|left, right| left.name.cmp(&right.name).then(left.id.cmp(&right.id)));
