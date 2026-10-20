@@ -78,6 +78,7 @@ python -m unittest discover -s backend/tests -v
 - [Visión](docs/VISION.md): propósito y dirección.
 - [Modelo](docs/model.md): conceptos y reglas semánticas.
 - [Arquitectura](docs/architecture.md): archivos, módulos y flujo de datos.
+- [Persistencia SQLite](docs/database-storage.md): esquema estructurado para perfiles, proyectos, recursos e instancias.
 - [Guía de desarrollo](docs/DEVELOPMENT-GUIDE.md): cambios pequeños y comandos.
 - [Contribución](CONTRIBUTING.md): ramas y Pull Requests.
 
