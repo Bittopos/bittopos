@@ -4,8 +4,8 @@ use std::fmt;
 
 use crate::{
     create_instance_under, load_workspace, remove_instance, LifecycleError, NavigationError,
-    NavigationState, NavigationStore, Profile, ProfileError, ProfileStore, ResourceStore,
-    Workspace, WorkspaceStore,
+    NavigationState, NavigationStore, Profile, ProfileError, ProfileStore, Project, ProjectError,
+    ProjectStore, ResourceStore, Workspace, WorkspaceStore,
 };
 
 /// Error producido al preparar el contexto operativo del workspace.
@@ -51,6 +51,44 @@ pub struct PreparedWorkspace {
 /// creación y persistencia permanecen en el núcleo.
 pub fn create_profile(profiles: &ProfileStore) -> Result<Profile, ProfileError> {
     profiles.create()
+}
+
+
+/// Error de aplicación al operar con proyectos del perfil local.
+#[derive(Debug)]
+pub enum ProjectApplicationError {
+    Profile(ProfileError),
+    Project(ProjectError),
+}
+
+impl fmt::Display for ProjectApplicationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Profile(error) => write!(f, "no se pudo leer el perfil: {error}"),
+            Self::Project(error) => write!(f, "no se pudo operar con el proyecto: {error}"),
+        }
+    }
+}
+impl std::error::Error for ProjectApplicationError {}
+
+/// Crea un proyecto asociado al perfil local existente.
+pub fn create_project(
+    profiles: &ProfileStore,
+    projects: &ProjectStore,
+    name: &str,
+    description: Option<&str>,
+) -> Result<Project, ProjectApplicationError> {
+    let profile = profiles.load().map_err(ProjectApplicationError::Profile)?;
+    projects.create(profile.id, name, description).map_err(ProjectApplicationError::Project)
+}
+
+/// Lista los proyectos asociados al perfil local existente.
+pub fn list_projects(
+    profiles: &ProfileStore,
+    projects: &ProjectStore,
+) -> Result<Vec<Project>, ProjectApplicationError> {
+    let profile = profiles.load().map_err(ProjectApplicationError::Profile)?;
+    projects.list(profile.id).map_err(ProjectApplicationError::Project)
 }
 
 /// Carga la estructura y valida el destino de navegación antes de usar la CLI.
@@ -112,6 +150,29 @@ pub fn remove_instance_and_update_navigation(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn creates_and_lists_project_through_shared_application_use_cases() {
+        let dir = tempfile::tempdir().unwrap();
+        let profiles = ProfileStore::new(dir.path());
+        profiles.create().unwrap();
+        let projects = ProjectStore::new(dir.path());
+
+        let project = create_project(&profiles, &projects, "Plan de estudio", None).unwrap();
+        assert_eq!(list_projects(&profiles, &projects).unwrap(), vec![project]);
+    }
+
+    #[test]
+    fn project_creation_requires_an_existing_profile() {
+        let dir = tempfile::tempdir().unwrap();
+        let profiles = ProfileStore::new(dir.path());
+        let projects = ProjectStore::new(dir.path());
+
+        assert!(matches!(
+            create_project(&profiles, &projects, "Proyecto", None),
+            Err(ProjectApplicationError::Profile(ProfileError::NotFound))
+        ));
+    }
 
     #[test]
     fn shared_use_case_creates_profile_without_initializing_a_workspace() {
