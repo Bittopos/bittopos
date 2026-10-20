@@ -4,10 +4,10 @@ use std::process;
 
 use bittopos_core::{
     children_of, create_instance_at_current_location, create_instance_under, create_profile,
-    create_relation, is_relation, prepare_workspace, relation_endpoints,
-    remove_instance_and_update_navigation, Instance, NavigationState, NavigationStore,
-    ProfileStore, RelationEndpoints, ResourcePatch, ResourceStore, Workspace, WorkspaceModelError,
-    WorkspaceStore,
+    create_project, create_relation, is_relation, list_projects, prepare_workspace,
+    relation_endpoints, remove_instance_and_update_navigation, Instance, NavigationState,
+    NavigationStore, ProfileStore, ProjectStore, RelationEndpoints, ResourcePatch, ResourceStore,
+    Workspace, WorkspaceModelError, WorkspaceStore,
 };
 use clap::{Parser, Subcommand};
 use uuid::Uuid;
@@ -17,6 +17,9 @@ const WORKSPACE_FILE: &str = "proyecto";
 #[derive(Debug, Parser)]
 #[command(name = "bitto", version, about = "Interfaz de terminal de Bittopos")]
 struct Cli {
+    /// UUID del proyecto en el que se operará.
+    #[arg(long, global = true)]
+    project: Option<Uuid>,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -27,6 +30,11 @@ enum Command {
     Profile {
         #[command(subcommand)]
         command: ProfileCommand,
+    },
+    /// Gestiona los proyectos asociados al perfil local.
+    Project {
+        #[command(subcommand)]
+        command: ProjectCommand,
     },
     /// Crea un recurso y, salvo --no-instance, una instancia en la ubicación actual.
     Create {
@@ -78,6 +86,14 @@ enum ProfileCommand {
     Create,
 }
 
+#[derive(Debug, Subcommand)]
+enum ProjectCommand {
+    /// Crea un proyecto dentro del perfil local.
+    Create { name: String, #[arg(long)] description: Option<String> },
+    /// Lista los proyectos del perfil local.
+    List,
+}
+
 struct Paths {
     root: PathBuf,
     resources: PathBuf,
@@ -102,6 +118,11 @@ impl Paths {
             resources: home.join("resources"),
             workspaces: home.join("workspaces"),
         })
+    }
+
+    fn for_project(&self, project_id: Uuid) -> Self {
+        let project_root = self.root.join("projects").join(project_id.to_string());
+        Self { root: self.root.clone(), resources: project_root.join("resources"), workspaces: project_root.join("workspaces") }
     }
 }
 
@@ -135,12 +156,54 @@ fn run() -> Result<(), String> {
     };
 
     let paths = Paths::discover()?;
+    let profiles = ProfileStore::new(&paths.root);
+    let project_store = ProjectStore::new(&paths.root);
 
-    // El perfil es una operación de aplicación independiente del workspace de recursos.
-    // Se despacha por su manejador, sin preparar ni mutar el workspace de navegación.
-    if let Command::Profile { command } = &command {
-        return run_profile_command(&paths, command);
+    match &command {
+        Command::Profile { command: ProfileCommand::Create } => {
+            let profile = create_profile(&profiles).map_err(|error| error.to_string())?;
+            println!("Perfil creado: {} (ID: {})", paths.root.join("profile.json").display(), profile.id);
+            return Ok(());
+        }
+        Command::Project { command: ProjectCommand::Create { name, description } } => {
+            let project = create_project(&profiles, &project_store, name, description.as_deref())
+                .map_err(|error| error.to_string())?;
+            println!("Proyecto creado: {} ({})", project.name, project.id);
+            println!("Directorio: {}", project_store.root().join(project.id.to_string()).display());
+            return Ok(());
+        }
+        Command::Project { command: ProjectCommand::List } => {
+            let projects = list_projects(&profiles, &project_store).map_err(|error| error.to_string())?;
+            if projects.is_empty() {
+                println!("Este perfil todavía no tiene proyectos.");
+            } else {
+                for project in projects {
+                    println!("{} [{}]", project.name, project.id);
+                    if let Some(description) = project.description {
+                        println!("  {description}");
+                    }
+                }
+            }
+            return Ok(());
+        }
+        _ => {}
     }
+
+    let profile = profiles.load().map_err(|error| {
+        format!("no se pudo cargar el perfil local; ejecuta primero 'bitto profile create': {error}")
+    })?;
+    let available_projects = project_store.list(profile.id).map_err(|error| error.to_string())?;
+    let selected_project = match cli.project {
+        Some(id) => project_store.load(profile.id, id).map_err(|error| error.to_string())?,
+        None if available_projects.len() == 1 => available_projects[0].clone(),
+        None if available_projects.is_empty() => return Err(
+            "este perfil no tiene proyectos; crea uno con 'bitto project create <nombre>'".to_owned()
+        ),
+        None => return Err(
+            "hay varios proyectos; indica uno con --project <UUID> (consulta 'bitto project list')".to_owned()
+        ),
+    };
+    let paths = paths.for_project(selected_project.id);
     let resources = ResourceStore::new(&paths.resources).map_err(|error| error.to_string())?;
     let workspaces = WorkspaceStore::new(&paths.workspaces).map_err(|error| error.to_string())?;
     let navigation = NavigationStore::new(&paths.workspaces);
@@ -156,10 +219,8 @@ fn run() -> Result<(), String> {
     }
 
     match command {
-        // Ya se despachó antes de preparar el workspace; este brazo mantiene
-        // exhaustivo el match sin duplicar la ejecución del caso de uso.
-        Command::Profile { .. } => {
-            unreachable!("el comando profile se despacha antes del workspace")
+        Command::Profile { .. } | Command::Project { .. } => {
+            unreachable!("profile/project commands are dispatched before project initialization")
         }
         Command::Create {
             title,
