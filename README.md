@@ -33,19 +33,28 @@ bitto show <ID_RELACION>
 
 ## Inicio rápido
 
-Requisitos: Rust y Cargo.
+Requisitos: Rust y Cargo. Cada perfil contiene proyectos; cada proyecto tiene un UUID propio y guarda sus recursos y estructuras dentro de su directorio. Crea el perfil y después un proyecto:
 
 ```bash
-cargo run -p bitto-cli -- --help
-cargo run -p bitto-cli -- create "Aprender Rust" --description "Notas del lenguaje"
-cargo run -p bitto-cli -- show
+cargo run -p bitto-cli -- profile create
+cargo run -p bitto-cli -- project create "Aprender Rust" --description "Notas del lenguaje"
+cargo run -p bitto-cli -- project list
 ```
 
-Crear una definición sin instancia:
+Si hay un único proyecto, los comandos de fichas lo seleccionan automáticamente. Si hay varios, indica `--project <UUID>`:
 
 ```bash
-cargo run -p bitto-cli -- create "Idea pendiente" --no-instance
+cargo run -p bitto-cli -- --project <UUID> create "Primera ficha"
+cargo run -p bitto-cli -- --project <UUID> show
 ```
+
+Crear una definición sin instanciarla dentro de la estructura:
+
+```bash
+cargo run -p bitto-cli -- --project <UUID> create "Idea pendiente" --no-instance
+```
+
+Los datos se guardan bajo `BITTOPOS_HOME` si está definida esa variable; por defecto se usa `~/.local/share/bittopos/`.
 
 ## Frontend y API experimental
 
