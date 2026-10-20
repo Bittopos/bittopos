@@ -1,5 +1,7 @@
 # Bittopos Web
 
+Licencia del frontend: [Mozilla Public License 2.0](LICENSE) (MPL-2.0). El servidor HTTP Rust se encuentra en `server/`; consulta [su guía](../server/README.md). La SPA inicia sesión con `BITTOPOS_USERNAME` y `BITTOPOS_PASSWORD` y trabaja dentro del primer perfil/proyecto disponibles (crea uno inicial si no existen).
+
 Frontend reescrito como SPA modular con HTML, CSS y módulos ES nativos. Consume `/api/v1` y no utiliza `localStorage` como almacén principal. La persistencia inicial la gestiona el adaptador SQLite del directorio `backend/`.
 
 ## Ejecutar el MVP local
@@ -7,10 +9,10 @@ Frontend reescrito como SPA modular con HTML, CSS y módulos ES nativos. Consume
 Requiere Python 3.11 o superior y un navegador moderno. No necesita paquetes externos.
 
 ```bash
-python3 backend/server.py
+cargo run -p bittopos-server
 ```
 
-Abre `http://127.0.0.1:8787`. El mismo proceso sirve los assets estáticos y el API en el mismo origen. La base se crea en `backend/data/bittopos.sqlite3`, ignorada por Git.
+Configura las variables descritas en `server/.env.example` y ejecuta el servidor. La SPA estática debe servirse por separado; el API Rust escucha por defecto en el puerto 3000 y guarda SQLite en `BITTOPOS_DB_PATH`.
 
 Para comprobar sintaxis del frontend desde `web/`:
 
