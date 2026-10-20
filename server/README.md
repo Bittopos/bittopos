@@ -1,5 +1,7 @@
 # Servidor HTTP Rust
 
+**Licencia:** GNU Affero General Public License v3.0 (AGPL-3.0-only). Consulta el texto completo en [`server/LICENSE`](LICENSE).
+
 Este servicio usa bittopos-core como autoridad para el esquema y utiliza su módulo SQLite para persistir perfiles, proyectos, recursos y estructuras. No duplica el modelo de fichas en otra implementación.
 
 ## Desarrollo local
