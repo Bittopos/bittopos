@@ -4,6 +4,7 @@
 //! en un archivo JSON y contiene instancias con identidad propia.
 
 mod application;
+mod database;
 mod lifecycle;
 mod mask_operations;
 mod model_operations;
@@ -17,6 +18,7 @@ mod store;
 mod workspace;
 mod workspace_model;
 
+pub use database::{Database, DatabaseError};
 pub use application::{
     create_instance_at_current_location, create_profile, create_project, list_projects,
     prepare_workspace, remove_instance_and_update_navigation, ApplicationError, PreparedWorkspace,
