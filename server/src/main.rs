@@ -12,7 +12,7 @@ use axum::{
     http::{header, HeaderValue, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::{get, post, put},
     Json, Router,
 };
 use bittopos_core::{Database, DatabaseError};
@@ -235,7 +235,10 @@ async fn create_resource(
         return error(StatusCode::BAD_REQUEST, "ID de proyecto inválido");
     }
     let Some(object) = resource.as_object() else {
-        return error(StatusCode::BAD_REQUEST, "El recurso debe ser un objeto JSON");
+        return error(
+            StatusCode::BAD_REQUEST,
+            "El recurso debe ser un objeto JSON",
+        );
     };
     if object.get("id").and_then(Value::as_str).is_none() {
         return error(StatusCode::BAD_REQUEST, "El recurso debe incluir un id");
@@ -246,6 +249,72 @@ async fn create_resource(
     };
     match db.save_resource(&project_id, &resource, None) {
         Ok(()) => (StatusCode::CREATED, Json(resource)).into_response(),
+        Err(error) => db_error(error),
+    }
+}
+
+async fn update_resource(
+    State(state): State<AppState>,
+    Path((project_id, resource_id)): Path<(String, String)>,
+    Json(resource): Json<Value>,
+) -> Response {
+    if Uuid::parse_str(&project_id).is_err() {
+        return error(StatusCode::BAD_REQUEST, "ID de proyecto inválido");
+    }
+    if resource.get("id").and_then(Value::as_str) != Some(resource_id.as_str()) {
+        return error(
+            StatusCode::BAD_REQUEST,
+            "El id del recurso debe coincidir con la URL",
+        );
+    }
+    let mut db = match open_database(&state) {
+        Ok(db) => db,
+        Err(response) => return response,
+    };
+    match db.save_resource(&project_id, &resource, None) {
+        Ok(()) => Json(resource).into_response(),
+        Err(error) => db_error(error),
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ImportTomlRequest {
+    content: String,
+}
+
+async fn import_resource_toml(
+    State(state): State<AppState>,
+    Path(project_id): Path<String>,
+    Json(input): Json<ImportTomlRequest>,
+) -> Response {
+    if Uuid::parse_str(&project_id).is_err() {
+        return error(StatusCode::BAD_REQUEST, "ID de proyecto inválido");
+    }
+    let resource: bittopos_core::Resource = match toml::from_str(&input.content) {
+        Ok(resource) => resource,
+        Err(parse_error) => {
+            return error(
+                StatusCode::BAD_REQUEST,
+                format!("TOML inválido: {parse_error}"),
+            )
+        }
+    };
+    let value = match serde_json::to_value(resource) {
+        Ok(value) => value,
+        Err(serialize_error) => {
+            return error(
+                StatusCode::BAD_REQUEST,
+                format!("Recurso inválido: {serialize_error}"),
+            )
+        }
+    };
+    let mut db = match open_database(&state) {
+        Ok(db) => db,
+        Err(response) => return response,
+    };
+    match db.save_resource(&project_id, &value, Some(&input.content)) {
+        Ok(()) => (StatusCode::CREATED, Json(json!({ "resource": value }))).into_response(),
         Err(error) => db_error(error),
     }
 }
@@ -372,6 +441,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route(
             "/api/v1/projects/{project_id}/resources",
             get(list_resources).post(create_resource),
+        )
+        .route(
+            "/api/v1/projects/{project_id}/resources/import-toml",
+            post(import_resource_toml),
+        )
+        .route(
+            "/api/v1/projects/{project_id}/resources/{resource_id}",
+            put(update_resource),
         )
         .route(
             "/api/v1/projects/{project_id}/workspace",
