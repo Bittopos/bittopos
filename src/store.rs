@@ -96,6 +96,29 @@ impl ResourceStore {
         &self.root
     }
 
+    /// Devuelve los recursos persistidos en orden estable por identidad.
+    pub fn list(&self) -> Result<Vec<Resource>, StoreError> {
+        let mut resources = Vec::new();
+
+        for entry in fs::read_dir(&self.root)? {
+            let path = entry?.path();
+            if path.extension().and_then(|extension| extension.to_str()) != Some("toml") {
+                continue;
+            }
+
+            let id = path
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .and_then(|stem| Uuid::parse_str(stem).ok())
+                .ok_or_else(|| StoreError::InvalidFileName(path.clone()))?;
+
+            resources.push(self.read_file(&path, id)?);
+        }
+
+        resources.sort_by_key(|resource| resource.id);
+        Ok(resources)
+    }
+
     pub fn create(
         &self,
         name: &str,
