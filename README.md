@@ -47,6 +47,10 @@ Crear una definición sin instancia:
 cargo run -p bitto-cli -- create "Idea pendiente" --no-instance
 ```
 
+## Servidor Rust
+
+El servicio HTTP inicial está en `server/` y reutiliza `bittopos-core`. Incluye comprobación de salud, inicio/cierre de sesión y operaciones básicas de recursos. Se puede construir como imagen Docker con el `Dockerfile` de la raíz. Consulta [la guía del servidor](server/README.md) para variables de entorno, API y límites actuales. La persistencia sigue siendo local; la integración primaria con Cloudflare R2/D1 queda pendiente de definir y probar.
+
 ## Frontend y API experimental
 
 La nueva SPA modular está en `web/` y consume la API HTTP v1. El adaptador experimental Python/SQLite está en `backend/`; ambos se ejecutan juntos en local con `python3 backend/server.py`. Esta API es una frontera de persistencia exploratoria, no el núcleo semántico Rust ni un servicio multiusuario listo para Internet. Consulta [la guía web](web/README.md), [la guía del backend](backend/README.md) y [el límite arquitectónico](docs/api-backed-frontend.md). La propuesta inicial de base frontend permanece en [docs/frontend-refactor-proposal.md](docs/frontend-refactor-proposal.md).
