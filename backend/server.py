@@ -68,6 +68,34 @@ def init_db():
             )
         """)
         db.execute("""
+            CREATE TABLE IF NOT EXISTS project_resources (
+                project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT,
+                tags_json TEXT NOT NULL DEFAULT '[]',
+                document_json TEXT NOT NULL,
+                source_toml TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY(project_id, id)
+            )
+        """)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS project_instances (
+                project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                id TEXT NOT NULL,
+                parent_id TEXT,
+                source_id TEXT NOT NULL,
+                semantic_json TEXT,
+                masks_json TEXT NOT NULL DEFAULT '[]',
+                instance_json TEXT NOT NULL,
+                PRIMARY KEY(project_id, id),
+                FOREIGN KEY(project_id, parent_id) REFERENCES project_instances(project_id, id)
+                    ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+            )
+        """)
+        db.execute("""
             CREATE TABLE IF NOT EXISTS resources (
                 id TEXT PRIMARY KEY,
                 document_json TEXT NOT NULL,
@@ -162,9 +190,13 @@ def get_project(project_id):
         row = db.execute(
             "SELECT document_json, workspace_json, revision FROM projects WHERE id=?",
             (project_id,)).fetchone()
-    if row is None:
-        raise KeyError(f"project:{project_id}")
+        if row is None:
+            raise KeyError(f"project:{project_id}")
+        resources = [json.loads(item["document_json"]) for item in db.execute(
+            "SELECT document_json FROM project_resources WHERE project_id=? ORDER BY created_at, id",
+            (project_id,))]
     return {"project": json.loads(row["document_json"]),
+            "resources": resources,
             "workspace": json.loads(row["workspace_json"]), "revision": row["revision"]}
 
 
@@ -180,10 +212,70 @@ def save_project_workspace(project_id, document, expected_revision):
             db.rollback()
             raise RuntimeError(f"REVISION_CONFLICT:{current}")
         next_revision = current + 1
+        sync_project_instances(db, project_id, workspace)
         db.execute("""UPDATE projects SET workspace_json=?, revision=?, updated_at=CURRENT_TIMESTAMP
                        WHERE id=?""", (dumps(workspace), next_revision, project_id))
         db.commit()
     return {"workspace": workspace, "revision": next_revision}
+
+
+
+def project_resource_document(value):
+    resource = validate_resource(value)
+    info = resource["info"]
+    tags = info.get("tags", [])
+    if not isinstance(tags, list) or any(not isinstance(tag, str) for tag in tags):
+        raise ValueError("info.tags debe ser una lista de textos.")
+    description = info.get("description")
+    if description is not None and not isinstance(description, str):
+        raise ValueError("info.description debe ser texto o null.")
+    return resource, info["title"].strip(), description, tags
+
+
+def save_project_resource(project_id, document, source_toml=None):
+    resource, title, description, tags = project_resource_document(document)
+    with connect() as db:
+        if db.execute("SELECT 1 FROM projects WHERE id=?", (project_id,)).fetchone() is None:
+            raise KeyError(f"project:{project_id}")
+        db.execute(
+            """INSERT INTO project_resources(project_id, id, title, description, tags_json,
+                                             document_json, source_toml)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(project_id, id) DO UPDATE SET title=excluded.title,
+                 description=excluded.description, tags_json=excluded.tags_json,
+                 document_json=excluded.document_json, source_toml=excluded.source_toml,
+                 updated_at=CURRENT_TIMESTAMP""",
+            (project_id, resource["id"], title, description, dumps(tags),
+             dumps(resource), source_toml),
+        )
+    return resource
+
+
+def list_project_resources(project_id):
+    with connect() as db:
+        if db.execute("SELECT 1 FROM projects WHERE id=?", (project_id,)).fetchone() is None:
+            raise KeyError(f"project:{project_id}")
+        return [json.loads(row["document_json"]) for row in db.execute(
+            "SELECT document_json FROM project_resources WHERE project_id=? ORDER BY created_at, id",
+            (project_id,))]
+
+
+def sync_project_instances(db, project_id, workspace):
+    # JSON remains the interchange format; rows provide queryable identity and containment.
+    db.execute("DELETE FROM project_instances WHERE project_id=?", (project_id,))
+    rows = []
+    def walk(instances, parent_id=None):
+        for instance in instances:
+            semantic = instance.get("semantic")
+            rows.append((project_id, instance["id"], parent_id, instance["source"]["id"],
+                         dumps(semantic) if semantic is not None else None,
+                         dumps(instance.get("masks", [])), dumps(instance)))
+            walk((instance.get("content") or {}).get("instances", []), instance["id"])
+    walk(workspace["content"]["instances"])
+    db.executemany(
+        """INSERT INTO project_instances(project_id, id, parent_id, source_id,
+                                          semantic_json, masks_json, instance_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""", rows)
 
 
 def validate_resource(value):
@@ -390,6 +482,9 @@ class Handler(SimpleHTTPRequestHandler):
             match = re.fullmatch(r"/api/v1/projects/([^/]+)", parsed.path)
             if match:
                 return self.send_json(200, get_project(unquote(match.group(1))))
+            match = re.fullmatch(r"/api/v1/projects/([^/]+)/resources", parsed.path)
+            if match:
+                return self.send_json(200, {"resources": list_project_resources(unquote(match.group(1)))})
             match = re.fullmatch(r"/api/v1/resources/([^/]+)/toml", parsed.path)
             if match:
                 return self.send_text(200, resource_toml(unquote(match.group(1))), "application/toml; charset=utf-8")
@@ -413,6 +508,21 @@ class Handler(SimpleHTTPRequestHandler):
             if match:
                 project = create_project(unquote(match.group(1)), self.read_json())
                 return self.send_json(201, {"project": project, "workspace": DEFAULT_WORKSPACE, "revision": 0})
+            match = re.fullmatch(r"/api/v1/projects/([^/]+)/resources/import-toml", parsed.path)
+            if match:
+                payload = self.read_json()
+                if not isinstance(payload, dict) or not isinstance(payload.get("content"), str):
+                    raise ValueError("Se esperaba {content: string} con el TOML original.")
+                try:
+                    resource = tomllib.loads(payload["content"])
+                except tomllib.TOMLDecodeError as exc:
+                    raise ValueError(f"TOML inválido: {exc}") from exc
+                resource = save_project_resource(unquote(match.group(1)), resource, payload["content"])
+                return self.send_json(201, {"resource": resource})
+            match = re.fullmatch(r"/api/v1/projects/([^/]+)/resources", parsed.path)
+            if match:
+                resource = save_project_resource(unquote(match.group(1)), self.read_json())
+                return self.send_json(201, {"resource": resource})
             if parsed.path == "/api/v1/resources/import-toml":
                 payload = self.read_json()
                 if not isinstance(payload, dict) or not isinstance(payload.get("content"), str):
