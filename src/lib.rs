@@ -9,6 +9,7 @@ mod mask_operations;
 mod model_operations;
 mod navigation;
 mod profile;
+mod project;
 mod relations;
 mod resource;
 mod semantic_masks;
@@ -30,6 +31,7 @@ pub use mask_operations::{
 pub use model_operations::children_of;
 pub use navigation::{NavigationError, NavigationState, NavigationStore};
 pub use profile::{Profile, ProfileError, ProfileStore};
+pub use project::{Project, ProjectError, ProjectStore};
 pub use relations::{
     create_relation, is_relation, relation_endpoints, RelationEndpoints, RelationError,
 };
