@@ -53,5 +53,60 @@ class ApiPersistenceTests(unittest.TestCase):
             server.save_resource("other", {"id": "r1", "info": {"title": "Uno"}})
 
 
+    def test_profiles_and_projects_are_structured_and_isolated(self):
+        profile = server.create_profile({"id": "profile-1", "label": "Personal"})
+        other = server.create_profile({"id": "profile-2"})
+        project = server.create_project(profile["id"], {
+            "id": "project-1", "profile_id": profile["id"], "name": "Estudio",
+            "description": "Notas"
+        })
+        self.assertEqual(server.list_profiles(), [profile, other])
+        self.assertEqual(server.list_projects(profile["id"]), [project])
+        self.assertEqual(server.list_projects(other["id"]), [])
+        loaded = server.get_project(project["id"])
+        self.assertEqual(loaded["project"], project)
+        self.assertEqual(loaded["workspace"], server.DEFAULT_WORKSPACE)
+        self.assertEqual(loaded["revision"], 0)
+
+    def test_project_requires_existing_profile_and_matching_profile_id(self):
+        with self.assertRaisesRegex(KeyError, "profile:missing"):
+            server.create_project("missing", {
+                "id": "project-1", "profile_id": "missing", "name": "Proyecto"
+            })
+        server.create_profile({"id": "profile-1"})
+        with self.assertRaisesRegex(ValueError, "no coincide"):
+            server.create_project("profile-1", {
+                "id": "project-1", "profile_id": "profile-2", "name": "Proyecto"
+            })
+
+    def test_project_workspace_isolated_and_uses_revision_control(self):
+        server.create_profile({"id": "profile-1"})
+        server.create_project("profile-1", {
+            "id": "project-1", "profile_id": "profile-1", "name": "Uno"
+        })
+        server.create_project("profile-1", {
+            "id": "project-2", "profile_id": "profile-1", "name": "Dos"
+        })
+        workspace = {"content": {"instances": [
+            {"id": "instance-1", "source": {"id": "resource-1"},
+             "custom": {"retained": True}}
+        ]}}
+        saved = server.save_project_workspace("project-1", workspace, 0)
+        self.assertEqual(saved["revision"], 1)
+        self.assertEqual(server.get_project("project-1")["workspace"], workspace)
+        self.assertEqual(server.get_project("project-2")["workspace"], server.DEFAULT_WORKSPACE)
+        with self.assertRaisesRegex(RuntimeError, "REVISION_CONFLICT"):
+            server.save_project_workspace("project-1", workspace, 0)
+
+    def test_duplicate_profile_and_project_ids_are_rejected(self):
+        server.create_profile({"id": "profile-1"})
+        with self.assertRaises(FileExistsError):
+            server.create_profile({"id": "profile-1"})
+        project = {"id": "project-1", "profile_id": "profile-1", "name": "Uno"}
+        server.create_project("profile-1", project)
+        with self.assertRaises(FileExistsError):
+            server.create_project("profile-1", project)
+
+
 if __name__ == "__main__":
     unittest.main()
