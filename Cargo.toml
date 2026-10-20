@@ -3,7 +3,7 @@ name = "bittopos-core"
 version = "0.1.0"
 edition = "2021"
 description = "Núcleo inicial de Bittopos: recursos identificados y persistidos en TOML"
-license = "Apache-2.0"
+license = "AGPL-3.0-only"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -15,5 +15,5 @@ serde_json = "1.0.152"
 tempfile = "3"
 
 [workspace]
-members = ["cli"]
+members = ["cli", "server"]
 resolver = "2"
