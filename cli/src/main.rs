@@ -133,21 +133,6 @@ fn main() {
     }
 }
 
-fn run_profile_command(paths: &Paths, command: &ProfileCommand) -> Result<(), String> {
-    match command {
-        ProfileCommand::Create => {
-            let profile = create_profile(&ProfileStore::new(&paths.root))
-                .map_err(|error| error.to_string())?;
-            println!(
-                "Perfil creado: {} (ID: {})",
-                paths.root.join("profile.json").display(),
-                profile.id
-            );
-            Ok(())
-        }
-    }
-}
-
 fn run() -> Result<(), String> {
     let cli = Cli::parse();
     let Some(command) = cli.command else {
