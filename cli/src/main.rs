@@ -3,11 +3,11 @@ use std::path::PathBuf;
 use std::process;
 
 use bittopos_core::{
-    children_of, create_instance_at_current_location, create_instance_under, create_relation,
-    is_relation, prepare_workspace, relation_endpoints, remove_instance_and_update_navigation,
-    create_profile, Instance, NavigationState, NavigationStore, ProfileStore, RelationEndpoints,
-    ResourcePatch,
-    ResourceStore, Workspace, WorkspaceModelError, WorkspaceStore,
+    children_of, create_instance_at_current_location, create_instance_under, create_profile,
+    create_relation, is_relation, prepare_workspace, relation_endpoints,
+    remove_instance_and_update_navigation, Instance, NavigationState, NavigationStore,
+    ProfileStore, RelationEndpoints, ResourcePatch, ResourceStore, Workspace, WorkspaceModelError,
+    WorkspaceStore,
 };
 use clap::{Parser, Subcommand};
 use uuid::Uuid;
