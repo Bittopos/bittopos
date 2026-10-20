@@ -15,7 +15,7 @@ const app = {
       validateWorkspace(data.workspace); this.resources = resources; this.workspace = data.workspace; this.revision = data.revision;
       if (this.selectedId && !flatten(this.workspace).some(row => row.instance.id === this.selectedId)) this.selectedId = null;
       this.paint();
-    } catch (error) { $("connection-label").textContent = "API no disponible"; $("connection-detail").textContent = "Ejecuta backend/server.py"; toast("No se pudieron cargar los datos: " + error.message, "error"); }
+    } catch (error) { $("connection-label").textContent = "API no disponible"; $("connection-detail").textContent = "Comprueba el servidor Rust"; toast("No se pudieron cargar los datos: " + error.message, "error"); }
   },
   async persistWorkspace(next) {
     this.busy = true; this.paint();
@@ -110,4 +110,41 @@ $("toml-file").addEventListener("change", async event => {
 });
 document.querySelectorAll("[data-close]").forEach(button => button.addEventListener("click", () => $(button.dataset.close).close()));
 document.addEventListener("keydown", event => { if (event.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) { event.preventDefault(); $("search").focus(); } });
-app.reload();
+async function initialize() {
+  const dialog = $("login-dialog");
+  const form = $("login-form");
+  const errorLabel = $("login-error");
+  async function prepareWorkspace() {
+    let profiles = await api.listProfiles();
+    if (!profiles.length) profiles = [await api.createProfile()];
+    const profileId = profiles[0].id;
+    let projects = await api.listProjects(profileId);
+    if (!projects.length) projects = [await api.createProject(profileId, { name: "Mi primer proyecto", description: "Espacio de trabajo inicial" })];
+    api.setProject(projects[0].id);
+  }
+  try {
+    await api.me();
+    await prepareWorkspace();
+    await app.reload();
+    return;
+  } catch (_) {
+    dialog.showModal();
+  }
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = form.querySelector('button[type="submit"]');
+    button.disabled = true;
+    errorLabel.textContent = "";
+    try {
+      await api.login($("login-username").value.trim(), $("login-password").value);
+      await prepareWorkspace();
+      dialog.close();
+      await app.reload();
+    } catch (error) {
+      errorLabel.textContent = error.status === 401 ? "Usuario o contraseña incorrectos." : "No se pudo iniciar sesión: " + error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+initialize();
