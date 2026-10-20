@@ -47,6 +47,27 @@ def connect():
 def init_db():
     with connect() as db:
         db.execute("""
+            CREATE TABLE IF NOT EXISTS profiles (
+                id TEXT PRIMARY KEY,
+                document_json TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS projects (
+                id TEXT PRIMARY KEY,
+                profile_id TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+                name TEXT NOT NULL,
+                description TEXT,
+                document_json TEXT NOT NULL,
+                workspace_json TEXT NOT NULL,
+                revision INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        db.execute("""
             CREATE TABLE IF NOT EXISTS resources (
                 id TEXT PRIMARY KEY,
                 document_json TEXT NOT NULL,
@@ -67,6 +88,102 @@ def init_db():
             "INSERT OR IGNORE INTO workspaces(id, document_json, revision) VALUES (?, ?, 0)",
             ("default", dumps(DEFAULT_WORKSPACE)),
         )
+
+
+
+def validate_profile(value):
+    if not isinstance(value, dict) or not isinstance(value.get("id"), str) or not value["id"].strip():
+        raise ValueError("El perfil debe conservar un id de texto.")
+    return value
+
+
+def create_profile(document):
+    profile = validate_profile(document)
+    with connect() as db:
+        try:
+            db.execute("INSERT INTO profiles(id, document_json) VALUES (?, ?)",
+                       (profile["id"], dumps(profile)))
+        except sqlite3.IntegrityError as exc:
+            raise FileExistsError(profile["id"]) from exc
+    return profile
+
+
+def list_profiles():
+    with connect() as db:
+        return [json.loads(row["document_json"]) for row in db.execute(
+            "SELECT document_json FROM profiles ORDER BY created_at, id")]
+
+
+def validate_project(value):
+    if not isinstance(value, dict) or not isinstance(value.get("id"), str) or not value["id"].strip():
+        raise ValueError("El proyecto debe conservar un id de texto.")
+    if not isinstance(value.get("profile_id"), str) or not value["profile_id"].strip():
+        raise ValueError("El proyecto debe indicar profile_id.")
+    if not isinstance(value.get("name"), str) or not value["name"].strip():
+        raise ValueError("El nombre del proyecto no puede estar vacío.")
+    value["name"] = value["name"].strip()
+    if value.get("description") is not None:
+        if not isinstance(value["description"], str):
+            raise ValueError("description debe ser texto o null.")
+        value["description"] = value["description"].strip() or None
+    return value
+
+
+def create_project(profile_id, document):
+    project = validate_project(document)
+    if project["profile_id"] != profile_id:
+        raise ValueError("profile_id del proyecto no coincide con la ruta.")
+    with connect() as db:
+        if db.execute("SELECT 1 FROM profiles WHERE id=?", (profile_id,)).fetchone() is None:
+            raise KeyError(f"profile:{profile_id}")
+        try:
+            db.execute(
+                """INSERT INTO projects(id, profile_id, name, description, document_json, workspace_json)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (project["id"], profile_id, project["name"], project.get("description"),
+                 dumps(project), dumps(DEFAULT_WORKSPACE)),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise FileExistsError(project["id"]) from exc
+    return project
+
+
+def list_projects(profile_id):
+    with connect() as db:
+        if db.execute("SELECT 1 FROM profiles WHERE id=?", (profile_id,)).fetchone() is None:
+            raise KeyError(f"profile:{profile_id}")
+        return [json.loads(row["document_json"]) for row in db.execute(
+            "SELECT document_json FROM projects WHERE profile_id=? ORDER BY created_at, id",
+            (profile_id,))]
+
+
+def get_project(project_id):
+    with connect() as db:
+        row = db.execute(
+            "SELECT document_json, workspace_json, revision FROM projects WHERE id=?",
+            (project_id,)).fetchone()
+    if row is None:
+        raise KeyError(f"project:{project_id}")
+    return {"project": json.loads(row["document_json"]),
+            "workspace": json.loads(row["workspace_json"]), "revision": row["revision"]}
+
+
+def save_project_workspace(project_id, document, expected_revision):
+    workspace = validate_workspace(document)
+    with connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute("SELECT revision FROM projects WHERE id=?", (project_id,)).fetchone()
+        if row is None:
+            raise KeyError(f"project:{project_id}")
+        current = row["revision"]
+        if expected_revision is not None and expected_revision != current:
+            db.rollback()
+            raise RuntimeError(f"REVISION_CONFLICT:{current}")
+        next_revision = current + 1
+        db.execute("""UPDATE projects SET workspace_json=?, revision=?, updated_at=CURRENT_TIMESTAMP
+                       WHERE id=?""", (dumps(workspace), next_revision, project_id))
+        db.commit()
+    return {"workspace": workspace, "revision": next_revision}
 
 
 def validate_resource(value):
@@ -265,6 +382,14 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             if parsed.path == "/api/v1/state":
                 return self.send_json(200, get_state())
+            if parsed.path == "/api/v1/profiles":
+                return self.send_json(200, {"profiles": list_profiles()})
+            match = re.fullmatch(r"/api/v1/profiles/([^/]+)/projects", parsed.path)
+            if match:
+                return self.send_json(200, {"projects": list_projects(unquote(match.group(1)))})
+            match = re.fullmatch(r"/api/v1/projects/([^/]+)", parsed.path)
+            if match:
+                return self.send_json(200, get_project(unquote(match.group(1))))
             match = re.fullmatch(r"/api/v1/resources/([^/]+)/toml", parsed.path)
             if match:
                 return self.send_text(200, resource_toml(unquote(match.group(1))), "application/toml; charset=utf-8")
@@ -281,6 +406,13 @@ class Handler(SimpleHTTPRequestHandler):
         if not self.authorized():
             return self.send_json(401, {"error": "Se requiere un token válido."})
         try:
+            if parsed.path == "/api/v1/profiles":
+                profile = create_profile(self.read_json())
+                return self.send_json(201, {"profile": profile})
+            match = re.fullmatch(r"/api/v1/profiles/([^/]+)/projects", parsed.path)
+            if match:
+                project = create_project(unquote(match.group(1)), self.read_json())
+                return self.send_json(201, {"project": project, "workspace": DEFAULT_WORKSPACE, "revision": 0})
             if parsed.path == "/api/v1/resources/import-toml":
                 payload = self.read_json()
                 if not isinstance(payload, dict) or not isinstance(payload.get("content"), str):
@@ -303,6 +435,16 @@ class Handler(SimpleHTTPRequestHandler):
         if not self.authorized():
             return self.send_json(401, {"error": "Se requiere un token válido."})
         try:
+            match = re.fullmatch(r"/api/v1/projects/([^/]+)/workspace", parsed.path)
+            if match:
+                payload = self.read_json()
+                if not isinstance(payload, dict) or "workspace" not in payload:
+                    raise ValueError("Se esperaba {workspace, expectedRevision}.")
+                expected = payload.get("expectedRevision")
+                if expected is not None and (not isinstance(expected, int) or expected < 0):
+                    raise ValueError("expectedRevision debe ser un entero no negativo.")
+                return self.send_json(200, save_project_workspace(
+                    unquote(match.group(1)), payload["workspace"], expected))
             if parsed.path == "/api/v1/workspace":
                 payload = self.read_json()
                 if not isinstance(payload, dict) or "workspace" not in payload:
