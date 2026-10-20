@@ -112,6 +112,21 @@ fn main() {
     }
 }
 
+fn run_profile_command(paths: &Paths, command: &ProfileCommand) -> Result<(), String> {
+    match command {
+        ProfileCommand::Create => {
+            let profile = create_profile(&ProfileStore::new(&paths.root))
+                .map_err(|error| error.to_string())?;
+            println!(
+                "Perfil creado: {} (ID: {})",
+                paths.root.join("profile.json").display(),
+                profile.id
+            );
+            Ok(())
+        }
+    }
+}
+
 fn run() -> Result<(), String> {
     let cli = Cli::parse();
     let Some(command) = cli.command else {
@@ -119,19 +134,13 @@ fn run() -> Result<(), String> {
         return Ok(());
     };
 
-    if let Command::Profile { command: ProfileCommand::Create } = &command {
-        let paths = Paths::discover()?;
-        let profile = create_profile(&ProfileStore::new(&paths.root))
-            .map_err(|error| error.to_string())?;
-        println!(
-            "Perfil creado: {} (ID: {})",
-            paths.root.join("profile.json").display(),
-            profile.id
-        );
-        return Ok(());
-    }
-
     let paths = Paths::discover()?;
+
+    // El perfil es una operación de aplicación independiente del workspace de recursos.
+    // Se despacha por su manejador, sin preparar ni mutar el workspace de navegación.
+    if let Command::Profile { command } = &command {
+        return run_profile_command(&paths, command);
+    }
     let resources = ResourceStore::new(&paths.resources).map_err(|error| error.to_string())?;
     let workspaces = WorkspaceStore::new(&paths.workspaces).map_err(|error| error.to_string())?;
     let navigation = NavigationStore::new(&paths.workspaces);
