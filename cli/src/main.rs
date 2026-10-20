@@ -158,7 +158,9 @@ fn run() -> Result<(), String> {
     match command {
         // Ya se despachó antes de preparar el workspace; este brazo mantiene
         // exhaustivo el match sin duplicar la ejecución del caso de uso.
-        Command::Profile { .. } => unreachable!("el comando profile se despacha antes del workspace"),
+        Command::Profile { .. } => {
+            unreachable!("el comando profile se despacha antes del workspace")
+        }
         Command::Create {
             title,
             description,
