@@ -56,9 +56,15 @@ cargo run -p bitto-cli -- --project <UUID> create "Idea pendiente" --no-instance
 
 Los datos se guardan bajo `BITTOPOS_HOME` si está definida esa variable; por defecto se usa `~/.local/share/bittopos/`.
 
-## Frontend y API experimental
+## Servidor HTTP y frontend
 
-La nueva SPA modular está en `web/` y consume la API HTTP v1. El adaptador experimental Python/SQLite está en `backend/`; ambos se ejecutan juntos en local con `python3 backend/server.py`. Esta API es una frontera de persistencia exploratoria, no el núcleo semántico Rust ni un servicio multiusuario listo para Internet. Consulta [la guía web](web/README.md), [la guía del backend](backend/README.md) y [el límite arquitectónico](docs/api-backed-frontend.md). La propuesta inicial de base frontend permanece en [docs/frontend-refactor-proposal.md](docs/frontend-refactor-proposal.md).
+El servicio HTTP Rust está en `server/`, reutiliza el núcleo y ofrece inicio de sesión de desarrollo y operaciones por perfil/proyecto. Consulta [la guía del servidor](server/README.md). La imagen Docker se construye desde la raíz con `docker build -t bittopos-server .` y necesita un volumen persistente para SQLite.
+
+Licencias por componente: núcleo Rust (`Cargo.toml`) bajo Apache-2.0; CLI (`cli/`) y frontend (`web/`) bajo MPL-2.0; servidor HTTP (`server/`) bajo GNU AGPLv3. Cada componente incluye el texto completo de su licencia en su directorio (la licencia del núcleo está en la raíz). El adaptador Python/SQLite de `backend/` sigue siendo experimental y no es el servidor remoto recomendado. Consulta [la guía web](web/README.md), [la guía del backend](backend/README.md) y [el límite arquitectónico](docs/api-backed-frontend.md).
+
+## Adaptador Python experimental
+
+El directorio `backend/` conserva el prototipo Python/SQLite usado durante la exploración del frontend; no es el servidor remoto objetivo. La aplicación en desarrollo utiliza el servidor Rust de `server/`. Consulta [la guía web](web/README.md), [la guía del servidor](server/README.md) y [la documentación histórica del adaptador](backend/README.md).
 
 ## Verificación
 
