@@ -74,7 +74,11 @@ impl Drop for Database {
 
 impl Database {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, DatabaseError> {
-        if let Some(parent) = path.as_ref().parent().filter(|parent| !parent.as_os_str().is_empty()) {
+        if let Some(parent) = path
+            .as_ref()
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+        {
             std::fs::create_dir_all(parent)
                 .map_err(|error| DatabaseError::Sql(error.to_string()))?;
         }
@@ -157,17 +161,18 @@ impl Database {
         self.query_json("SELECT document_json FROM profiles ORDER BY created_at, id")
     }
 
-    pub fn create_project(
-        &mut self,
-        project: &serde_json::Value,
-    ) -> Result<(), DatabaseError> {
+    pub fn create_project(&mut self, project: &serde_json::Value) -> Result<(), DatabaseError> {
         let id = required_text(project, "id", "proyecto")?;
         let profile_id = required_text(project, "profile_id", "proyecto")?;
         let name = required_text(project, "name", "proyecto")?.trim();
         if name.is_empty() {
-            return Err(DatabaseError::Invalid("el nombre del proyecto está vacío".into()));
+            return Err(DatabaseError::Invalid(
+                "el nombre del proyecto está vacío".into(),
+            ));
         }
-        let description = project.get("description").and_then(serde_json::Value::as_str);
+        let description = project
+            .get("description")
+            .and_then(serde_json::Value::as_str);
         self.exec(&format!(
             "INSERT INTO projects(id, profile_id, name, description, document_json, workspace_json)
              VALUES ({}, {}, {}, {}, {}, '{{\"content\":{{\"instances\":[]}}}}');",
@@ -196,15 +201,24 @@ impl Database {
         source_toml: Option<&str>,
     ) -> Result<(), DatabaseError> {
         let id = required_text(resource, "id", "recurso")?;
-        let info = resource.get("info").and_then(serde_json::Value::as_object)
+        let info = resource
+            .get("info")
+            .and_then(serde_json::Value::as_object)
             .ok_or_else(|| DatabaseError::Invalid("el recurso debe contener info".into()))?;
-        let title = info.get("title").and_then(serde_json::Value::as_str)
+        let title = info
+            .get("title")
+            .and_then(serde_json::Value::as_str)
             .filter(|title| !title.trim().is_empty())
             .ok_or_else(|| DatabaseError::Invalid("el recurso debe contener info.title".into()))?;
         let description = info.get("description").and_then(serde_json::Value::as_str);
-        let tags = info.get("tags").cloned().unwrap_or_else(|| serde_json::json!([]));
+        let tags = info
+            .get("tags")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!([]));
         if !tags.is_array() || tags.as_array().unwrap().iter().any(|tag| !tag.is_string()) {
-            return Err(DatabaseError::Invalid("info.tags debe ser una lista de textos".into()));
+            return Err(DatabaseError::Invalid(
+                "info.tags debe ser una lista de textos".into(),
+            ));
         }
         self.exec(&format!(
             "INSERT INTO project_resources(project_id, id, title, description, tags_json, document_json, source_toml)
@@ -244,7 +258,8 @@ impl Database {
             sql_text(project_id)?,
             sql_text(resource_id)?
         ))?;
-        let row = rows.first()
+        let row = rows
+            .first()
             .ok_or_else(|| DatabaseError::NotFound(format!("recurso {resource_id}")))?;
         Ok(row.first().and_then(Clone::clone))
     }
@@ -257,10 +272,15 @@ impl Database {
             "SELECT workspace_json, revision FROM projects WHERE id={}",
             sql_text(project_id)?
         ))?;
-        let row = rows.first().ok_or_else(|| DatabaseError::NotFound(format!("proyecto {project_id}")))?;
+        let row = rows
+            .first()
+            .ok_or_else(|| DatabaseError::NotFound(format!("proyecto {project_id}")))?;
         let workspace = serde_json::from_str(row[0].as_deref().unwrap_or("{}"))
             .map_err(|error| DatabaseError::Json(error.to_string()))?;
-        let revision = row[1].as_deref().unwrap_or("0").parse::<i64>()
+        let revision = row[1]
+            .as_deref()
+            .unwrap_or("0")
+            .parse::<i64>()
             .map_err(|error| DatabaseError::Sql(error.to_string()))?;
         Ok((workspace, revision))
     }
@@ -278,9 +298,13 @@ impl Database {
                 "SELECT revision FROM projects WHERE id={}",
                 sql_text(project_id)?
             ))?;
-            let row = rows.first()
+            let row = rows
+                .first()
                 .ok_or_else(|| DatabaseError::NotFound(format!("proyecto {project_id}")))?;
-            let current = row[0].as_deref().unwrap_or("0").parse::<i64>()
+            let current = row[0]
+                .as_deref()
+                .unwrap_or("0")
+                .parse::<i64>()
                 .map_err(|error| DatabaseError::Sql(error.to_string()))?;
             if current != expected_revision {
                 return Err(DatabaseError::RevisionConflict { current });
@@ -290,7 +314,11 @@ impl Database {
                 sql_text(project_id)?
             ))?;
             let mut rows = Vec::new();
-            flatten_instances(workspace["content"]["instances"].as_array().unwrap(), None, &mut rows)?;
+            flatten_instances(
+                workspace["content"]["instances"].as_array().unwrap(),
+                None,
+                &mut rows,
+            )?;
             for row in rows {
                 self.exec(&format!(
                     "INSERT INTO project_instances(project_id, id, parent_id, source_id, semantic_json, masks_json, instance_json)
@@ -327,17 +355,19 @@ impl Database {
         let sql = CString::new(sql)
             .map_err(|_| DatabaseError::Invalid("la consulta contiene un byte NUL".into()))?;
         let mut error = ptr::null_mut();
-        let result = unsafe {
-            sqlite3_exec(self.raw, sql.as_ptr(), None, ptr::null_mut(), &mut error)
-        };
+        let result =
+            unsafe { sqlite3_exec(self.raw, sql.as_ptr(), None, ptr::null_mut(), &mut error) };
         if result == SQLITE_OK {
             return Ok(());
         }
         let message = if error.is_null() {
             unsafe { CStr::from_ptr(sqlite3_errmsg(self.raw)) }
-                .to_string_lossy().into_owned()
+                .to_string_lossy()
+                .into_owned()
         } else {
-            let message = unsafe { CStr::from_ptr(error) }.to_string_lossy().into_owned();
+            let message = unsafe { CStr::from_ptr(error) }
+                .to_string_lossy()
+                .into_owned();
             unsafe { sqlite3_free(error.cast()) };
             message
         };
@@ -373,10 +403,13 @@ impl Database {
     }
 
     fn query_json(&mut self, sql: &str) -> Result<Vec<serde_json::Value>, DatabaseError> {
-        self.query(sql)?.iter().map(|row| {
-            serde_json::from_str(row.first().and_then(Option::as_deref).unwrap_or("{}"))
-                .map_err(|error| DatabaseError::Json(error.to_string()))
-        }).collect()
+        self.query(sql)?
+            .iter()
+            .map(|row| {
+                serde_json::from_str(row.first().and_then(Option::as_deref).unwrap_or("{}"))
+                    .map_err(|error| DatabaseError::Json(error.to_string()))
+            })
+            .collect()
     }
 }
 
@@ -395,13 +428,16 @@ unsafe extern "C" fn collect_row(
     } else {
         std::slice::from_raw_parts(values, count as usize)
     };
-    let row = values.iter().map(|value| {
-        if value.is_null() {
-            None
-        } else {
-            Some(CStr::from_ptr(*value).to_string_lossy().into_owned())
-        }
-    }).collect();
+    let row = values
+        .iter()
+        .map(|value| {
+            if value.is_null() {
+                None
+            } else {
+                Some(CStr::from_ptr(*value).to_string_lossy().into_owned())
+            }
+        })
+        .collect();
     rows.push(row);
     0
 }
@@ -422,18 +458,32 @@ fn flatten_instances(
 ) -> Result<(), DatabaseError> {
     for instance in instances {
         let id = required_text(instance, "id", "instancia")?.to_owned();
-        let source_id = instance.get("source").and_then(|source| source.get("id"))
+        let source_id = instance
+            .get("source")
+            .and_then(|source| source.get("id"))
             .and_then(serde_json::Value::as_str)
-            .ok_or_else(|| DatabaseError::Invalid(format!("la instancia {id} debe contener source.id")))?
+            .ok_or_else(|| {
+                DatabaseError::Invalid(format!("la instancia {id} debe contener source.id"))
+            })?
             .to_owned();
-        let semantic = instance.get("semantic").filter(|value| !value.is_null())
-            .map(json_text).transpose()?;
-        let masks = instance.get("masks").cloned().unwrap_or_else(|| serde_json::json!([]));
+        let semantic = instance
+            .get("semantic")
+            .filter(|value| !value.is_null())
+            .map(json_text)
+            .transpose()?;
+        let masks = instance
+            .get("masks")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!([]));
         let children = match instance.get("content") {
             None | Some(serde_json::Value::Null) => &[][..],
-            Some(content) => content.get("instances").and_then(serde_json::Value::as_array)
+            Some(content) => content
+                .get("instances")
+                .and_then(serde_json::Value::as_array)
                 .map(Vec::as_slice)
-                .ok_or_else(|| DatabaseError::Invalid(format!("content.instances inválido en {id}")))?,
+                .ok_or_else(|| {
+                    DatabaseError::Invalid(format!("content.instances inválido en {id}"))
+                })?,
         };
         output.push(FlatInstance {
             id: id.clone(),
@@ -449,15 +499,22 @@ fn flatten_instances(
 }
 
 fn validate_workspace(workspace: &serde_json::Value) -> Result<(), DatabaseError> {
-    let instances = workspace.get("content").and_then(|content| content.get("instances"))
+    let instances = workspace
+        .get("content")
+        .and_then(|content| content.get("instances"))
         .and_then(serde_json::Value::as_array)
-        .ok_or_else(|| DatabaseError::Invalid("la estructura debe contener content.instances".into()))?;
+        .ok_or_else(|| {
+            DatabaseError::Invalid("la estructura debe contener content.instances".into())
+        })?;
     let mut rows = Vec::new();
     flatten_instances(instances, None, &mut rows)?;
     let mut ids = HashSet::new();
     for row in rows {
         if !ids.insert(row.id.clone()) {
-            return Err(DatabaseError::Invalid(format!("ID de instancia duplicado: {}", row.id)));
+            return Err(DatabaseError::Invalid(format!(
+                "ID de instancia duplicado: {}",
+                row.id
+            )));
         }
     }
     Ok(())
@@ -468,7 +525,9 @@ fn required_text<'a>(
     key: &str,
     entity: &str,
 ) -> Result<&'a str, DatabaseError> {
-    value.get(key).and_then(serde_json::Value::as_str)
+    value
+        .get(key)
+        .and_then(serde_json::Value::as_str)
         .filter(|text| !text.trim().is_empty())
         .ok_or_else(|| DatabaseError::Invalid(format!("{entity} debe contener {key}")))
 }
@@ -479,7 +538,9 @@ fn json_text(value: &serde_json::Value) -> Result<String, DatabaseError> {
 
 fn sql_text(value: &str) -> Result<String, DatabaseError> {
     if value.contains('\0') {
-        return Err(DatabaseError::Invalid("los textos no pueden contener NUL".into()));
+        return Err(DatabaseError::Invalid(
+            "los textos no pueden contener NUL".into(),
+        ));
     }
     Ok(format!("'{}'", value.replace('\'', "''")))
 }
@@ -513,7 +574,10 @@ mod tests {
         assert_eq!(db.list_profiles().unwrap(), vec![profile]);
         assert_eq!(db.list_projects("p1").unwrap(), vec![project]);
         assert_eq!(db.list_resources("j1").unwrap(), vec![resource]);
-        assert_eq!(db.load_resource_toml("j1", "r1").unwrap().as_deref(), Some(source));
+        assert_eq!(
+            db.load_resource_toml("j1", "r1").unwrap().as_deref(),
+            Some(source)
+        );
     }
 
     #[test]
@@ -521,7 +585,8 @@ mod tests {
         let dir = tempdir().unwrap();
         let mut db = Database::open(dir.path().join("store.sqlite3")).unwrap();
         db.create_profile(&serde_json::json!({"id":"p1"})).unwrap();
-        db.create_project(&serde_json::json!({"id":"j1","profile_id":"p1","name":"Study"})).unwrap();
+        db.create_project(&serde_json::json!({"id":"j1","profile_id":"p1","name":"Study"}))
+            .unwrap();
         let workspace = serde_json::json!({"content":{"instances":[
             {"id":"root","source":{"id":"r1"},"content":{"instances":[
                 {"id":"child","source":{"id":"r2"},"masks":[{"segment":"info"}]}
