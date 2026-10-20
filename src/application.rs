@@ -4,7 +4,8 @@ use std::fmt;
 
 use crate::{
     create_instance_under, load_workspace, remove_instance, LifecycleError, NavigationError,
-    NavigationState, NavigationStore, ResourceStore, Workspace, WorkspaceStore,
+    NavigationState, NavigationStore, Profile, ProfileError, ProfileStore, Project, ProjectError,
+    ProjectStore, ResourceStore, Workspace, WorkspaceStore,
 };
 
 /// Error producido al preparar el contexto operativo del workspace.
@@ -44,6 +45,46 @@ pub struct PreparedWorkspace {
     pub navigation_state: NavigationState,
     pub navigation_reset: bool,
 }
+
+
+/// Crea un proyecto dentro del perfil existente. El almacén prepara una carpeta
+/// UUID y sus fichas JSON/TOML antes de devolver el proyecto a la interfaz.
+pub fn create_project(
+    profiles: &ProfileStore,
+    projects: &ProjectStore,
+    name: &str,
+    description: Option<&str>,
+) -> Result<Project, ProjectCreationError> {
+    let profile = profiles.load().map_err(ProjectCreationError::Profile)?;
+    projects
+        .create(profile.id, name, description)
+        .map_err(ProjectCreationError::Project)
+}
+
+/// Lista los proyectos asociados al perfil local.
+pub fn list_projects(
+    profiles: &ProfileStore,
+    projects: &ProjectStore,
+) -> Result<Vec<Project>, ProjectCreationError> {
+    let profile = profiles.load().map_err(ProjectCreationError::Profile)?;
+    projects.list(profile.id).map_err(ProjectCreationError::Project)
+}
+
+#[derive(Debug)]
+pub enum ProjectCreationError {
+    Profile(ProfileError),
+    Project(ProjectError),
+}
+
+impl fmt::Display for ProjectCreationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Profile(error) => write!(f, "no se pudo leer el perfil: {error}"),
+            Self::Project(error) => write!(f, "no se pudo operar con el proyecto: {error}"),
+        }
+    }
+}
+impl std::error::Error for ProjectCreationError {}
 
 /// Carga la estructura y valida el destino de navegación antes de usar la CLI.
 /// Un destino inexistente se restablece a la raíz mediante NavigationStore.
