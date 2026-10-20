@@ -60,7 +60,7 @@ Los datos se guardan bajo `BITTOPOS_HOME` si está definida esa variable; por de
 
 El servicio HTTP Rust está en `server/`, reutiliza el núcleo y ofrece inicio de sesión de desarrollo y operaciones por perfil/proyecto. Consulta [la guía del servidor](server/README.md). La imagen Docker se construye desde la raíz con `docker build -t bittopos-server .` y necesita un volumen persistente para SQLite.
 
-El frontend modular está en `web/` y se publica bajo la licencia MPL 2.0; el núcleo, CLI y servidor están bajo GNU AGPLv3. El adaptador Python/SQLite de `backend/` sigue siendo experimental y no es el servidor remoto recomendado. Consulta [la guía web](web/README.md), [la guía del backend](backend/README.md) y [el límite arquitectónico](docs/api-backed-frontend.md).
+Licencias por componente: núcleo Rust (`Cargo.toml`) bajo Apache-2.0; CLI (`cli/`) y frontend (`web/`) bajo MPL-2.0; servidor HTTP (`server/`) bajo GNU AGPLv3. Cada componente incluye el texto completo de su licencia en su directorio (la licencia del núcleo está en la raíz). El adaptador Python/SQLite de `backend/` sigue siendo experimental y no es el servidor remoto recomendado. Consulta [la guía web](web/README.md), [la guía del backend](backend/README.md) y [el límite arquitectónico](docs/api-backed-frontend.md).
 
 ## Adaptador Python experimental
 
