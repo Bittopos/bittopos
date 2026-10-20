@@ -154,3 +154,28 @@ Antes de cambiar código:
 - Actualizar el documento canónico cuando una decisión aprobada cambie el modelo o la arquitectura.
 
 Si la documentación y el código discrepan, documentar primero la discrepancia con evidencia. El modelo define la semántica; el código demuestra lo que hoy existe; este documento conecta el propósito con la dirección aprobada. No resolver una contradicción suponiendo silenciosamente que la funcionalidad más ambiciosa ya está disponible.
+
+
+## 2.1 Una estructura, múltiples proyecciones: directorio, diagrama, mapa y árbol radial
+
+La imagen de especies en blanco y negro, con una vista ampliada circular, ilustra un principio central de Bittopos: **es un árbol jerárquico como el de un sistema de archivos Linux, dispuesto visualmente en forma circular**. La forma circular no cambia la estructura lógica; cambia el modo en que se proyecta y se recorre visualmente.
+
+De ahí se desprende una regla de diseño de producto: un directorio, un diagrama y un mapa pueden ser representaciones diferentes de la misma estructura subyacente. No son necesariamente tres modelos de datos ni tres documentos que haya que mantener sincronizados. Pueden ser distintas vistas, proyecciones o modos de navegación sobre los mismos nodos, identidades, segmentos y vínculos.
+
+- **Vista de directorio o árbol:** privilegia la contención, los niveles y la navegación ordenada, como un filesystem Linux.
+- **Vista de árbol radial/circular:** conserva las relaciones padre-hijo, pero organiza los niveles alrededor de un centro para aprovechar el espacio y revelar agrupaciones.
+- **Vista de diagrama:** privilegia la disposición espacial, los caminos y las relaciones visibles entre elementos.
+- **Vista de mapa:** privilegia orientación, vecindad y exploración espacial o conceptual; según el caso puede proyectar jerarquía, relaciones o ambas.
+
+La geometría puede cambiar —vertical, horizontal, radial, circular, espacial o esquemática— mientras la identidad y la semántica del modelo permanecen estables. Las conexiones transversales como «se alimenta de», «acicala a» o «utilizado por» deben distinguirse visualmente de las aristas de contención, aunque aparezcan en el mismo lienzo.
+
+Consecuencias para implementación:
+
+1. Separar el **modelo semántico** del **motor de disposición visual** y de la **vista** que lo presenta.
+2. Permitir cambiar de vista sin duplicar ni reconstruir las entidades semánticas.
+3. Mantener estables las identidades y la selección del elemento al pasar de árbol a diagrama, mapa o vista circular.
+4. Hacer explícito qué representa cada línea: contención jerárquica, referencia o relación tipada.
+5. Permitir zoom y enfoque sobre una zona sin que el zoom cambie la jerarquía real.
+6. No asumir que todo mapa debe ser geográfico ni que todo diagrama es un árbol; la representación elegida depende de qué aspecto del mismo sistema se quiera explorar.
+
+Este principio es una de las ventajas distintivas de Bittopos: **un solo sistema estructurado, múltiples ángulos de lectura**. La interfaz aprovecha la estructura en lugar de obligar a cada vista a inventar su propia organización.
