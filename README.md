@@ -56,6 +56,12 @@ cargo run -p bitto-cli -- --project <UUID> create "Idea pendiente" --no-instance
 
 Los datos se guardan bajo `BITTOPOS_HOME` si está definida esa variable; por defecto se usa `~/.local/share/bittopos/`.
 
+## Servidor HTTP y frontend
+
+El servicio HTTP Rust está en `server/`, reutiliza el núcleo y ofrece inicio de sesión de desarrollo y operaciones por perfil/proyecto. Consulta [la guía del servidor](server/README.md). La imagen Docker se construye desde la raíz con `docker build -t bittopos-server .` y necesita un volumen persistente para SQLite.
+
+El frontend modular está en `web/` y se publica bajo la licencia MPL 2.0; el núcleo, CLI y servidor están bajo GNU AGPLv3. El adaptador Python/SQLite de `backend/` sigue siendo experimental y no es el servidor remoto recomendado. Consulta [la guía web](web/README.md), [la guía del backend](backend/README.md) y [el límite arquitectónico](docs/api-backed-frontend.md).
+
 ## Frontend y API experimental
 
 La nueva SPA modular está en `web/` y consume la API HTTP v1. El adaptador experimental Python/SQLite está en `backend/`; ambos se ejecutan juntos en local con `python3 backend/server.py`. Esta API es una frontera de persistencia exploratoria, no el núcleo semántico Rust ni un servicio multiusuario listo para Internet. Consulta [la guía web](web/README.md), [la guía del backend](backend/README.md) y [el límite arquitectónico](docs/api-backed-frontend.md). La propuesta inicial de base frontend permanece en [docs/frontend-refactor-proposal.md](docs/frontend-refactor-proposal.md).
