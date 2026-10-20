@@ -85,7 +85,10 @@ async fn login(State(state): State<AppState>, Json(input): Json<LoginRequest>) -
             response.headers_mut().insert(header::SET_COOKIE, value);
             response
         }
-        Err(_) => error(StatusCode::INTERNAL_SERVER_ERROR, "No se pudo crear la sesión"),
+        Err(_) => error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "No se pudo crear la sesión",
+        ),
     }
 }
 
@@ -115,7 +118,10 @@ async fn me(State(state): State<AppState>) -> Json<Value> {
 async fn list_resources(State(state): State<AppState>) -> Response {
     match state.resources.list() {
         Ok(resources) => Json(resources).into_response(),
-        Err(_) => error(StatusCode::INTERNAL_SERVER_ERROR, "No se pudieron leer los recursos"),
+        Err(_) => error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "No se pudieron leer los recursos",
+        ),
     }
 }
 
@@ -125,7 +131,10 @@ async fn get_resource(State(state): State<AppState>, Path(id): Path<Uuid>) -> Re
         Err(bittopos_core::StoreError::NotFound(_)) => {
             error(StatusCode::NOT_FOUND, "Recurso no encontrado")
         }
-        Err(_) => error(StatusCode::INTERNAL_SERVER_ERROR, "No se pudo leer el recurso"),
+        Err(_) => error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "No se pudo leer el recurso",
+        ),
     }
 }
 
@@ -133,27 +142,32 @@ async fn create_resource(
     State(state): State<AppState>,
     Json(input): Json<CreateResourceRequest>,
 ) -> Response {
-    match state.resources.create(&input.title, input.description.as_deref()) {
+    match state
+        .resources
+        .create(&input.title, input.description.as_deref())
+    {
         Ok((resource, _warnings)) => (StatusCode::CREATED, Json(resource)).into_response(),
         Err(bittopos_core::StoreError::InvalidName) => {
             error(StatusCode::BAD_REQUEST, "El título no puede estar vacío")
         }
-        Err(_) => error(StatusCode::INTERNAL_SERVER_ERROR, "No se pudo crear el recurso"),
+        Err(_) => error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "No se pudo crear el recurso",
+        ),
     }
 }
 
 async fn list_workspaces(State(state): State<AppState>) -> Response {
     match state.workspaces.list() {
         Ok(workspaces) => Json(json!({ "items": workspaces })).into_response(),
-        Err(_) => error(StatusCode::INTERNAL_SERVER_ERROR, "No se pudieron leer los espacios"),
+        Err(_) => error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "No se pudieron leer los espacios",
+        ),
     }
 }
 
-async fn require_session(
-    State(state): State<AppState>,
-    request: Request,
-    next: Next,
-) -> Response {
+async fn require_session(State(state): State<AppState>, request: Request, next: Next) -> Response {
     let Some(token) = cookie_value(request.headers(), SESSION_COOKIE) else {
         return error(StatusCode::UNAUTHORIZED, "Autenticación requerida");
     };
@@ -161,7 +175,9 @@ async fn require_session(
     let valid = match state.sessions.lock() {
         Ok(mut sessions) => {
             sessions.retain(|_, expiry| *expiry > Instant::now());
-            sessions.get(&token).is_some_and(|expiry| *expiry > Instant::now())
+            sessions
+                .get(&token)
+                .is_some_and(|expiry| *expiry > Instant::now())
         }
         Err(_) => return error(StatusCode::INTERNAL_SERVER_ERROR, "Sesiones no disponibles"),
     };
@@ -184,9 +200,8 @@ fn cookie_value(headers: &axum::http::HeaderMap, name: &str) -> Option<String> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let password = env::var("BITTOPOS_PASSWORD").map_err(|_| {
-        "Falta BITTOPOS_PASSWORD; el servidor no arrancará sin autenticación"
-    })?;
+    let password = env::var("BITTOPOS_PASSWORD")
+        .map_err(|_| "Falta BITTOPOS_PASSWORD; el servidor no arrancará sin autenticación")?;
     if password.len() < 12 {
         return Err("BITTOPOS_PASSWORD debe tener al menos 12 caracteres".into());
     }
@@ -227,10 +242,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let protected = Router::new()
         .route("/api/v1/logout", post(logout))
         .route("/api/v1/me", get(me))
-        .route("/api/v1/resources", get(list_resources).post(create_resource))
+        .route(
+            "/api/v1/resources",
+            get(list_resources).post(create_resource),
+        )
         .route("/api/v1/resources/{id}", get(get_resource))
         .route("/api/v1/workspaces", get(list_workspaces))
-        .route_layer(middleware::from_fn_with_state(state.clone(), require_session))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            require_session,
+        ))
         .with_state(state);
 
     let app = public.merge(protected).layer(cors);
