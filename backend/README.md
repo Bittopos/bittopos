@@ -28,16 +28,7 @@ Variables opcionales:
 ## API v1
 
 - `GET /api/v1/health`: estado del proceso, sin datos.
-- `GET /api/v1/state`: definiciones y estructura JSON heredadas, con revisión de estructura.
-- `GET /api/v1/profiles`: lista los perfiles registrados.
-- `POST /api/v1/profiles`: crea un perfil por ID; los IDs duplicados se rechazan.
-- `GET /api/v1/profiles/{profile_id}/projects`: lista exclusivamente los proyectos del perfil.
-- `POST /api/v1/profiles/{profile_id}/projects`: crea un proyecto ligado a un perfil existente y con estructura vacía.
-- `GET /api/v1/projects/{project_id}`: devuelve metadatos, recursos, estructura y revisión del proyecto.
-- `GET /api/v1/projects/{project_id}/resources`: lista recursos del proyecto.
-- `POST /api/v1/projects/{project_id}/resources`: guarda un recurso JSON estructurando título, descripción y etiquetas.
-- `POST /api/v1/projects/{project_id}/resources/import-toml`: valida y conserva el TOML original y su representación estructurada.
-- `PUT /api/v1/projects/{project_id}/workspace`: guarda la estructura y actualiza las filas relacionales de instancias en una transacción.
+- `GET /api/v1/state`: definiciones y estructura JSON actuales, con revisión de estructura.
 - `POST /api/v1/resources`: crea una definición JSON.
 - `POST /api/v1/resources/import-toml`: valida TOML con la biblioteca estándar y conserva el texto original.
 - `PUT /api/v1/resources/{id}`: actualiza la definición JSON existente.
@@ -47,8 +38,8 @@ La estructura mantiene `content.instances`, la identidad de cada instancia y `so
 
 ## Persistencia y límites
 
-SQLite conserva perfiles y proyectos en tablas independientes, con una clave foránea de proyecto a perfil. Cada proyecto tiene su propia estructura y contador de revisión. Los recursos de proyecto se guardan como documento JSON, con columnas consultables para título, descripción y etiquetas; cuando se importan, también se conserva el TOML original. Las instancias se guardan como estructura JSON de intercambio y se proyectan transaccionalmente en filas con ID, padre, recurso de origen, semántica y máscaras. El documento JSON sigue siendo una representación compatible; no se eliminan ni se reescriben archivos locales. La API heredada `/api/v1/state` continúa disponible para no romper la SPA actual.
+SQLite guarda recursos como documentos JSON y, cuando se importan, conserva también el texto TOML original. La estructura se guarda como JSON con un contador de revisión para detectar escrituras concurrentes simples. `GET /api/v1/state` entrega el conjunto JSON que consume el navegador.
 
-Esto no define aún el esquema relacional definitivo. No hay autenticación de usuario ni autorización por perfil, multi-tenancy seguro, borrado de recursos, auditoría, sincronización CLI, `push/pull/log`, gRPC ni migración automática de los archivos locales existentes. Los nuevos endpoints de perfil/proyecto son una capa inicial de persistencia, no una promesa de despliegue multiusuario listo para Internet. No expongas este servicio directamente a Internet ni lo consideres multiusuario seguro.
+Esto no define aún el esquema relacional definitivo. No hay cuentas, permisos por usuario, multi-tenancy, borrado de recursos, auditoría, sincronización CLI, `push/pull/log`, gRPC ni migración automática de los archivos locales existentes. No expongas este servicio directamente a Internet ni lo consideres multiusuario seguro.
 
 Antes de un despliegue remoto real se necesitan autenticación de usuario, autorización por espacio de trabajo, límites de abuso, HTTPS, copias de seguridad/migraciones y una política de concurrencia. Cloudflare Pages puede servir la SPA, pero no ejecuta este servidor Python: el API necesitará un entorno compatible separado. No se ha desplegado ningún servicio en la nube desde este cambio.
