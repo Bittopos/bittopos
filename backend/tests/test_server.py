@@ -108,5 +108,51 @@ class ApiPersistenceTests(unittest.TestCase):
             server.create_project("profile-1", project)
 
 
+    def test_project_resource_stores_queryable_fields_and_original_toml(self):
+        server.create_profile({"id": "profile-1"})
+        server.create_project("profile-1", {
+            "id": "project-1", "profile_id": "profile-1", "name": "Uno"
+        })
+        source = 'id = "resource-1"\n\n[info]\ntitle = "Definición"\ndescription = "Detalle"\ntags = ["a", "b"]\n'
+        resource = server.save_project_resource(
+            "project-1", __import__("tomllib").loads(source), source
+        )
+        self.assertEqual(server.list_project_resources("project-1"), [resource])
+        with server.connect() as db:
+            row = db.execute(
+                "SELECT title, description, tags_json, source_toml FROM project_resources "
+                "WHERE project_id=? AND id=?", ("project-1", "resource-1")
+            ).fetchone()
+        self.assertEqual(row["title"], "Definición")
+        self.assertEqual(row["description"], "Detalle")
+        self.assertEqual(json.loads(row["tags_json"]), ["a", "b"])
+        self.assertEqual(row["source_toml"], source)
+
+    def test_workspace_instances_are_normalized_with_parent_and_source_ids(self):
+        server.create_profile({"id": "profile-1"})
+        server.create_project("profile-1", {
+            "id": "project-1", "profile_id": "profile-1", "name": "Uno"
+        })
+        workspace = {"content": {"instances": [{
+            "id": "parent", "source": {"id": "resource-parent"},
+            "content": {"instances": [{
+                "id": "child", "source": {"id": "resource-child"},
+                "masks": [{"segment": "info"}]
+            }]}
+        }]}}
+        server.save_project_workspace("project-1", workspace, 0)
+        with server.connect() as db:
+            rows = db.execute(
+                "SELECT id, parent_id, source_id, masks_json FROM project_instances "
+                "WHERE project_id=? ORDER BY id", ("project-1",)
+            ).fetchall()
+        by_id = {row["id"]: row for row in rows}
+        self.assertEqual(by_id["parent"]["parent_id"], None)
+        self.assertEqual(by_id["parent"]["source_id"], "resource-parent")
+        self.assertEqual(by_id["child"]["parent_id"], "parent")
+        self.assertEqual(by_id["child"]["source_id"], "resource-child")
+        self.assertEqual(json.loads(by_id["child"]["masks_json"]), [{"segment": "info"}])
+
+
 if __name__ == "__main__":
     unittest.main()
