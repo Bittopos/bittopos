@@ -45,6 +45,10 @@ Las operaciones escriben directamente los archivos implicados. La escritura del 
 
 La prioridad es que el camino normal de datos sea visible. No se incorporan mecanismos de recuperación, temporales administrados, transacciones entre archivos o adaptadores futuros sin una decisión expresa.
 
+## Persistencia estructurada opcional
+
+El módulo `database.rs` del núcleo expone una capa SQLite para perfiles, proyectos, recursos e instancias. Conserva documentos JSON completos, el TOML original cuando se importa y columnas relacionales para consultas. No sustituye los almacenes de archivos ni migra datos automáticamente. La integración de esta capa con un servidor HTTP Rust queda pendiente de implementar junto con ese servidor; consulta [Persistencia SQLite](database-storage.md).
+
 ## Fuera del núcleo actual
 
 La interfaz web es experimental y guarda su propio estado en el navegador. No está conectada al núcleo Rust. Servidor, sincronización, autenticación, bases de datos externas y despliegue WASM no forman parte del flujo local actual.
