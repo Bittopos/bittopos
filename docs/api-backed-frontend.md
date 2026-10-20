@@ -25,7 +25,7 @@ SQLite: recursos JSON (+ TOML original importado) y estructura JSON
 JSON para el navegador
 ```
 
-La API no es el núcleo ni define todavía el esquema definitivo de base de datos. La importación TOML utiliza `tomllib`; el servicio conserva el texto original cuando es posible y guarda el documento parseado. No se convierte todo TOML arbitrario a TOML canónico automáticamente porque eso podría perder detalles o tipos que el contrato aún no ha definido.
+La API no es el núcleo semántico. La base de datos incluye tablas de perfiles y proyectos con relaciones por clave foránea; recursos e instancias de cada proyecto también tienen proyecciones relacionales consultables. La importación TOML utiliza `tomllib`, conserva el texto original y guarda los campos estructurados. No se convierte todo TOML arbitrario a TOML canónico automáticamente porque eso podría perder detalles o tipos que el contrato aún no ha definido.
 
 ## Contrato de compatibilidad inicial
 
@@ -42,6 +42,7 @@ El servidor Python está limitado a loopback por defecto y no debe exponerse dir
 ## Próximos pasos antes de aprobar el MVP
 
 1. Ejecutar tests de contrato sobre recursos TOML reales y estructuras que incluyan máscaras, referencias, relaciones y campos desconocidos.
+2. Diseñar y probar autenticación/autorización por perfil y proyecto antes de exponer datos privados.
 2. Definir un formato de exportación JSON versionado y una estrategia de migración de archivos locales a SQLite.
 3. Decidir si la base inicial debe ser SQLite o un servicio gestionado según el entorno real de despliegue y los requisitos multiusuario.
 4. Diseñar autenticación/autorización y separación de datos antes de aceptar usuarios externos.
