@@ -245,7 +245,7 @@ mod tests {
         let other_profile = Uuid::now_v7();
         let project = store.create(profile_id, "Uno", None).unwrap();
 
-        assert_eq!(store.list(profile_id).unwrap(), vec![project]);
+        assert_eq!(store.list(profile_id).unwrap(), vec![project.clone()]);
         assert!(matches!(
             store.load(other_profile, project.id),
             Err(ProjectError::ProfileMismatch { .. })
