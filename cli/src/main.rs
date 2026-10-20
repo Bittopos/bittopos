@@ -5,8 +5,8 @@ use std::process;
 use bittopos_core::{
     children_of, create_instance_at_current_location, create_instance_under, create_relation,
     is_relation, prepare_workspace, relation_endpoints, remove_instance_and_update_navigation,
-    Instance, NavigationState, NavigationStore, RelationEndpoints, ResourcePatch, ResourceStore,
-    Workspace, WorkspaceModelError, WorkspaceStore,
+    Instance, NavigationState, NavigationStore, ProfileStore, RelationEndpoints, ResourcePatch,
+    ResourceStore, Workspace, WorkspaceModelError, WorkspaceStore,
 };
 use clap::{Parser, Subcommand};
 use uuid::Uuid;
@@ -22,6 +22,11 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Gestiona el perfil local que identifica este entorno de Bittopos.
+    Profile {
+        #[command(subcommand)]
+        command: ProfileCommand,
+    },
     /// Crea un recurso y, salvo --no-instance, una instancia en la ubicación actual.
     Create {
         title: String,
@@ -66,7 +71,14 @@ enum Command {
     },
 }
 
+#[derive(Debug, Subcommand)]
+enum ProfileCommand {
+    /// Crea el perfil local si todavía no existe.
+    Create,
+}
+
 struct Paths {
+    root: PathBuf,
     resources: PathBuf,
     workspaces: PathBuf,
 }
@@ -85,6 +97,7 @@ impl Paths {
             }
         };
         Ok(Self {
+            root: home.clone(),
             resources: home.join("resources"),
             workspaces: home.join("workspaces"),
         })
@@ -104,6 +117,19 @@ fn run() -> Result<(), String> {
         Cli::parse_from(["bitto", "--help"]);
         return Ok(());
     };
+
+    if let Command::Profile { command: ProfileCommand::Create } = &command {
+        let paths = Paths::discover()?;
+        let profile = ProfileStore::new(&paths.root)
+            .create()
+            .map_err(|error| error.to_string())?;
+        println!(
+            "Perfil creado: {} (ID: {})",
+            paths.root.join("profile.json").display(),
+            profile.id
+        );
+        return Ok(());
+    }
 
     let paths = Paths::discover()?;
     let resources = ResourceStore::new(&paths.resources).map_err(|error| error.to_string())?;
