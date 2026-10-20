@@ -2,7 +2,7 @@
 
 ## Requisitos
 
-Instala Rust y Cargo. El workspace contiene el paquete `bittopos-core` y la CLI `bitto-cli`.
+Instala Rust y Cargo. El workspace contiene el paquete `bittopos-core`, la CLI `bitto-cli` y el servidor HTTP `bittopos-server`.
 
 ## Construir y probar
 
@@ -10,8 +10,8 @@ Desde la raíz del repositorio:
 
 ```bash
 cargo fmt --all -- --check
-cargo build --workspace --locked
-cargo test --workspace --locked
+cargo build --workspace
+cargo test --workspace
 git diff --check
 ```
 
@@ -36,7 +36,7 @@ cargo run -p bitto-cli -- --help
 - No separe estructura y espacio de trabajo en entidades paralelas.
 - No duplique la definición completa del recurso en cada instancia.
 - No añadas abstracciones sin consumidores reales.
-- No añadas recuperación automática, mecanismos de rescate, telemetría, autenticación o infraestructura futura sin aprobación.
+- No añadas recuperación automática ni abstracciones de infraestructura sin una necesidad comprobada. El servidor de desarrollo vive en `server/`; su persistencia y autenticación están documentadas en `server/README.md`.
 - La persistencia actual no es transaccional entre archivos; describe esa limitación con claridad.
 
 ## Organización documental
