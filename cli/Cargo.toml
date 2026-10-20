@@ -3,7 +3,7 @@ name = "bitto-cli"
 version = "0.1.0"
 edition = "2021"
 description = "Interfaz de terminal de Bittopos"
-license = "AGPL-3.0-only"
+license = "MPL-2.0"
 
 [[bin]]
 name = "bitto"
