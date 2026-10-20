@@ -95,7 +95,7 @@ impl Database {
             }
             return Err(DatabaseError::Sql(message));
         }
-        let database = Self { raw };
+        let mut database = Self { raw };
         database.exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;")?;
         database.exec(
             "CREATE TABLE IF NOT EXISTS profiles (
