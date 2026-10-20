@@ -1,4 +1,10 @@
-use std::{collections::HashMap, env, net::SocketAddr, sync::{Arc, Mutex}, time::{Duration, Instant}};
+use std::{
+    collections::HashMap,
+    env,
+    net::SocketAddr,
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 
 use axum::{
     extract::{Path, Request, State},
@@ -175,8 +181,9 @@ fn cookie_value(headers: &axum::http::HeaderMap, name: &str) -> Option<String> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let password = env::var("BITTOPOS_PASSWORD")
-        .map_err(|_| "Falta BITTOPOS_PASSWORD; el servidor no arrancará sin autenticación")?;
+    let password = env::var("BITTOPOS_PASSWORD").map_err(|_| {
+        "Falta BITTOPOS_PASSWORD; el servidor no arrancará sin autenticación"
+    })?;
     if password.len() < 12 {
         return Err("BITTOPOS_PASSWORD debe tener al menos 12 caracteres".into());
     }
@@ -202,7 +209,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cors = CorsLayer::new()
         .allow_origin(origin)
         .allow_credentials(true)
-        .allow_methods([axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::OPTIONS])
+        .allow_methods([
+            axum::http::Method::GET,
+            axum::http::Method::POST,
+            axum::http::Method::OPTIONS,
+        ])
         .allow_headers([header::CONTENT_TYPE]);
 
     let public = Router::new()
