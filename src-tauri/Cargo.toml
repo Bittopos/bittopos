@@ -1,0 +1,14 @@
+[package]
+name = "bittopos-desktop"
+version = "0.1.0"
+description = "Bittopos desktop GUI"
+authors = ["Bittopos contributors"]
+edition = "2021"
+license = "MPL-2.0"
+
+[build-dependencies]
+tauri-build = { version = "2" }
+
+[dependencies]
+tauri = { version = "2" }
+bittopos-core = { git = "https://github.com/jasperalsain/bittopos-core", rev = "cd6483acda746858cfaffc45f52c5df1f1c4a940" }
