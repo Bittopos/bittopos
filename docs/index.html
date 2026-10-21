@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101a2b">
+  <meta name="description" content="Bittopos: software libre para estructurar información, proyectos y relaciones semánticas.">
+  <title>Bittopos — estructura tus ideas</title>
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#inicio" aria-label="Bittopos, inicio"><span class="brand-mark" aria-hidden="true">B</span><span>Bittopos</span></a>
+    <nav aria-label="Navegación principal">
+      <a href="#modelo">El modelo</a>
+      <a href="#componentes">Componentes</a>
+      <a href="#proyecto">El proyecto</a>
+      <a class="nav-cta" href="https://github.com/jasperalsain/bittopos">Ver en GitHub <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+
+  <main id="inicio">
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="pulse"></span> Software libre · En desarrollo</p>
+        <h1>Ideas conectadas.<br><span>Proyectos con estructura.</span></h1>
+        <p class="lead">Bittopos ayuda a organizar información y proyectos como sistemas vivos: con jerarquías, elementos reutilizables y relaciones que conservan su significado.</p>
+        <div class="hero-actions">
+          <a class="button primary" href="#modelo">Descubre el modelo <span aria-hidden="true">↓</span></a>
+          <a class="button secondary" href="https://github.com/jasperalsain/bittopos">Explora el código <span aria-hidden="true">↗</span></a>
+        </div>
+        <p class="microcopy">De una ficha a un sistema completo, sin perder el contexto.</p>
+      </div>
+      <div class="visual" role="img" aria-label="Ilustración de recursos conectados dentro de una estructura">
+        <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+        <div class="connector c1"></div><div class="connector c2"></div><div class="connector c3"></div><div class="connector c4"></div>
+        <div class="node node-main"><span class="node-glyph">B</span><strong>Proyecto</strong><small>contexto raíz</small></div>
+        <div class="node node-a"><span class="mini-dot"></span><strong>Recurso</strong><small>definición</small></div>
+        <div class="node node-b"><span class="mini-dot mint"></span><strong>Instancia</strong><small>uso local</small></div>
+        <div class="node node-c"><span class="mini-dot gold"></span><strong>Relación</strong><small>significado</small></div>
+        <div class="node node-d"><span class="mini-dot violet"></span><strong>Contexto</strong><small>resolución</small></div>
+        <div class="visual-label"><span></span> Estructura semántica</div>
+      </div>
+      <div class="hero-foot"><span>01 / ORGANIZAR</span><span>02 / RELACIONAR</span><span>03 / COMPRENDER</span></div>
+    </section>
+
+    <section class="intro section" id="modelo">
+      <div class="section-kicker">UN MODELO, MUCHOS USOS</div>
+      <div class="intro-grid">
+        <h2>La estructura no debería limitar tus ideas.</h2>
+        <div><p>Bittopos parte de una idea sencilla: un proyecto, un plan de estudios o un sistema de conocimiento pueden organizarse como una estructura de elementos relacionados. El modelo hace explícitas esas conexiones y mantiene separado lo que se comparte de lo que cambia en cada uso.</p><p>Así puedes adaptar el espacio de trabajo a tu propósito, en lugar de forzar cada propósito a una herramienta rígida.</p></div>
+      </div>
+      <div class="principles">
+        <article><span class="number">01</span><h3>Define una vez</h3><p>Crea recursos reutilizables y conserva su identidad fuera de cada instancia.</p></article>
+        <article><span class="number">02</span><h3>Organiza con sentido</h3><p>Construye estructuras jerárquicas que reflejen cómo se compone tu proyecto.</p></article>
+        <article><span class="number">03</span><h3>Relaciona libremente</h3><p>Expresa dependencias y vínculos sin confundir los elementos conectados.</p></article>
+      </div>
+    </section>
+
+    <section class="components section" id="componentes">
+      <div class="section-kicker">ECOSISTEMA MODULAR</div>
+      <div class="section-heading"><h2>Un proyecto.<br>Componentes especializados.</h2><p>Cada parte tiene una responsabilidad clara. Las interfaces evolucionan sin obligar a duplicar el modelo central.</p></div>
+      <div class="component-grid">
+        <a class="component-card featured" href="https://github.com/jasperalsain/bittopos-core"><span class="card-icon">⌘</span><span class="card-tag">FUNDAMENTO</span><h3>Core</h3><p>El modelo y las operaciones compartidas que sostienen el ecosistema.</p><span class="card-link">Repositorio <b>↗</b></span></a>
+        <a class="component-card" href="https://github.com/jasperalsain/bittopos-web"><span class="card-icon">◫</span><span class="card-tag">INTERFAZ</span><h3>Web</h3><p>Una interfaz para explorar y operar sobre el espacio de trabajo.</p><span class="card-link">Repositorio <b>↗</b></span></a>
+        <a class="component-card" href="https://github.com/jasperalsain/bittopos-cli"><span class="card-icon">›_</span><span class="card-tag">TERMINAL</span><h3>CLI</h3><p>Acceso directo a las operaciones desde la línea de comandos.</p><span class="card-link">Repositorio <b>↗</b></span></a>
+        <a class="component-card" href="https://github.com/jasperalsain/bittopos-server"><span class="card-icon">⌁</span><span class="card-tag">SERVICIOS</span><h3>Server</h3><p>Una API para conectar clientes con las capacidades del sistema.</p><span class="card-link">Repositorio <b>↗</b></span></a>
+      </div>
+    </section>
+
+    <section class="manifesto section" id="proyecto">
+      <div class="manifesto-mark" aria-hidden="true">B</div>
+      <div><div class="section-kicker">UNA BASE ABIERTA</div><h2>Herramientas para construir tu propio sistema.</h2><p>Bittopos es software libre en desarrollo. Su dirección es crear una base flexible para organizar desde pequeñas colecciones de fichas hasta proyectos complejos, con el contexto y las relaciones como parte del modelo, no como un añadido.</p><a class="text-link" href="https://github.com/jasperalsain/bittopos">Lee la documentación y participa <span aria-hidden="true">↗</span></a></div>
+    </section>
+  </main>
+
+  <footer><a class="brand footer-brand" href="#inicio"><span class="brand-mark" aria-hidden="true">B</span><span>Bittopos</span></a><p>Información estructurada. Relaciones con significado.</p><div class="footer-links"><a href="https://github.com/jasperalsain/bittopos">GitHub</a><a href="https://github.com/jasperalsain/bittopos/blob/main/LICENSE">Licencias</a><a href="https://github.com/jasperalsain/bittopos/blob/main/CONTRIBUTING.md">Contribuir</a></div><small>© Bittopos · Proyecto de software libre</small></footer>
+</body>
+</html>
