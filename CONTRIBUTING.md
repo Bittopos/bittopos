@@ -1,34 +1,24 @@
 # Contribuir a Bittopos
 
-El desarrollo debe avanzar en incrementos pequeños que puedan explicarse, compilarse y revisarse.
+Este repositorio coordina el producto Bittopos. No es el lugar para implementar cambios en el core, servidor, CLI, UI ni recetas de instalación.
 
-## Flujo
+## Dónde contribuir
 
-1. Parte del `main` actualizado.
-2. Crea una rama por cambio lógico: `feat/`, `fix/`, `refactor/`, `docs/` o `test/`.
-3. Mantén el cambio limitado a una responsabilidad.
-4. Actualiza la documentación solo cuando cambie el modelo, el comportamiento o la forma de construir.
-5. Ejecuta las comprobaciones de la guía de desarrollo y comunica cuáles no pudiste ejecutar.
-6. Abre un Pull Request con motivo, alcance, pruebas y limitaciones.
+- Cambios del dominio: [bittopos-core](https://github.com/Bittopos/bittopos-core)
+- API y servicio: [bittopos-server](https://github.com/Bittopos/bittopos-server)
+- CLI: [bittopos-cli](https://github.com/Bittopos/bittopos-cli)
+- Interfaz web: [bittopos-ui](https://github.com/Bittopos/bittopos-ui)
+- Empaquetado: `bittopos-packaging` cuando esté creado.
 
-Usa mensajes de commit claros, preferiblemente Conventional Commits, por ejemplo `refactor(core): simplify instance lifecycle`.
+## En este repositorio
 
-## Comprobaciones
+Las contribuciones deben tratar sobre arquitectura transversal, contratos entre componentes, matriz de compatibilidad, manifiestos de producto, documentación o coordinación de releases.
 
-```bash
-cargo fmt --all -- --check
-cargo build --workspace --locked
-cargo test --workspace --locked
-git diff --check
-```
+- Usa una rama y una pull request.
+- Describe el motivo, alcance, decisiones y efectos sobre otros componentes.
+- Fija SHAs inmutables en los manifiestos de releases.
+- No declares una plataforma compatible sin builds y pruebas reproducibles.
+- No copies implementaciones de componentes a este repositorio.
+- No sobrescribas artefactos de release existentes.
 
-No declares pruebas como exitosas si no se ejecutaron. No añadas capas, abstracciones, recuperación automática ni preparación para plataformas futuras sin una necesidad actual demostrable.
-
-## Documentos
-
-- [Visión](docs/VISION.md)
-- [Modelo](docs/model.md)
-- [Arquitectura](docs/architecture.md)
-- [Guía de desarrollo](docs/DEVELOPMENT-GUIDE.md)
-
-El README es la entrada al proyecto; el modelo define las reglas conceptuales y la arquitectura explica cómo están repartidas en el código.
+Los cambios de arquitectura que afecten varios componentes deben identificar qué repositorios necesitan cambios coordinados.

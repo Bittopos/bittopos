@@ -1,149 +1,80 @@
-# Bittopos: arquitectura base Unix-first
+# Fundamentos de arquitectura de Bittopos
 
-**Estado:** propuesta fundacional para revisión  
-**Alcance:** reemplaza la organización experimental actual; no promete retrocompatibilidad con APIs, formatos, CLI ni esquemas que aún estén en diseño.
+**Estado:** propuesta para el rediseño experimental.  
+**Principio rector:** una sola fuente de verdad por componente, contratos explícitos y portabilidad verificada mediante adaptadores y pruebas, no mediante duplicación por sistema operativo.
 
-## Decisión central
+## 1. Responsabilidad del repositorio central
 
-Bittopos se organizará como un **monorepositorio con un workspace de Rust y aplicaciones de plataforma**, contratos versionados en el propio árbol y una única fuente canónica del dominio. El repositorio `Bittopos/bittopos` será la fuente de verdad para código, pruebas, especificaciones y releases. Los repositorios separados actuales no deben seguir conteniendo copias independientes de módulos que evolucionan juntos; se migrarán cuando exista una implementación nueva comprobable y después se archivarán o convertirán en repositorios de distribución según corresponda. No se borrará ni archivará nada automáticamente durante esta etapa.
+`Bittopos/bittopos` es el centro de coordinación del producto. Contiene visión, arquitectura transversal, topología de repositorios, políticas de versiones, manifiestos de releases y workflows de orquestación. No mantiene implementaciones del núcleo, servidor, CLI, UI ni recetas específicas de instalación.
 
-La razón no es que un monorepo sea universalmente mejor: es que Bittopos comparte tipos, semántica de dominio, protocolos y contratos entre núcleo, servidor, CLI y clientes. Esos elementos necesitan cambios atómicos, pruebas conjuntas y releases coordinadas. Separar repositorios ahora impone coste de sincronización sin aportar todavía límites de producto suficientemente estables.
+El código vive en los repositorios de sus componentes. Los releases del producto reúnen revisiones exactas de esos repositorios, fijadas por SHA inmutable.
 
-## Objetivo del sistema
+## 2. Responsabilidades de los componentes
 
-Un único modelo de producto, operado a través de interfaces diferentes:
+- **Core:** modelo de dominio, entidades, valores, invariantes y operaciones fundamentales; sin dependencia de UI, HTTP o un sistema operativo concreto.
+- **Server:** API, autenticación, autorización, sesiones, coordinación de casos de uso y operación como servicio.
+- **CLI:** interfaz para operadores y automatización; consume contratos/casos de uso publicados por los componentes, sin reimplementar reglas de negocio.
+- **UI:** experiencia web que consume la API documentada.
+- **Packaging:** recetas, manifiestos y pruebas de instalación específicas de distribución, en `Bittopos/bittopos-packaging` una vez creado.
+- **Central:** contratos entre componentes a nivel de producto, matriz de compatibilidad, manifiestos de composición y coordinación de releases.
 
-- Usuario cotidiano: interfaz móvil/escritorio/web sencilla, segura y limitada por las capacidades del dispositivo.
-- Operador: CLI, API administrativa, diagnósticos, configuración y automatización.
-- Administrador de sistemas: inventario de hardware/software visible desde el host, estado de servicios, recursos, dependencias, eventos y trazabilidad.
-- Despliegue: ejecución local, servicio de servidor o instalación gestionada, usando el mismo dominio y contratos.
+Cada componente es dueño de su código, pruebas y CI. Un cambio transversal debe coordinar las versiones de los componentes afectados y actualizar el manifiesto de producto.
 
-Bittopos administra productos y su estructura. El host que ejecuta Bittopos es una entidad distinta del producto administrado; no se deben confundir los recursos de la máquina con los componentes inventariados del producto.
+## 3. Modelo de dependencias
 
-## Estructura de destino
+1. Las reglas de dominio pertenecen al core y no dependen del framework HTTP, la interfaz ni del sistema operativo.
+2. El servidor y la CLI consumen la misma semántica del core mediante una frontera explícita y versionada.
+3. La UI depende de contratos de API documentados, no de estructuras internas de implementación.
+4. Las integraciones específicas de SO quedan en adaptadores o módulos de plataforma dentro del componente que los necesita.
+5. No crear capas, crates ni repositorios vacíos por anticipado: una frontera se extrae cuando existe una responsabilidad o variación verificable.
+6. No permitir que el mismo componente tenga dos implementaciones canónicas mantenidas en paralelo.
 
-```text
-bittopos/
-├── Cargo.toml                  # workspace y política común de dependencias
-├── Cargo.lock
-├── crates/
-│   ├── bittopos-domain/        # entidades, valores, invariantes, reglas puras
-│   ├── bittopos-application/   # casos de uso y coordinación
-│   ├── bittopos-contracts/     # DTO, errores, eventos y contratos públicos
-│   ├── bittopos-ports/         # interfaces requeridas por los casos de uso
-│   ├── bittopos-storage/       # persistencia y transacciones
-│   ├── bittopos-inventory/     # modelo de inventario y procedencia de observaciones
-│   ├── bittopos-observability/ # métricas, trazas y salud de aplicación
-│   ├── bittopos-runtime/       # configuración, ciclo de vida, apagado y señales
-│   ├── bittopos-server/        # API, autenticación y autorización de red
-│   └── bittopos-cli/           # CLI de usuario y administración
-├── apps/
-│   ├── web/                    # cliente web; consume contratos/API
-│   ├── desktop/                # shell de escritorio si aporta valor
-│   └── android/                # cliente Android y adaptadores Android
-├── platforms/
-│   ├── unix-common/            # comportamiento portable POSIX cuando aplique
-│   ├── linux/                  # systemd, rutas, capacidades y empaquetado Linux
-│   └── freebsd/                # rc.d, pkg, rutas y capacidades FreeBSD
-├── deploy/
-│   ├── containers/
-│   ├── linux/
-│   └── freebsd/
-├── schemas/                    # OpenAPI, eventos y formatos publicados
-├── tests/
-│   ├── contracts/
-│   ├── integration/
-│   └── platform/
-├── docs/
-│   ├── architecture/
-│   ├── decisions/
-│   ├── operations/
-│   └── development/
-└── tools/
-```
+## 4. Sistemas operativos y entornos
 
-Los directorios son límites conceptuales iniciales, no una obligación de crear crates vacíos. Cada crate se crea cuando existe una responsabilidad y una frontera de dependencia verificables.
+- **Linux:** primera plataforma de referencia para desarrollo, CI, servidor y empaquetado.
+- **FreeBSD:** destino real de portabilidad, con builds y pruebas propias; no basta con que el código compile en Linux.
+- **Windows:** destino futuro previsto, sin repositorio preventivo por SO. Su soporte se declarará solo después de verificar toolchain, servicios, rutas, permisos, señales, almacenamiento y distribución.
+- **Android y otros clientes móviles:** se incorporan como aplicaciones o repositorios propios cuando exista código nativo y un ciclo de publicación real.
 
-## Reglas de dependencia
+La portabilidad se organiza por contratos, adaptadores, destinos de compilación y pruebas. No por copias del dominio.
 
-1. `domain` no depende de SO, red, UI, base de datos ni framework web.
-2. `application` depende del dominio y de contratos/puertos; no conoce adaptadores concretos.
-3. Adaptadores implementan puertos. El ensamblado de dependencias ocurre en los puntos de entrada.
-4. `server`, `cli`, `web`, `desktop` y `android` no reimplementan reglas de negocio.
-5. La persistencia es un adaptador. El dominio no contiene SQL ni tipos del motor.
-6. El inventario distingue **observaciones** de **hechos de dominio**. Cada observación de host incluye fuente, instante, alcance y nivel de confianza; la ausencia de permiso se informa como desconocido/no accesible, nunca como inexistencia.
-7. Las capacidades se declaran explícitamente: no se asume que Android, Linux y FreeBSD puedan inspeccionar o administrar los mismos recursos.
-8. No se crean capas genéricas por anticipado. Una abstracción existe cuando delimita una variación real, una frontera de seguridad o una responsabilidad estable.
+## 5. Inventario y observabilidad
 
-## Hardware, sistema operativo y usuarios
+Bittopos debe distinguir el estado del host que ejecuta el producto del estado del producto administrado.
 
-Bittopos distinguirá al menos:
+- El inventario de hardware/software registra la fuente de la observación, el momento, el alcance y las limitaciones de permisos.
+- La ausencia de permiso o de una fuente de datos significa “desconocido/no accesible”, no “inexistente”.
+- Las métricas de infraestructura (salud del host, CPU, memoria, almacenamiento, disponibilidad) se separan de las métricas de producto (usuarios, solicitudes, acciones y latencia).
+- La observabilidad no debe requerir privilegios administrativos para las operaciones ordinarias. Los colectores con privilegios se aíslan y aplican mínimo privilegio.
 
-- **Producto administrado:** componentes, relaciones, versiones, dependencias y estado funcional.
-- **Host de ejecución:** hardware, sistema operativo, procesos, servicios, almacenamiento y red que alojan Bittopos.
-- **Agente o fuente de observación:** mecanismo con permisos y alcance definidos para recopilar datos.
-- **Usuario/operador:** identidad, permisos y acciones permitidas.
+## 6. Seguridad y datos
 
-La recolección de inventario será modular y de privilegio mínimo. La aplicación normal no requiere privilegios de root/administrador. Operaciones privilegiadas se separan en adaptadores o agentes estrechos, con protocolo explícito y superficie de ataque limitada.
+La autenticación y autorización pertenecen a la arquitectura del servidor, no a una configuración de despliegue opcional. Antes de declarar soporte multiusuario o producción se deben validar identidad, permisos por recurso, gestión de sesiones, protección CSRF cuando aplique, límites de intentos, transporte seguro, auditoría y pruebas de seguridad.
 
-Las métricas de infraestructura (CPU, memoria, disco, red, salud de proceso) no se mezclan con métricas de producto (usuarios/s, operaciones, solicitudes, acciones). Ambas pueden correlacionarse mediante tiempo e identificadores de instancia, manteniendo fuentes y semánticas distintas.
+Los cambios de diseño pueden ser incompatibles durante la fase experimental. Sin embargo, una migración o reinicialización de datos persistentes debe ser explícita, documentada y recuperable; no debe destruir datos silenciosamente.
 
-## Portabilidad como contrato verificable
+## 7. Releases y procedencia
 
-Linux será la primera plataforma de referencia de servidor; FreeBSD será una plataforma objetivo explícita; Android será un cliente de plataforma con restricciones propias. No se declarará soporte por compilar únicamente.
+Una release de producto fija:
+- versión y canal;
+- SHA de cada repositorio componente;
+- targets y requisitos mínimos;
+- toolchain, features y opciones relevantes;
+- pruebas ejecutadas y limitaciones conocidas;
+- lista de artefactos, SHA-256 y metadatos de firma/procedencia cuando estén configurados.
 
-Cada plataforma define capacidades comprobables y pruebas para:
+Fuentes, binarios y paquetes de instalación son artefactos distintos. Nunca se reconstruye una release a partir de una rama móvil ni se sobrescriben artefactos publicados.
 
-- rutas de configuración, datos, caché, temporales y logs;
-- identidad de servicio y permisos;
-- inicio, señales, apagado limpio y recuperación;
-- almacenamiento, bloqueos y concurrencia;
-- red, límites de recursos y restricciones del entorno;
-- recopilación de inventario disponible y permisos necesarios;
-- instalación, actualización, desinstalación y restauración.
+## 8. Secuencia
 
-Las diferencias de systemd/rc.d/Android permanecen en adaptadores, no en el dominio.
-
-## Persistencia y cambios incompatibles
-
-La arquitectura está en fase experimental. Se permite reemplazar completamente los contratos y esquemas iniciales cuando el diseño lo justifique. No se implementarán capas de compatibilidad por defecto ni se preservarán APIs/CLI/esquemas experimentales por inercia.
-
-Cada formato persistente tendrá una versión explícita y una política de creación, validación, copia/restauración y reinicialización. Durante esta fase, un cambio incompatible puede requerir crear una base nueva o ejecutar una migración deliberada documentada; no se promete compatibilidad automática con datos experimentales. Antes de una operación destructiva se debe advertir claramente y evitar pérdida silenciosa de datos.
-
-## Contratos y seguridad
-
-- OpenAPI para HTTP; esquemas explícitos para eventos y formatos persistentes.
-- Errores tipados y estables dentro de una versión de contrato.
-- Autenticación y autorización en el servidor, separadas de las reglas del dominio.
-- La CLI local y la API remota llaman a los mismos casos de uso cuando ejecutan la misma operación.
-- Registro de auditoría separado del panel de estado para usuarios.
-- Secretos fuera del repositorio y de los logs.
-- Sin ejecución de comandos arbitrarios del host desde la API.
-
-## Verificación y releases
-
-La integración continua deberá comprobar formato, lint, pruebas unitarias, pruebas de contratos, integración de almacenamiento y compilación por plataforma. La matriz se ampliará según soporte real, incluyendo targets Linux y FreeBSD donde el runner esté disponible, y Android en su toolchain.
-
-No se fusionará una reestructuración masiva sin:
-1. mapa de responsabilidades y dependencias;
-2. contratos e invariantes definidos;
-3. pruebas de comportamiento del dominio;
-4. instalación limpia reproducible;
-5. comprobaciones de permisos y recuperación;
-6. documentación de cambios incompatibles.
-
-## Plan de ejecución
-
-1. Inventariar el código actual y clasificarlo por responsabilidad; detectar copias divergentes.
-2. Fijar el modelo de dominio y los contratos nuevos antes de mover código.
-3. Crear el workspace canónico y mover/reimplementar por responsabilidad, no por nombre de archivo.
-4. Rehacer servidor, CLI y UI para consumir los mismos casos de uso/contratos.
-5. Definir el ciclo de vida del proceso y las rutas de sistema como contratos de runtime.
-6. Incorporar adaptadores Linux y FreeBSD y pruebas de plataforma.
-7. Diseñar inventario y observabilidad con límites de permisos.
-8. Incorporar Android y empaquetados de usuario cuando el núcleo/contratos estén definidos.
-9. Convertir los repositorios separados en artefactos derivados, documentación histórica o repositorios archivados; nunca mantener copias editables del mismo código.
+1. Dejar este repositorio central libre de implementaciones de componentes.
+2. Auditar cada repositorio componente y confirmar que sus fuentes, pruebas, licencias y CI están completas.
+3. Fijar contratos entre core, server, CLI y UI.
+4. Crear `bittopos-packaging` y trasladar allí las recetas específicas de instalación cuando el repositorio esté disponible.
+5. Definir un manifiesto de producto con SHAs exactos y comprobaciones de compatibilidad.
+6. Unificar la coordinación de releases sin ocultar la independencia de CI de cada componente.
+7. Verificar Linux primero, FreeBSD como target explícito y Windows cuando existan pruebas reales.
 
 ## Criterio de éxito
 
-La arquitectura se considera adecuada cuando una nueva interfaz o plataforma se incorpora principalmente implementando sus adaptadores y consumiendo contratos existentes, sin reescribir el dominio; cuando el host revela solo las capacidades que puede observar con sus permisos; y cuando las operaciones locales, remotas y administrativas comparten la misma semántica.
+El repositorio central describe y compone el producto sin duplicar el código de sus componentes; cada componente tiene una fuente canónica; y cada release puede reconstruirse y auditarse a partir de commits y herramientas declarados.

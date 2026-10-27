@@ -1,85 +1,54 @@
-# Topología de repositorios y modelo de publicación
+# Topología de repositorios de Bittopos
 
-**Estado:** propuesta revisada a partir de la auditoría inicial del código actual.  
-**Objetivo:** definir una única fuente de verdad y evitar implementaciones divergentes.
+**Estado:** propuesta de organización para el rediseño experimental.
 
 ## Principio
 
-Los repositorios siguen límites estables de responsabilidad, no nombres de sistemas operativos. Linux, FreeBSD y Windows son destinos de compilación, prueba, integración y distribución; no requieren copias del dominio por sistema operativo.
+Cada repositorio tiene una responsabilidad clara y una fuente de verdad. Los repositorios de componentes mantienen el código y su CI; el repositorio central coordina la composición y publicación del producto. Los sistemas operativos son destinos de compilación, prueba e instalación, no razones para duplicar el dominio.
 
-## Hecho actual y decisión objetivo
+## Repositorios
 
-La auditoría de `main` confirma que `Bittopos/bittopos` ya contiene un workspace Rust, el paquete raíz `bittopos-core`, miembros `cli` y `server`, una SPA en `web/` y un backend Python experimental. También existen repositorios separados con otro paquete `bittopos-core`, una CLI, un servidor y una SPA.
-
-Por tanto, la propuesta anterior de tratar `bittopos/bittopos` como un hub sin código fuente contradice el estado real y la arquitectura fundacional. **La decisión propuesta es hacer de `Bittopos/bittopos` la fuente canónica del producto y su código durante el rediseño.** Los repositorios separados se mantienen temporalmente mientras se comparan; no se asumirán equivalentes ni se archivarán automáticamente.
-
-## Responsabilidades de destino
-
-| Ruta o repositorio | Responsabilidad objetivo | Estado y regla |
+| Repositorio | Responsabilidad | Regla |
 |---|---|---|
-| `Bittopos/bittopos` | Fuente canónica: workspace Rust, contratos, pruebas, documentación, aplicaciones y CI | Ya contiene un workspace y varias aplicaciones. Ampliarlo por límites reales de responsabilidad. |
-| `crates/bittopos-domain` | Entidades, valores, invariantes y reglas puras del dominio | Crear al extraer límites comprobables; no crear crates vacíos por adelantado. |
-| `crates/bittopos-application` | Casos de uso y coordinación | No conoce frameworks ni adaptadores concretos. |
-| `crates/bittopos-contracts` y `crates/bittopos-ports` | Contratos públicos, errores, eventos e interfaces requeridas | Versionados y probados; separar solo cuando aporte una frontera clara. |
-| `crates/bittopos-storage` | Adaptadores de persistencia y transacciones | El dominio no depende de SQLite, TOML, archivos ni servicios externos. |
-| `crates/bittopos-inventory` | Modelo y procedencia de observaciones de host | Diferencia hardware/software del host del producto que se administra. |
-| `crates/bittopos-observability` | Salud, métricas, trazas y correlación | Separa métricas de infraestructura y métricas de producto. |
-| `crates/bittopos-runtime` | Configuración, ciclo de vida, apagado y señales | Encapsula diferencias de sistema operativo mediante adaptadores. |
-| `apps/web` | SPA web | Comparar primero con `web/` y `bittopos-ui`; elegir una sola versión canónica. |
-| `apps/android` | Cliente Android nativo | Incorporar cuando exista código y requisitos reales de plataforma. |
-| `apps/desktop` | Shell de escritorio | Solo si hay integración nativa que justifique una aplicación separada. |
-| `platforms/linux`, `platforms/freebsd`, `platforms/windows` | Adaptadores, pruebas y configuración específicos | Añadir código real por plataforma; nunca duplicar reglas de dominio. |
-| `deploy/` y `packaging/` | Servicios, instalaciones, paquetes y pruebas de instalación | Mantener recetas pequeñas y verificables junto al producto mientras no exista un motivo de propiedad independiente. |
+| `Bittopos/bittopos` | Visión, arquitectura transversal, contratos de producto, matriz de compatibilidad, manifiestos y orquestación de releases | No alberga implementaciones de componentes ni recetas específicas de distribución. |
+| `Bittopos/bittopos-core` | Modelo y lógica fundamental del producto | Única fuente canónica del core. |
+| `Bittopos/bittopos-server` | API, autenticación, autorización y ejecución del servicio | Consume el core mediante una frontera explícita. |
+| `Bittopos/bittopos-cli` | CLI para personas operadoras y automatización | No duplica reglas del dominio. |
+| `Bittopos/bittopos-ui` | Interfaz web | Consume contratos documentados del servidor. |
+| `Bittopos/bittopos-packaging` | Paquetes, recetas de instalación, manifiestos de distribución y pruebas de instalación | Se creará por separado; no asumir que ya existe. |
 
-## Tratamiento de los repositorios separados actuales
+## Reglas de límites
 
-- `bittopos-core`: comparar su historial, módulos, persistencia y pruebas con el paquete raíz del mismo nombre. Declarar un ganador tras una comparación explícita, no por nombre ni por tamaño.
-- `bittopos-server`: comparar con `server/`, incluidas autenticación, sesión, SQLite, configuración, Docker y licencias.
-- `bittopos-cli`: comparar con `cli/`, incluidos nombres de comandos, formatos, pruebas y licencias.
-- `bittopos-ui`: comparar con `web/`, incluidos adaptador API, orígenes de despliegue, validaciones y licencias.
+1. Cada componente mantiene su código, pruebas, documentación local y CI en su repositorio.
+2. El repositorio central mantiene documentación transversal y manifiestos que fijan SHAs exactos de cada componente.
+3. Las releases nunca dependen de ramas móviles: cada componente se referencia por commit inmutable.
+4. Las recetas de paquetes, servicios de sistema y configuración específica de instalación viven en `bittopos-packaging`, no en repositorios por SO.
+5. Un adaptador específico de Linux, FreeBSD o Windows vive en el componente al que pertenece, salvo que sea una receta de empaquetado.
+6. No crear repositorios de Android, iOS o escritorio hasta que exista una aplicación nativa con propiedad y ciclo de publicación propios.
+7. No borrar ni archivar los repositorios actuales de componentes como parte de la limpieza del repositorio central.
 
-Hasta completar esas comparaciones, no hacer nuevas funciones que deban mantenerse en paralelo. Los repositorios pueden quedar como archivos de transición o convertirse después en repositorios de distribución solo si existe una necesidad demostrable. La decisión final se documentará antes de cualquier archivo o renombre.
+## Manifiesto de producto
 
-No crear ahora un repositorio de empaquetado solo por anticipación: primero evaluar si `packaging/` y `deploy/` dentro del monorepo cubren las necesidades. Separarlo más adelante solo si tiene ciclo de publicación, permisos o responsables realmente independientes.
+Un manifiesto de release debe registrar al menos:
 
-## Límites de dependencia
+- versión y canal de Bittopos;
+- SHA y versión de core, server, CLI y UI;
+- SHA de packaging si interviene en la release;
+- destinos soportados y toolchains;
+- pruebas requeridas y su resultado;
+- artefactos resultantes, checksums y metadatos de procedencia.
 
-1. El dominio no depende del sistema operativo, red, UI, framework HTTP ni motor de persistencia.
-2. Los casos de uso consumen contratos/puertos; adaptadores concretos se conectan en los puntos de entrada.
-3. Servidor, CLI y clientes llaman a los mismos casos de uso o consumen los mismos contratos; no reimplementan reglas de negocio.
-4. La aplicación normal no necesita privilegios de administrador. La recopilación de inventario usa permisos mínimos y comunica explícitamente capacidades no disponibles.
-5. Las observaciones de host incluyen fuente, instante, alcance y confianza. Falta de permiso significa desconocido/no accesible, no inexistente.
-6. No introducir capas genéricas ni repositorios por SO sin una variación real, una frontera de seguridad o un ciclo de mantenimiento independiente.
+La matriz de compatibilidad debe declarar qué combinaciones de versiones de componentes han sido probadas. Si una combinación no está probada, se marca como tal y no se supone compatible.
 
-## Publicaciones reproducibles
+## Política de cambios
 
-La fuente canónica publica releases de producto con:
-- versión y canal de producto;
-- SHA inmutable del commit y versión de cada componente relevante;
-- targets y versiones mínimas soportadas;
-- toolchain, features y configuración de compilación;
-- resultados de pruebas, limitaciones conocidas y procedencia;
-- nombres de artefactos, checksums SHA-256 y firmas/metadatos verificables cuando estén configurados.
+Los cambios transversales se coordinan mediante PRs en los repositorios afectados. El repositorio central no copia el código de los componentes: actualiza los manifiestos y documentación después de que las revisiones de cada componente hayan sido aprobadas.
 
-Los archivos de código fuente y los paquetes binarios se identifican por separado. Un archivo `.tar.gz` de fuentes no se presenta como binario portable. Nunca se construye una release desde una rama móvil ni se sobrescriben artefactos publicados.
+## Migración
 
-## Secuencia de migración
-
-1. Auditar contenidos, historiales, licencias, dependencias, workflows y despliegues de cada repositorio.
-2. Comparar las implementaciones actuales y elegir la fuente canónica de cada responsabilidad.
-3. Definir modelo de dominio, contratos, persistencia y límites de seguridad antes de reorganizar módulos.
-4. Reestructurar el workspace en cambios pequeños, conservando los avisos de licencia por componente.
-5. Unificar CI y pruebas de contrato/integración; comprobar instalación limpia y recuperación.
-6. Añadir pruebas reales para Linux y FreeBSD; mantener Windows como target previsto y verificarlo antes de anunciar soporte.
-7. Crear manifiestos de releases y ensamblado de fuentes/artefactos a partir de commits exactos.
-8. Solo tras validar la migración, decidir si los repositorios separados se archivan, redirigen o siguen con un papel distinto.
-
-## Seguridad y cambios incompatibles
-
-Bittopos sigue en fase experimental y no promete compatibilidad con APIs, CLI ni formatos todavía en diseño. Los cambios incompatibles se pueden adoptar deliberadamente, pero los datos persistentes no se deben destruir silenciosamente: toda reinicialización o migración debe ser explícita y documentada.
-
-La autenticación actual del servidor se describe como una barrera temporal de desarrollo de un solo administrador. No se debe declarar listo para producción multiusuario ni exponerlo a Internet hasta completar la revisión de autenticación, autorización por recurso, protección CSRF, limitación de intentos, gestión de sesiones, HTTPS y pruebas de seguridad pertinentes.
-
-## Criterio de éxito
-
-Existe una sola implementación canónica del dominio; las interfaces comparten su semántica; los targets se verifican con pruebas y artefactos reproducibles; y cada repositorio que permanezca separado tiene una frontera de propiedad justificada.
+1. Mantener el historial del repositorio central y retirar de su árbol actual el código fuente de los componentes y la configuración de compilación que solo les corresponde.
+2. Conservar la documentación de arquitectura, la visión del producto, la licencia aplicable al repositorio y las reglas de contribución de este repositorio.
+3. Retirar workflows que compilan el código eliminado y sustituirlos por coordinación de releases cuando el proceso esté definido y probado.
+4. Crear `bittopos-packaging` y trasladar allí recetas y pruebas de instalación, sin copiar implementaciones del dominio.
+5. Confirmar que cada componente separado compila y mantiene sus fuentes antes de considerar terminada la transición.
+6. No eliminar, renombrar ni archivar repositorios de componentes durante esta migración.
