@@ -1,82 +1,85 @@
-# Repository topology and release model
+# Topología de repositorios y modelo de publicación
 
-**Status:** proposed canonical repository topology  
-**Scope:** repository responsibilities, naming, artifact production and release ownership.
+**Estado:** propuesta revisada a partir de la auditoría inicial del código actual.  
+**Objetivo:** definir una única fuente de verdad y evitar implementaciones divergentes.
 
-## Principle
+## Principio
 
-Repositories follow stable engineering/product boundaries, not operating-system names. Operating systems are build and packaging targets, not separate implementations of Bittopos. A platform-specific repository is justified only when it contains independently maintained platform integration or packaging—not a copied version of the application source.
+Los repositorios siguen límites estables de responsabilidad, no nombres de sistemas operativos. Linux, FreeBSD y Windows son destinos de compilación, prueba, integración y distribución; no requieren copias del dominio por sistema operativo.
 
-## Canonical repository roles
+## Hecho actual y decisión objetivo
 
-| Repository | Responsibility | Contains | Must not contain |
-|---|---|---|---|
-| `Bittopos/bittopos` | Product hub, documentation and release orchestration | Product overview, architecture/docs, release manifests pinning component revisions, release workflows, checksums, signatures, release notes, generated source bundles and published artifacts | Authoritative copies of component implementation code |
-| `Bittopos/bittopos-core` | Core domain and engine | Domain model, invariants, core operations and tests | UI, host-specific service management, HTTP framework details |
-| `Bittopos/bittopos-server` | Network/server application | API, identity, authorization, server assembly and remote operation | Duplicated domain rules |
-| `Bittopos/bittopos-cli` | Terminal interface and automation | CLI commands, output formats, shell completion and CLI tests | A second implementation of domain operations |
-| `Bittopos/bittopos-ui` | Current UI component; scope must be audited before renaming | Existing UI until the product surface is classified | Release bundles or copies of core/server source |
-| `Bittopos/bittopos-packaging` | Platform packaging and installation recipes | Linux packages, FreeBSD packages/ports recipes, service definitions, filesystem layout, signing and packaging tests | A fork/copy of the main implementation |
+La auditoría de `main` confirma que `Bittopos/bittopos` ya contiene un workspace Rust, el paquete raíz `bittopos-core`, miembros `cli` y `server`, una SPA en `web/` y un backend Python experimental. También existen repositorios separados con otro paquete `bittopos-core`, una CLI, un servidor y una SPA.
 
-### Conditional repositories
+Por tanto, la propuesta anterior de tratar `bittopos/bittopos` como un hub sin código fuente contradice el estado real y la arquitectura fundacional. **La decisión propuesta es hacer de `Bittopos/bittopos` la fuente canónica del producto y su código durante el rediseño.** Los repositorios separados se mantienen temporalmente mientras se comparan; no se asumirán equivalentes ni se archivarán automáticamente.
 
-Create these only when they have real independently maintained code:
+## Responsabilidades de destino
 
-- `Bittopos/bittopos-android`: Android application, platform lifecycle, permissions, packaging and Play Store configuration.
-- `Bittopos/bittopos-ios`: iOS application and App Store configuration.
-- `Bittopos/bittopos-desktop`: only if desktop shell/platform integration is a separate product component rather than a thin packaging of the UI.
-- `Bittopos/bittopos-spec`: only if contracts need a separate release cadence and consumers; otherwise keep canonical schemas with the owning component or in the product hub.
+| Ruta o repositorio | Responsabilidad objetivo | Estado y regla |
+|---|---|---|
+| `Bittopos/bittopos` | Fuente canónica: workspace Rust, contratos, pruebas, documentación, aplicaciones y CI | Ya contiene un workspace y varias aplicaciones. Ampliarlo por límites reales de responsabilidad. |
+| `crates/bittopos-domain` | Entidades, valores, invariantes y reglas puras del dominio | Crear al extraer límites comprobables; no crear crates vacíos por adelantado. |
+| `crates/bittopos-application` | Casos de uso y coordinación | No conoce frameworks ni adaptadores concretos. |
+| `crates/bittopos-contracts` y `crates/bittopos-ports` | Contratos públicos, errores, eventos e interfaces requeridas | Versionados y probados; separar solo cuando aporte una frontera clara. |
+| `crates/bittopos-storage` | Adaptadores de persistencia y transacciones | El dominio no depende de SQLite, TOML, archivos ni servicios externos. |
+| `crates/bittopos-inventory` | Modelo y procedencia de observaciones de host | Diferencia hardware/software del host del producto que se administra. |
+| `crates/bittopos-observability` | Salud, métricas, trazas y correlación | Separa métricas de infraestructura y métricas de producto. |
+| `crates/bittopos-runtime` | Configuración, ciclo de vida, apagado y señales | Encapsula diferencias de sistema operativo mediante adaptadores. |
+| `apps/web` | SPA web | Comparar primero con `web/` y `bittopos-ui`; elegir una sola versión canónica. |
+| `apps/android` | Cliente Android nativo | Incorporar cuando exista código y requisitos reales de plataforma. |
+| `apps/desktop` | Shell de escritorio | Solo si hay integración nativa que justifique una aplicación separada. |
+| `platforms/linux`, `platforms/freebsd`, `platforms/windows` | Adaptadores, pruebas y configuración específicos | Añadir código real por plataforma; nunca duplicar reglas de dominio. |
+| `deploy/` y `packaging/` | Servicios, instalaciones, paquetes y pruebas de instalación | Mantener recetas pequeñas y verificables junto al producto mientras no exista un motivo de propiedad independiente. |
 
-Do not create `bittopos-linux`, `bittopos-freebsd`, `bittopos-openbsd`, etc. merely to host the same source. Platform differences belong in the packaging repository and platform adapters in the relevant component. If a future OS needs a substantial native implementation, reassess that decision based on concrete code.
+## Tratamiento de los repositorios separados actuales
 
-## What the product hub releases
+- `bittopos-core`: comparar su historial, módulos, persistencia y pruebas con el paquete raíz del mismo nombre. Declarar un ganador tras una comparación explícita, no por nombre ni por tamaño.
+- `bittopos-server`: comparar con `server/`, incluidas autenticación, sesión, SQLite, configuración, Docker y licencias.
+- `bittopos-cli`: comparar con `cli/`, incluidos nombres de comandos, formatos, pruebas y licencias.
+- `bittopos-ui`: comparar con `web/`, incluidos adaptador API, orígenes de despliegue, validaciones y licencias.
 
-The hub creates one release per Bittopos product version. Its release manifest records the exact immutable commit/tag of each required component and the build toolchain/configuration. CI checks out those revisions, builds them, assembles the source bundle and platform artifacts, and publishes them as release assets.
+Hasta completar esas comparaciones, no hacer nuevas funciones que deban mantenerse en paralelo. Los repositorios pueden quedar como archivos de transición o convertirse después en repositorios de distribución solo si existe una necesidad demostrable. La decisión final se documentará antes de cualquier archivo o renombre.
 
-The hub orchestrates release builds; it does not push copies of application code to platform repositories. Publishing artifacts is different from synchronizing source trees. Source repositories remain authoritative for their own code and tags.
+No crear ahora un repositorio de empaquetado solo por anticipación: primero evaluar si `packaging/` y `deploy/` dentro del monorepo cubren las necesidades. Separarlo más adelante solo si tiene ciclo de publicación, permisos o responsables realmente independientes.
 
-A release manifest should contain, at minimum:
+## Límites de dependencia
 
-- product version and release channel;
-- component repository, immutable commit SHA and component version;
-- supported target triples and minimum platform versions;
-- build profile/features and toolchain versions;
-- artifact filenames, SHA-256 checksums, and signatures/provenance;
-- test results and known platform limitations.
+1. El dominio no depende del sistema operativo, red, UI, framework HTTP ni motor de persistencia.
+2. Los casos de uso consumen contratos/puertos; adaptadores concretos se conectan en los puntos de entrada.
+3. Servidor, CLI y clientes llaman a los mismos casos de uso o consumen los mismos contratos; no reimplementan reglas de negocio.
+4. La aplicación normal no necesita privilegios de administrador. La recopilación de inventario usa permisos mínimos y comunica explícitamente capacidades no disponibles.
+5. Las observaciones de host incluyen fuente, instante, alcance y confianza. Falta de permiso significa desconocido/no accesible, no inexistente.
+6. No introducir capas genéricas ni repositorios por SO sin una variación real, una frontera de seguridad o un ciclo de mantenimiento independiente.
 
-## Source and binary distribution
+## Publicaciones reproducibles
 
-For supported Unix-like systems, publish clearly named source bundles such as:
+La fuente canónica publica releases de producto con:
+- versión y canal de producto;
+- SHA inmutable del commit y versión de cada componente relevante;
+- targets y versiones mínimas soportadas;
+- toolchain, features y configuración de compilación;
+- resultados de pruebas, limitaciones conocidas y procedencia;
+- nombres de artefactos, checksums SHA-256 y firmas/metadatos verificables cuando estén configurados.
 
-- `bittopos-<version>-source-unix.tar.gz` — generated bundle of the pinned source components needed for the Unix source distribution, excluding Android/iOS code as the product policy specifies;
-- optionally `bittopos-<version>-source.tar.gz` — complete source bundle when useful for developers;
-- platform-specific binary/package artifacts generated by CI, e.g. Linux archives/packages and FreeBSD packages/archives where supported.
+Los archivos de código fuente y los paquetes binarios se identifican por separado. Un archivo `.tar.gz` de fuentes no se presenta como binario portable. Nunca se construye una release desde una rama móvil ni se sobrescriben artefactos publicados.
 
-Do not label a source archive as a portable binary. A `.tar.gz` containing source does not automatically run on every OS; build dependencies, target architectures, libc/ABI and platform support must be documented. Provide checksums and signed release metadata. GitHub's automatic source archives for the hub alone will contain the hub repository, not all component repositories; the release pipeline must explicitly assemble the product source bundle from pinned revisions.
+## Secuencia de migración
 
-Android and iOS releases belong in their respective stores and platform release channels. They may still have source repositories and tagged source code, but their app packages need not be included in the Unix source bundle.
+1. Auditar contenidos, historiales, licencias, dependencias, workflows y despliegues de cada repositorio.
+2. Comparar las implementaciones actuales y elegir la fuente canónica de cada responsabilidad.
+3. Definir modelo de dominio, contratos, persistencia y límites de seguridad antes de reorganizar módulos.
+4. Reestructurar el workspace en cambios pequeños, conservando los avisos de licencia por componente.
+5. Unificar CI y pruebas de contrato/integración; comprobar instalación limpia y recuperación.
+6. Añadir pruebas reales para Linux y FreeBSD; mantener Windows como target previsto y verificarlo antes de anunciar soporte.
+7. Crear manifiestos de releases y ensamblado de fuentes/artefactos a partir de commits exactos.
+8. Solo tras validar la migración, decidir si los repositorios separados se archivan, redirigen o siguen con un papel distinto.
 
-## Dependency and version policy
+## Seguridad y cambios incompatibles
 
-- Components own their source and component tags.
-- The product hub owns the product-level release manifest and release notes.
-- Product releases pin exact component commits; never build a release from moving `main` branches.
-- Use automated compatibility/integration tests against the exact pinned revisions.
-- Prefer one coordinated product release train initially; independent component releases can be introduced when their interfaces and ownership justify it.
-- Avoid cross-repository submodules as the required consumer workflow. A manifest plus CI checkout is easier to reproduce and audit.
-- Never overwrite published release artifacts. Publish a new version for corrected artifacts and retain checksums/signatures.
+Bittopos sigue en fase experimental y no promete compatibilidad con APIs, CLI ni formatos todavía en diseño. Los cambios incompatibles se pueden adoptar deliberadamente, pero los datos persistentes no se deben destruir silenciosamente: toda reinicialización o migración debe ser explícita y documentada.
 
-## Migration sequence
+La autenticación actual del servidor se describe como una barrera temporal de desarrollo de un solo administrador. No se debe declarar listo para producción multiusuario ni exponerlo a Internet hasta completar la revisión de autenticación, autorización por recurso, protección CSRF, limitación de intentos, gestión de sesiones, HTTPS y pruebas de seguridad pertinentes.
 
-1. Audit every existing repository: contents, ownership, build outputs, consumers, duplicated files and current CI.
-2. Approve names and responsibilities before renaming or creating many repositories.
-3. Establish the product hub's release manifest and CI design.
-4. Establish packaging recipes and target matrix.
-5. Move/rewrite code into its authoritative component repository; remove duplicate implementations only after tests pass.
-6. Create Android/iOS repositories only when their actual implementation begins.
-7. Publish a test release assembled from pinned commits; verify source completeness, checksums, signatures, install/uninstall and clean-host installation.
-8. Only then archive or redirect obsolete repositories. Do not delete repository history during the initial redistribution.
+## Criterio de éxito
 
-## Decision criterion
-
-A repository is permanent only when its ownership and change boundary are independently meaningful. OS support should normally add build/test/package targets, not a new copy of the source code. The product hub assembles reproducible releases; it is not a mirror farm.
+Existe una sola implementación canónica del dominio; las interfaces comparten su semántica; los targets se verifican con pruebas y artefactos reproducibles; y cada repositorio que permanezca separado tiene una frontera de propiedad justificada.
