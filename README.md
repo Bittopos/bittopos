@@ -1,91 +1,36 @@
 # Bittopos
 
-Bittopos es un **sistema de estructuración semántica y control de ejecución**. Su modelo local se construye con recursos reutilizables, instancias organizadas en una estructura y una resolución que determina los datos efectivos.
+Bittopos es un producto compuesto por componentes independientes. Este repositorio es el **centro de coordinación del producto**, no el repositorio fuente del núcleo, el servidor, la CLI ni la interfaz.
 
-## Modelo
+## Responsabilidades de este repositorio
 
-- **Recurso:** archivo TOML individual con una definición reutilizable.
-- **Estructura:** archivo JSON que organiza las instancias. Es el espacio de trabajo; no son dos entidades distintas.
-- **Instancia:** aparición identificable de un recurso dentro de la estructura.
-- **Segmento:** parte identificable de un recurso; también puede existir solo en una instancia.
-- **Máscara:** segmento de instancia que guarda diferencias locales respecto al recurso.
-- **Resolución semántica:** obtiene los datos efectivos aplicando las reglas de herencia y las diferencias locales.
+- Mantener la visión del producto y la arquitectura transversal.
+- Documentar la topología de repositorios, contratos entre componentes y políticas de versiones.
+- Coordinar releases mediante manifiestos que fijan commits inmutables de los componentes.
+- Documentar la generación y publicación de archivos fuente, artefactos, checksums y procedencia.
+- Mantener workflows de coordinación y publicación cuando hayan sido probados.
 
-El recurso conserva los datos compartidos. La estructura conserva las instancias y su organización. La resolución no debe duplicar la definición completa para cada instancia.
+## Repositorios de componentes
 
-## Estado actual
+- [bittopos-core](https://github.com/Bittopos/bittopos-core): núcleo y modelo del producto.
+- [bittopos-server](https://github.com/Bittopos/bittopos-server): servicio y API.
+- [bittopos-cli](https://github.com/Bittopos/bittopos-cli): interfaz de línea de comandos.
+- [bittopos-ui](https://github.com/Bittopos/bittopos-ui): interfaz web.
+- `bittopos-packaging`: repositorio de empaquetado y recetas de instalación, que se creará por separado.
 
-Prototipo local en Rust. La CLI `bitto` es la interfaz operativa principal. Hay una interfaz web experimental que funciona con datos del navegador y todavía no utiliza el núcleo Rust.
+Los nombres y las responsabilidades no implican que todas las plataformas estén soportadas ya. Linux será el primer destino de referencia; FreeBSD debe ser un objetivo explícito y Windows se añadirá como destino de compilación y distribución cuando pueda verificarse. Los sistemas operativos no se separan en repositorios que dupliquen el dominio.
 
-La persistencia entre archivos no es transaccional: las operaciones escriben directamente sus archivos y una interrupción puede dejar cambios parciales. No existe journal ni recuperación automática.
+## Documentación de arquitectura
 
-## Relaciones
+- [Fundamentos](docs/architecture/FOUNDATION.md)
+- [Topología de repositorios](docs/architecture/REPOSITORY-TOPOLOGY.md)
+- [Auditoría inicial](docs/architecture/INITIAL-REPOSITORY-AUDIT.md)
+- [Política de releases](docs/releases/README.md)
 
-Las relaciones son recursos de definición con identidad propia; no se instancian. Se pueden crear relaciones entre recursos o entre instancias, sin mezclar los tipos de extremos:
+## Releases reproducibles
 
-```bash
-bitto relate-resources "Relacionado con" <ID_RECURSO_ORIGEN> <ID_RECURSO_DESTINO>
-bitto relate-instances "Depende de" <ID_INSTANCIA_ORIGEN> <ID_INSTANCIA_DESTINO>
-bitto show <ID_RELACION>
-```
+Cada release debe fijar los SHAs exactos de los componentes y registrar la versión, los destinos, la configuración de compilación, las pruebas ejecutadas y los artefactos publicados. Los archivos fuente, los binarios y los paquetes de instalación se identificarán por separado. No se publicarán releases desde ramas móviles ni se sobrescribirán artefactos existentes.
 
-`bitto show <ID_RELACION>` muestra los metadatos y los extremos de la relación.
+## Estado
 
-## Inicio rápido
-
-Requisitos: Rust y Cargo. Cada perfil contiene proyectos; cada proyecto tiene un UUID propio y guarda sus recursos y estructuras dentro de su directorio. Crea el perfil y después un proyecto:
-
-```bash
-cargo run -p bitto-cli -- profile create
-cargo run -p bitto-cli -- project create "Aprender Rust" --description "Notas del lenguaje"
-cargo run -p bitto-cli -- project list
-```
-
-Si hay un único proyecto, los comandos de fichas lo seleccionan automáticamente. Si hay varios, indica `--project <UUID>`:
-
-```bash
-cargo run -p bitto-cli -- --project <UUID> create "Primera ficha"
-cargo run -p bitto-cli -- --project <UUID> show
-```
-
-Crear una definición sin instanciarla dentro de la estructura:
-
-```bash
-cargo run -p bitto-cli -- --project <UUID> create "Idea pendiente" --no-instance
-```
-
-Los datos se guardan bajo `BITTOPOS_HOME` si está definida esa variable; por defecto se usa `~/.local/share/bittopos/`.
-
-## Servidor HTTP y frontend
-
-El servicio HTTP Rust está en `server/`, reutiliza el núcleo y ofrece inicio de sesión de desarrollo y operaciones por perfil/proyecto. Consulta [la guía del servidor](server/README.md). La imagen Docker se construye desde la raíz con `docker build -t bittopos-server .` y necesita un volumen persistente para SQLite.
-
-Licencias por componente: núcleo Rust (`Cargo.toml`) bajo Apache-2.0; CLI (`cli/`) y frontend (`web/`) bajo MPL-2.0; servidor HTTP (`server/`) bajo GNU AGPLv3. Cada componente incluye el texto completo de su licencia en su directorio (la licencia del núcleo está en la raíz). El adaptador Python/SQLite de `backend/` sigue siendo experimental y no es el servidor remoto recomendado. Consulta [la guía web](web/README.md), [la guía del backend](backend/README.md) y [el límite arquitectónico](docs/api-backed-frontend.md).
-
-## Adaptador Python experimental
-
-El directorio `backend/` conserva el prototipo Python/SQLite usado durante la exploración del frontend; no es el servidor remoto objetivo. La aplicación en desarrollo utiliza el servidor Rust de `server/`. Consulta [la guía web](web/README.md), [la guía del servidor](server/README.md) y [la documentación histórica del adaptador](backend/README.md).
-
-## Verificación
-
-Desde la raíz:
-
-```bash
-cargo fmt --all -- --check
-cargo build --workspace --locked
-cargo test --workspace --locked
-git diff --check
-npm --prefix web run check
-python -m unittest discover -s backend/tests -v
-```
-
-## Documentación
-
-- [Visión](docs/VISION.md): propósito y dirección.
-- [Modelo](docs/model.md): conceptos y reglas semánticas.
-- [Arquitectura](docs/architecture.md): archivos, módulos y flujo de datos.
-- [Persistencia SQLite](docs/database-storage.md): esquema estructurado para perfiles, proyectos, recursos e instancias.
-- [Guía de desarrollo](docs/DEVELOPMENT-GUIDE.md): cambios pequeños y comandos.
-- [Contribución](CONTRIBUTING.md): ramas y Pull Requests.
-
-La documentación describe el comportamiento vigente. Las decisiones sustituidas y los contratos históricos no se conservan como parte de la documentación operativa.
+El producto está en rediseño experimental. Las propuestas de arquitectura se revisan mediante pull requests. No se debe interpretar la presencia de un componente o de un destino en la documentación como garantía de que está listo para producción.
